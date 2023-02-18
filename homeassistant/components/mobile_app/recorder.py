@@ -12,6 +12,7 @@ def exclude_attributes(hass: HomeAssistant) -> set[str]:
         "Available",
         "Available (Important)",
         "Available (Opportunistic)",
+        "Location",  # duplicate of device_tracker
         # Mac app
         "Current Capacity",
         "Current",
@@ -23,7 +24,7 @@ def exclude_attributes(hass: HomeAssistant) -> set[str]:
         "light",
         "motion",
         "timestamp",
-        "location",
+        "location",  # duplicate of device_tracker
         "in_vehicle",
         "on_bicycle",
         "on_foot",
