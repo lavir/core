@@ -337,6 +337,7 @@ class DoorBirdRequestView(HomeAssistantView):
 
     async def get(self, request, event):
         """Respond to requests from the device."""
+        _LOGGER.warning("DoorBird request: %s", event)
         hass = request.app["hass"]
 
         token = request.query.get("token")
@@ -344,6 +345,7 @@ class DoorBirdRequestView(HomeAssistantView):
         device = get_doorstation_by_token(hass, token)
 
         if device is None:
+            _LOGGER.warning("DoorBird request rejected: %s", event)
             return web.Response(
                 status=HTTPStatus.UNAUTHORIZED, text="Invalid token provided."
             )
