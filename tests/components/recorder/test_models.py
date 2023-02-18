@@ -63,7 +63,7 @@ def test_from_event_to_db_state_attributes(entity_registry: er.EntityRegistry) -
     dialect = SupportedDialect.MYSQL
 
     db_attrs.shared_attrs = StateAttributes.shared_attrs_bytes_from_event(
-        event, entity_registry, {}, dialect
+        event, {}, {}, dialect
     )
     assert db_attrs.to_native() == attrs
 
