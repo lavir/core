@@ -148,7 +148,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             "State change events are excluded, recorder will not record state changes."
             "This will become an error in Home Assistant Core 2022.2"
         )
-    instance = hass.data[DATA_INSTANCE] = Recorder(
+    instance = Recorder(
         hass=hass,
         auto_purge=auto_purge,
         auto_repack=auto_repack,
@@ -162,6 +162,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         exclude_attributes_by_domain=exclude_attributes_by_domain,
     )
     instance.async_initialize()
+    # Do not set hass.data[DATA_INSTANCE] until after async_initialize
+    # to ensure we prime the recorder cache before we accept events
+    # to be recorded.
+    hass.data[DATA_INSTANCE] = instance
     instance.async_register()
     instance.start()
     async_register_services(hass, instance)
