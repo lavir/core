@@ -328,3 +328,15 @@ class StatisticsTimestampMigrationCleanupTask(RecorderTask):
         if not statistics.cleanup_statistics_timestamp_migration(instance):
             # Schedule a new statistics migration task if this one didn't finish
             instance.queue_task(StatisticsTimestampMigrationCleanupTask())
+
+
+@dataclass
+class PrimeCacheFromDatabaseTask(RecorderTask):
+    """Prime the LRU of event_data and state_attributes ids from the db."""
+
+    commit_before = False
+
+    def run(self, instance: Recorder) -> None:
+        """Handle the task."""
+        instance._load_recent_event_attributes()  # pylint: disable=[protected-access]
+        instance._load_recent_state_attributes()  # pylint: disable=[protected-access]

@@ -92,6 +92,7 @@ from .tasks import (
     ImportStatisticsTask,
     KeepAliveTask,
     PerodicCleanupTask,
+    PrimeCacheFromDatabaseTask,
     PurgeTask,
     RecorderTask,
     StatisticsTask,
@@ -619,6 +620,10 @@ class Recorder(threading.Thread):
             self.migration_in_progress = True
             self.migration_is_live = migration.live_migration(schema_status)
 
+        # Restore the attributes and event data id cache from the database
+        # as soon as we begin processing the queue
+        self.queue_task(PrimeCacheFromDatabaseTask())
+
         self.hass.add_job(self.async_connection_success)
 
         if self.migration_is_live or schema_status.valid:
@@ -857,8 +862,6 @@ class Recorder(threading.Thread):
             return
 
         shared_data = shared_data_bytes.decode("utf-8")
-        if not self._event_data_ids:
-            self._load_recent_event_attributes()
         # Matching attributes found in the pending commit
         if pending_event_data := self._pending_event_data.get(shared_data):
             dbevent.event_data_rel = pending_event_data
@@ -930,8 +933,6 @@ class Recorder(threading.Thread):
 
         shared_attrs = shared_attrs_bytes.decode("utf-8")
         dbstate.attributes = None
-        if not self._state_attributes_ids:
-            self._load_recent_state_attributes()
         # Matching attributes found in the pending commit
         if pending_attributes := self._pending_state_attributes.get(shared_attrs):
             dbstate.state_attributes = pending_attributes
