@@ -75,12 +75,7 @@ from .models import (
     process_timestamp,
 )
 from .pool import POOL_SIZE, MutexPool, RecorderPool
-from .queries import (
-    find_shared_attributes_id,
-    find_shared_data_id,
-    get_recent_shared_attributes,
-    get_recent_shared_event_data,
-)
+from .queries import find_shared_attributes_id, find_shared_data_id
 from .run_history import RunHistory
 from .tasks import (
     AdjustStatisticsTask,
@@ -92,7 +87,6 @@ from .tasks import (
     ImportStatisticsTask,
     KeepAliveTask,
     PerodicCleanupTask,
-    PrimeCacheFromDatabaseTask,
     PurgeTask,
     RecorderTask,
     StatisticsTask,
@@ -290,9 +284,6 @@ class Recorder(threading.Thread):
         self._queue_watcher = async_track_time_interval(
             self.hass, self._async_check_queue, timedelta(minutes=10)
         )
-        # Restore the attributes and event data id cache from the database
-        # as soon as we begin processing the queue
-        self.queue_task(PrimeCacheFromDatabaseTask())
 
     @callback
     def _async_keep_alive(self, now: datetime) -> None:
@@ -900,35 +891,6 @@ class Recorder(threading.Thread):
                 self.event_session.add(dbevent_data)
 
         self.event_session.add(dbevent)
-
-    def _load_recent_state_attributes(self) -> None:
-        """Load recent state attributes from the database.
-
-        Since the _state_attributes_ids cache is empty at startup
-        we restore it from the database to avoid having to look up
-        the attributes in the database for every state change
-        until its primed.
-        """
-        assert self.event_session is not None
-        with self.event_session.no_autoflush:
-            for id_, shared_attrs in self.event_session.execute(
-                get_recent_shared_attributes(STATE_ATTRIBUTES_ID_CACHE_SIZE)
-            ).fetchall():
-                self._state_attributes_ids[shared_attrs] = id_
-
-    def _load_recent_event_attributes(self) -> None:
-        """Load recent event attributes from the database.
-
-        Since the _event_data_ids cache is empty at startup
-        we restore it from the database to avoid having to look up
-        the data in the database for every event until its primed.
-        """
-        assert self.event_session is not None
-        with self.event_session.no_autoflush:
-            for id_, shared_data in self.event_session.execute(
-                get_recent_shared_event_data(EVENT_DATA_ID_CACHE_SIZE)
-            ).fetchall():
-                self._event_data_ids[shared_data] = id_
 
     def _process_state_changed_event_into_session(self, event: Event) -> None:
         """Process a state_changed event into the session."""
