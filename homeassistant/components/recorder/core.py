@@ -288,6 +288,9 @@ class Recorder(threading.Thread):
         self._queue_watcher = async_track_time_interval(
             self.hass, self._async_check_queue, timedelta(minutes=10)
         )
+        # Restore the attributes and event data id cache from the database
+        # as soon as we begin processing the queue
+        self.queue_task(PrimeCacheFromDatabaseTask())
 
     @callback
     def _async_keep_alive(self, now: datetime) -> None:
@@ -617,10 +620,6 @@ class Recorder(threading.Thread):
         else:
             self.migration_in_progress = True
             self.migration_is_live = migration.live_migration(schema_status)
-
-        # Restore the attributes and event data id cache from the database
-        # as soon as we begin processing the queue
-        self.queue_task(PrimeCacheFromDatabaseTask())
 
         self.hass.add_job(self.async_connection_success)
 
