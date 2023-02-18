@@ -487,9 +487,7 @@ class Recorder(threading.Thread):
         cache to avoid thrashing.
         """
         current_size = self._state_attributes_ids.get_size()
-        _LOGGER.warning("Current size: %s", current_size)
         new_size = self.hass.states.async_entity_ids_count() * 2
-        _LOGGER.warning("New size: %s", new_size)
         if new_size > current_size:
             self._state_attributes_ids.set_size(new_size)
 
