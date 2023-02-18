@@ -141,6 +141,29 @@ async def async_get_last_config(hass: HomeAssistant) -> dict[str, Any] | None:
     return await store.async_load()
 
 
+async def _async_check_internal_ssl(hass: HomeAssistant) -> bool:
+    """Check if internal URL has valid SSL."""
+    try:
+        internal_ssl_url = get_url(
+            hass,
+            allow_internal=True,
+            allow_external=False,
+            allow_cloud=False,
+            require_ssl=True,
+        )
+    except NoURLAvailableError:
+        return False
+
+    session = async_get_clientsession(hass, verify_ssl=True)
+    with contextlib.suppress(
+        ClientConnectorCertificateError, ClientError, asyncio.TimeoutError
+    ):
+        async with session.get(internal_ssl_url, timeout=5, allow_redirects=False):
+            return True
+
+    return False
+
+
 @dataclass
 class ApiConfig:
     """Configuration settings for API server."""
@@ -149,7 +172,7 @@ class ApiConfig:
     host: str
     port: int
     use_ssl: bool
-    internal_url_has_valid_ssl: bool
+    internal_url_has_valid_ssl: bool | None
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -192,16 +215,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         """Stop the server."""
         await server.stop()
 
-    async def start_server(*_: Any) -> None:
-        """Start the server."""
-        with async_start_setup(hass, ["http"]):
-            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_server)
-            # We already checked it's not None.
-            assert conf is not None
-            await start_http_server_and_save_config(hass, dict(conf), server)
-
-    async_when_setup_or_start(hass, "frontend", start_server)
-
     hass.http = server
 
     local_ip = await async_get_source_ip(hass)
@@ -211,32 +224,28 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         # Assume the first server host name provided as API host
         host = server_host[0]
 
-    internal_url_has_valid_ssl = False
-    try:
-        internal_ssl_url = get_url(
-            hass,
-            allow_internal=True,
-            allow_external=False,
-            allow_cloud=False,
-            require_ssl=True,
-        )
-    except NoURLAvailableError:
-        pass
-    else:
-        session = async_get_clientsession(hass, verify_ssl=True)
-        with contextlib.suppress(
-            ClientConnectorCertificateError, ClientError, asyncio.TimeoutError
-        ):
-            async with session.get(internal_ssl_url, timeout=5, allow_redirects=False):
-                internal_url_has_valid_ssl = True
-
-    hass.config.api = ApiConfig(
+    api_config = ApiConfig(
         local_ip,
         host,
         server_port,
         ssl_certificate is not None,
-        internal_url_has_valid_ssl,
+        None,
     )
+
+    async def start_server(*_: Any) -> None:
+        """Start the server."""
+        with async_start_setup(hass, ["http"]):
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_server)
+            # We already checked it's not None.
+            assert conf is not None
+            await start_http_server_and_save_config(hass, dict(conf), server)
+            api_config.internal_url_has_valid_ssl = await _async_check_internal_ssl(
+                hass
+            )
+
+    async_when_setup_or_start(hass, "frontend", start_server)
+
+    hass.config.api = api_config
 
     return True
 
