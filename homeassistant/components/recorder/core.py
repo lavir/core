@@ -409,6 +409,7 @@ class Recorder(threading.Thread):
     @callback
     def _async_hass_started(self, hass: HomeAssistant) -> None:
         """Notify that hass has started."""
+        self.async_adjust_lru()
         self._hass_started.set_result(None)
 
     @callback
@@ -677,7 +678,6 @@ class Recorder(threading.Thread):
 
         _LOGGER.debug("Recorder processing the queue")
         self.hass.add_job(self._async_set_recorder_ready_migration_done)
-        self.async_adjust_lru()
         self._run_event_loop()
 
     def _run_event_loop(self) -> None:
