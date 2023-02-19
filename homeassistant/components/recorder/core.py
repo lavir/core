@@ -689,16 +689,41 @@ class Recorder(threading.Thread):
         # Use a session for the event read loop
         # with a commit every time the event time
         # has changed. This reduces the disk io.
+        queue = self._queue
+        startup_tasks = list(queue.get_nowait())  # type: ignore[call-overload]
+        self._pre_process_startup_tasks(startup_tasks)
+        for task in startup_tasks:
+            self._guarded_process_one_task_or_recover(task)
+
         self.stop_requested = False
         while not self.stop_requested:
-            task = self._queue.get()
-            _LOGGER.debug("Processing task: %s", task)
-            try:
-                self._process_one_task_or_recover(task)
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.exception("Error while processing event %s: %s", task, err)
-
+            self._guarded_process_one_task_or_recover(queue.get())
         self._shutdown()
+
+    def _pre_process_startup_tasks(self, startup_tasks: list[RecorderTask]) -> None:
+        """Pre process startup tasks."""
+        # Prime all the state_attributes and event_data caches
+        # before we start processing events
+        state_change_events = []
+        non_state_change_events = []
+
+        for task in startup_tasks:
+            if isinstance(task, EventTask):
+                if task.event.event_type == EVENT_STATE_CHANGED:
+                    state_change_events.append(task)
+                else:
+                    non_state_change_events.append(task)
+
+        self._pre_process_state_change_events(state_change_events)
+        self._pre_process_non_state_change_events(non_state_change_events)
+
+    def _guarded_process_one_task_or_recover(self, task: RecorderTask) -> None:
+        """Process a task, guarding against exceptions to ensure the loop does not collapse."""
+        _LOGGER.debug("Processing task: %s", task)
+        try:
+            self._process_one_task_or_recover(task)
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.exception("Error while processing event %s: %s", task, err)
 
     def _process_one_task_or_recover(self, task: RecorderTask) -> None:
         """Process an event, reconnect, or recover a malformed database."""
