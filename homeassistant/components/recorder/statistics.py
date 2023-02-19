@@ -2075,7 +2075,7 @@ def _sorted_statistics_to_dict(  # noqa: C901
             session, need_stat_at_start_time, table, start_time, types
         ):
             for stat in tmp:
-                stats_by_meta_id[stat[metadata_id_idx]].insert(0, stat)
+                stats_by_meta_id[stat[0]].insert(0, stat)
 
     # Figure out which fields we need to extract from the SQL result
     # and which indices they have in the result so we can avoid the overhead
