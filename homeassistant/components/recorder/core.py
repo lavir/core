@@ -694,15 +694,17 @@ class Recorder(threading.Thread):
         # Use a session for the event read loop
         # with a commit every time the event time
         # has changed. This reduces the disk io.
-        queue = self._queue
-        startup_tasks = list(queue.get_nowait())  # type: ignore[call-overload]
+        queue_ = self._queue
+        startup_tasks: list[RecorderTask] = []
+        while task := queue_.get_nowait():
+            startup_tasks.append(task)
         self._pre_process_startup_tasks(startup_tasks)
         for task in startup_tasks:
             self._guarded_process_one_task_or_recover(task)
 
         self.stop_requested = False
         while not self.stop_requested:
-            self._guarded_process_one_task_or_recover(queue.get())
+            self._guarded_process_one_task_or_recover(queue_.get())
         self._shutdown()
 
     def _pre_process_startup_tasks(self, startup_tasks: list[RecorderTask]) -> None:
