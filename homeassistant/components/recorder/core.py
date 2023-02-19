@@ -688,6 +688,7 @@ class Recorder(threading.Thread):
         self._adjust_lru_size()
         self.hass.add_job(self._async_set_recorder_ready_migration_done)
         self._run_event_loop()
+        self._shutdown()
 
     def _run_event_loop(self) -> None:
         """Run the event loop for the recorder."""
@@ -705,7 +706,6 @@ class Recorder(threading.Thread):
         self.stop_requested = False
         while not self.stop_requested:
             self._guarded_process_one_task_or_recover(queue_.get())
-        self._shutdown()
 
     def _pre_process_startup_tasks(self, startup_tasks: list[RecorderTask]) -> None:
         """Pre process startup tasks."""
@@ -1113,11 +1113,11 @@ class Recorder(threading.Thread):
 
     def _close_event_session(self) -> None:
         """Close the event session."""
-        self._old_states = {}
-        self._state_attributes_ids = {}
-        self._event_data_ids = {}
-        self._pending_state_attributes = {}
-        self._pending_event_data = {}
+        self._old_states.clear()
+        self._state_attributes_ids.clear()
+        self._event_data_ids.clear()
+        self._pending_state_attributes.clear()
+        self._pending_event_data.clear()
 
         if not self.event_session:
             return
@@ -1340,6 +1340,7 @@ class Recorder(threading.Thread):
 
     def _shutdown(self) -> None:
         """Save end time for current run."""
+        _LOGGER.debug("Shutting down recorder")
         self.hass.add_job(self._async_stop_listeners)
         self._stop_executor()
         try:
