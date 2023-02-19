@@ -53,6 +53,7 @@ from .const import (
     MAX_QUEUE_BACKLOG,
     MYSQLDB_PYMYSQL_URL_PREFIX,
     MYSQLDB_URL_PREFIX,
+    SQLITE_MAX_BIND_VARS,
     SQLITE_URL_PREFIX,
     SupportedDialect,
 )
@@ -104,6 +105,7 @@ from .tasks import (
 )
 from .util import (
     build_mysqldb_conv,
+    chunked,
     dburl_to_path,
     end_incomplete_runs,
     is_second_sunday,
@@ -742,10 +744,11 @@ class Recorder(threading.Thread):
             )
         ]:
             with self.event_session.no_autoflush:
-                for id_, shared_attrs in self.event_session.execute(
-                    get_shared_attributes(hashes)
-                ).fetchall():
-                    self._state_attributes_ids[shared_attrs] = id_
+                for hash_chunk in chunked(hashes, SQLITE_MAX_BIND_VARS):
+                    for id_, shared_attrs in self.event_session.execute(
+                        get_shared_attributes(hash_chunk)
+                    ).fetchall():
+                        self._state_attributes_ids[shared_attrs] = id_
 
     def _pre_process_non_state_change_events(self, events: list[Event]) -> None:
         """Load startup event attributes from the database.
@@ -761,10 +764,11 @@ class Recorder(threading.Thread):
             if (shared_event_bytes := self._serialize_event_data_from_event(event))
         ]:
             with self.event_session.no_autoflush:
-                for id_, shared_data in self.event_session.execute(
-                    get_shared_event_datas(hashes)
-                ).fetchall():
-                    self._event_data_ids[shared_data] = id_
+                for hash_chunk in chunked(hashes, SQLITE_MAX_BIND_VARS):
+                    for id_, shared_data in self.event_session.execute(
+                        get_shared_event_datas(hash_chunk)
+                    ).fetchall():
+                        self._event_data_ids[shared_data] = id_
 
     def _guarded_process_one_task_or_recover(self, task: RecorderTask) -> None:
         """Process a task, guarding against exceptions to ensure the loop does not collapse."""
