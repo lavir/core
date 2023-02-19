@@ -696,7 +696,7 @@ class Recorder(threading.Thread):
         # has changed. This reduces the disk io.
         queue_ = self._queue
         startup_tasks: list[RecorderTask] = []
-        while task := queue_.get_nowait():
+        while not queue_.empty() and (task := queue_.get_nowait()):
             startup_tasks.append(task)
         self._pre_process_startup_tasks(startup_tasks)
         for task in startup_tasks:
