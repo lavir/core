@@ -55,7 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Error while connecting to the gateway %s: %s", connect_info, ex)
         raise ConfigEntryNotReady from ex
 
-    coordinator = ScreenlogicDataUpdateCoordinator(hass, gateway=gateway)
+    coordinator = ScreenlogicDataUpdateCoordinator(
+        hass, config_entry=entry, gateway=gateway
+    )
 
     async_load_screenlogic_services(hass)
 
@@ -114,11 +116,11 @@ class ScreenlogicDataUpdateCoordinator(DataUpdateCoordinator):
         self,
         hass: HomeAssistant,
         *,
+        config_entry: ConfigEntry,
         gateway: ScreenLogicGateway,
     ) -> None:
         """Initialize the Screenlogic Data Update Coordinator."""
-        config_entry = self.config_entry
-        assert config_entry is not None
+        self.config_entry = config_entry
         self.gateway = gateway
 
         interval = timedelta(
