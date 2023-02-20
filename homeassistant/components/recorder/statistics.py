@@ -1011,7 +1011,7 @@ def list_statistic_ids(
         }
 
     if not statistic_ids_set or statistic_ids_set.difference(result):
-        # If we all statistic_ids, or some are missing, we need to query
+        # If we want all statistic_ids, or some are missing, we need to query
         # the integrations for the missing ones.
         #
         # Query all integrations with a registered recorder platform
@@ -2039,7 +2039,7 @@ def _statistics_at_time(
     return cast(Sequence[Row], execute_stmt_lambda_element(session, stmt))
 
 
-def _sorted_statistics_to_dict(  # noqa: C901
+def _sorted_statistics_to_dict(
     hass: HomeAssistant,
     session: Session,
     stats: Sequence[Row[Any]],
@@ -2087,7 +2087,7 @@ def _sorted_statistics_to_dict(  # noqa: C901
             session, need_stat_at_start_time, table, start_time, types
         ):
             for stat in tmp:
-                stats_by_meta_id[stat[0]].insert(0, stat)
+                stats_by_meta_id[stat[metadata_id_idx]].insert(0, stat)
 
     # Figure out which fields we need to extract from the SQL result
     # and which indices they have in the result so we can avoid the overhead
