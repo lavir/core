@@ -74,10 +74,14 @@ class ActiveConnection:
     def async_handle(self, msg: dict[str, Any]) -> None:
         """Handle a single incoming message."""
         if (
-            not (cur_id := msg.get("id"))
-            or not isinstance(cur_id, int)
-            or not (type_ := msg.get("type"))
-            or not isinstance(type_, str)
+            # Not using isinstance as we don't care about children
+            type(msg) is not dict  # pylint: disable=unidiomatic-typecheck
+            or (
+                not (cur_id := msg.get("id"))
+                or not isinstance(cur_id, int)
+                or not (type_ := msg.get("type"))
+                or not isinstance(type_, str)
+            )
         ):
             self.logger.error("Received invalid command", msg)
             self.send_message(
