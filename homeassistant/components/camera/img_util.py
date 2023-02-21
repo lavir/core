@@ -53,6 +53,14 @@ def scale_jpeg_camera_image(cam_image: Image, width: int, height: int) -> bytes:
     except OSError:
         return cam_image.content
 
+    _LOGGER.warning(
+        "Scaling camera image current=%s target=%s",
+        (current_width, current_height),
+        (width, height),
+    )
+    if current_width == width:
+        return cam_image.content
+
     scaling_factor = find_supported_scaling_factor(
         current_width, current_height, width, height
     )
