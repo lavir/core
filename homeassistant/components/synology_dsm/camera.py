@@ -5,11 +5,6 @@ from dataclasses import dataclass
 import logging
 
 from synology_dsm.api.surveillance_station import SynoCamera, SynoSurveillanceStation
-from synology_dsm.api.surveillance_station.const import (
-    SNAPSHOT_PROFILE_BALANCED,
-    SNAPSHOT_PROFILE_HIGH_QUALITY,
-    SNAPSHOT_PROFILE_LOW_BANDWIDTH,
-)
 from synology_dsm.exceptions import (
     SynologyDSMAPIErrorException,
     SynologyDSMRequestException,
@@ -158,17 +153,8 @@ class SynoDSMCamera(SynologyDSMBaseEntity[SynologyDSMCameraUpdateCoordinator], C
         )
         if not self.available:
             return None
-        if height is not None:
-            if height <= 480:
-                quality = SNAPSHOT_PROFILE_LOW_BANDWIDTH
-            elif height <= 720:
-                quality = SNAPSHOT_PROFILE_BALANCED
-            else:
-                quality = SNAPSHOT_PROFILE_HIGH_QUALITY
-        else:
-            quality = self.snapshot_quality
         try:
-            return await self._api.surveillance_station.get_camera_image(self.entity_description.key, quality)  # type: ignore[no-any-return]
+            return await self._api.surveillance_station.get_camera_image(self.entity_description.key, self.snapshot_quality)  # type: ignore[no-any-return]
         except (
             SynologyDSMAPIErrorException,
             SynologyDSMRequestException,
