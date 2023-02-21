@@ -1491,7 +1491,7 @@ pyaehw4a1==0.3.9
 pyaftership==21.11.0
 
 # homeassistant.components.airnow
-pyairnow==1.1.0
+pyairnow==1.2.1
 
 # homeassistant.components.airvisual
 # homeassistant.components.airvisual_pro
@@ -2724,7 +2724,7 @@ zigpy==0.53.0
 zm-py==0.5.2
 
 # homeassistant.components.zwave_js
-zwave-js-server-python==0.45.2
+zwave-js-server-python==0.46.0
 
 # homeassistant.components.zwave_me
 zwave_me_ws==0.3.1
