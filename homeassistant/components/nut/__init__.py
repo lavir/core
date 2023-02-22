@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 import logging
+from typing import cast
 
 import async_timeout
 from pynut2.nut2 import PyNUTClient, PyNUTError
@@ -19,13 +20,16 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     COORDINATOR,
     DEFAULT_SCAN_INTERVAL,
+    DEVICE_SUPPORTED_COMMANDS,
     DOMAIN,
+    INTEGRATION_SUPPORTED_COMMANDS,
     PLATFORMS,
     PYNUT_DATA,
     PYNUT_UNIQUE_ID,
@@ -79,6 +83,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
     status = coordinator.data
 
+    supported_commands = {
+        device_supported_command
+        for device_supported_command in data.list_commands() or {}
+        if device_supported_command in INTEGRATION_SUPPORTED_COMMANDS
+    }
+
     _LOGGER.debug("NUT Sensors Available: %s", status)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -91,6 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         COORDINATOR: coordinator,
         PYNUT_DATA: data,
         PYNUT_UNIQUE_ID: unique_id,
+        DEVICE_SUPPORTED_COMMANDS: supported_commands,
     }
 
     device_registry = dr.async_get(hass)
@@ -270,3 +281,24 @@ class PyNUTData:
         self._status = self._get_status()
         if self._device_info is None:
             self._device_info = self._get_device_info()
+
+    async def async_run_command(
+        self, hass: HomeAssistant, data: PyNUTData, command_name: str | None
+    ) -> None:
+        """Invoke instant command in UPS."""
+        try:
+            await hass.async_add_executor_job(
+                self._client.run_command, self._alias, command_name
+            )
+        except PyNUTError as err:
+            raise HomeAssistantError(
+                f"Error running command {command_name}, {err}"
+            ) from err
+
+    def list_commands(self) -> dict[str, str] | None:
+        """Fetch the list of supported commands."""
+        try:
+            return cast(dict[str, str], self._client.list_commands(self._alias))
+        except PyNUTError as err:
+            _LOGGER.error("Error retrieving supported commands %s", err)
+            return None
