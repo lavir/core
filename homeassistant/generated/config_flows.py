@@ -61,7 +61,6 @@ FLOWS = {
         "blink",
         "bluemaestro",
         "bluetooth",
-        "bluetooth_le_tracker",
         "bmw_connected_drive",
         "bond",
         "bosch_shc",
