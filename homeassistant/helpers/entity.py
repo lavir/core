@@ -520,9 +520,7 @@ class Entity(ABC):
         self._context = context
         self._context_set = dt_util.utcnow()
 
-    async def async_update_ha_state(
-        self, force_refresh: bool = False, warning: bool = True
-    ) -> None:
+    async def async_update_ha_state(self, force_refresh: bool = False) -> None:
         """Update Home Assistant with current state of entity.
 
         If force_refresh == True will update entity before setting state.
@@ -540,7 +538,7 @@ class Entity(ABC):
         # update entity data
         if force_refresh:
             try:
-                await self.async_device_update(warning)
+                await self.async_device_update()
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Update for %s fails", self.entity_id)
                 return
@@ -721,27 +719,34 @@ class Entity(ABC):
         if self.parallel_updates:
             await self.parallel_updates.acquire()
 
-        assert self.hass is not None
-        if warning:
-            update_warn = self.hass.loop.call_later(
-                SLOW_UPDATE_WARNING,
-                _LOGGER.warning,
+        try:
+            task: asyncio.Future[None]
+            if hasattr(self, "async_update"):
+                task = self.hass.async_create_task(self.async_update())
+            elif hasattr(self, "update"):
+                task = self.hass.async_add_executor_job(self.update)
+            else:
+                return
+
+            if not warning:
+                await task
+                return
+
+            finished, _ = await asyncio.wait([task], timeout=SLOW_UPDATE_WARNING)
+
+            for done in finished:
+                if exc := done.exception():
+                    raise exc
+                return
+
+            _LOGGER.warning(
                 "Update of %s is taking over %s seconds",
                 self.entity_id,
                 SLOW_UPDATE_WARNING,
             )
-
-        try:
-            if hasattr(self, "async_update"):
-                await self.async_update()
-            elif hasattr(self, "update"):
-                await self.hass.async_add_executor_job(self.update)
-            else:
-                return
+            await task
         finally:
             self._update_staged = False
-            if warning:
-                update_warn.cancel()
             if self.parallel_updates:
                 self.parallel_updates.release()
 
