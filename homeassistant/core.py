@@ -718,6 +718,7 @@ class HomeAssistant:
             task.cancel()
 
         self.exit_code = exit_code
+        self._async_log_running_tasks(0)
 
         # stage 1
         self.state = CoreState.stopping
