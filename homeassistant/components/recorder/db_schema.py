@@ -57,9 +57,11 @@ from .models import (
     StatisticDataTimestamp,
     StatisticMetaData,
     bytes_to_ulid_or_none,
+    bytes_to_uuid_hex_or_none,
     datetime_to_timestamp_or_none,
     process_timestamp,
     ulid_to_bytes_or_none,
+    uuid_hex_to_bytes_or_none,
 )
 
 
@@ -203,7 +205,7 @@ class Events(Base):
     context_id: Mapped[str | None] = mapped_column(  # no longer used
         String(MAX_LENGTH_EVENT_CONTEXT_ID), index=True
     )
-    context_user_id: Mapped[str | None] = mapped_column(
+    context_user_id: Mapped[str | None] = mapped_column(  # no longer used
         String(MAX_LENGTH_EVENT_CONTEXT_ID)
     )
     context_parent_id: Mapped[str | None] = mapped_column(  # no longer used
@@ -213,6 +215,9 @@ class Events(Base):
         Integer, ForeignKey("event_data.data_id"), index=True
     )
     context_id_bin: Mapped[bytes | None] = mapped_column(
+        LargeBinary(CONTEXT_ID_BIN_MAX_LENGTH),
+    )
+    context_user_id_bin: Mapped[bytes | None] = mapped_column(
         LargeBinary(CONTEXT_ID_BIN_MAX_LENGTH),
     )
     context_parent_id_bin: Mapped[bytes | None] = mapped_column(
@@ -252,7 +257,8 @@ class Events(Base):
             time_fired_ts=dt_util.utc_to_timestamp(event.time_fired),
             context_id=None,
             context_id_bin=ulid_to_bytes_or_none(event.context.id),
-            context_user_id=event.context.user_id,
+            context_user_id=None,
+            context_user_id_bin=uuid_hex_to_bytes_or_none(event.context.user_id),
             context_parent_id=None,
             context_parent_id_bin=ulid_to_bytes_or_none(event.context.parent_id),
         )
@@ -261,7 +267,7 @@ class Events(Base):
         """Convert to a native HA Event."""
         context = Context(
             id=bytes_to_ulid_or_none(self.context_id_bin),
-            user_id=self.context_user_id,
+            user_id=bytes_to_uuid_hex_or_none(self.context_user_id),
             parent_id=bytes_to_ulid_or_none(self.context_parent_id_bin),
         )
         try:
@@ -371,7 +377,7 @@ class States(Base):
     context_id: Mapped[str | None] = mapped_column(  # no longer used
         String(MAX_LENGTH_EVENT_CONTEXT_ID), index=True
     )
-    context_user_id: Mapped[str | None] = mapped_column(
+    context_user_id: Mapped[str | None] = mapped_column(  # no longer used
         String(MAX_LENGTH_EVENT_CONTEXT_ID)
     )
     context_parent_id: Mapped[str | None] = mapped_column(  # no longer used
@@ -383,6 +389,9 @@ class States(Base):
     old_state: Mapped[States | None] = relationship("States", remote_side=[state_id])
     state_attributes: Mapped[StateAttributes | None] = relationship("StateAttributes")
     context_id_bin: Mapped[bytes | None] = mapped_column(
+        LargeBinary(CONTEXT_ID_BIN_MAX_LENGTH),
+    )
+    context_user_id_bin: Mapped[bytes | None] = mapped_column(
         LargeBinary(CONTEXT_ID_BIN_MAX_LENGTH),
     )
     context_parent_id_bin: Mapped[bytes | None] = mapped_column(
@@ -420,7 +429,8 @@ class States(Base):
             attributes=None,
             context_id=None,
             context_id_bin=ulid_to_bytes_or_none(event.context.id),
-            context_user_id=event.context.user_id,
+            context_user_id=None,
+            context_user_id_bin=uuid_hex_to_bytes_or_none(event.context.user_id),
             context_parent_id=None,
             context_parent_id_bin=ulid_to_bytes_or_none(event.context.parent_id),
             origin_idx=EVENT_ORIGIN_TO_IDX.get(event.origin),
@@ -447,7 +457,7 @@ class States(Base):
         """Convert to an HA state object."""
         context = Context(
             id=bytes_to_ulid_or_none(self.context_id_bin),
-            user_id=self.context_user_id,
+            user_id=bytes_to_uuid_hex_or_none(self.context_user_id),
             parent_id=bytes_to_ulid_or_none(self.context_parent_id_bin),
         )
         try:
