@@ -46,8 +46,8 @@ def _select_entities_device_id_context_ids_sub_query(
             (States.last_updated_ts > start_day) & (States.last_updated_ts < end_day)
         )
         .where(States.entity_id.in_(entity_ids)),
-    )
-    return select(union.c.context_id_bin).group_by(union.c.context_id_bin)
+    ).subquery()
+    return select(union.c.context_id).group_by(union.c.context_id)
 
 
 def _apply_entities_devices_context_union(
