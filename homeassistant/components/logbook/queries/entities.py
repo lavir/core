@@ -48,7 +48,7 @@ def _select_entities_context_ids_sub_query(
         )
         .where(States.entity_id.in_(entity_ids)),
     ).subquery()
-    return select(union.c.context_id).group_by(union.c.context_id)
+    return select(union.c.context_id_bin).group_by(union.c.context_id_bin)
 
 
 def _apply_entities_context_union(
