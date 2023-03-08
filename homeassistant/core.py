@@ -992,6 +992,7 @@ class EventBus:
                 except Exception:  # pylint: disable=broad-except
                     _LOGGER.exception("Error running job: %s", job)
             else:
+                _LOGGER.warning("Adding hass job %s for %s", job, event)
                 self._hass.async_add_hass_job(job, event)
 
     def listen(
