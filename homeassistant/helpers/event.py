@@ -1043,6 +1043,7 @@ class TrackTemplateResultInfo:
         replayed is True if the event is being replayed because the
         rate limit was hit.
         """
+        _LOGGER.warning("Processing: %s", self._track_templates)
         updates: list[TrackTemplateResult] = []
         info_changed = False
         now = event.time_fired if not replayed and event else dt_util.utcnow()
