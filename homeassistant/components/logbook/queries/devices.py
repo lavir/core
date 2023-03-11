@@ -1,12 +1,17 @@
 """Devices queries for logbook."""
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableMapping
+from typing import Any
 
 import sqlalchemy
 from sqlalchemy import lambda_stmt, select
 from sqlalchemy.sql.elements import BooleanClauseList
-from sqlalchemy.sql.lambdas import StatementLambdaElement
+from sqlalchemy.sql.lambdas import (
+    AnalyzedFunction,
+    NonAnalyzedFunction,
+    StatementLambdaElement,
+)
 from sqlalchemy.sql.selectable import CTE, CompoundSelect, Select
 
 from homeassistant.components.recorder.db_schema import (
@@ -24,6 +29,10 @@ from .common import (
     select_events_without_states,
     select_states_context_only,
 )
+
+_QUERY_CACHE: MutableMapping[
+    tuple[Any, ...], NonAnalyzedFunction | AnalyzedFunction
+] = {}
 
 
 def _select_device_id_context_ids_sub_query(
@@ -85,7 +94,8 @@ def devices_stmt(
             end_day,
             event_types,
             json_quotable_device_ids,
-        ).order_by(Events.time_fired_ts)
+        ).order_by(Events.time_fired_ts),
+        lambda_cache=_QUERY_CACHE,
     )
     return stmt
 

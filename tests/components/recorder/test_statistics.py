@@ -1900,3 +1900,54 @@ def test_cache_key_for_generate_statistics_at_time_stmt():
     stmt3 = _generate_statistics_at_time_stmt(columns2, StatisticsShortTerm, {0}, 0.0)
     cache_key_3 = stmt3._generate_cache_key()
     assert cache_key_1 != cache_key_3
+
+
+def test_query_cache_does_not_grow_without_bound():
+    """Test that the query cache does not grow without bound."""
+    temp_cache = {}
+    query_cache_copy = {}
+    with patch.object(statistics, "_QUERY_CACHE", temp_cache):
+        for iteration in range(2):
+            columns = select(
+                StatisticsShortTerm.metadata_id, StatisticsShortTerm.start_ts
+            )
+            stmt = _generate_statistics_during_period_stmt(
+                columns,
+                dt_util.utcnow(),
+                dt_util.utcnow(),
+                [0],
+                StatisticsShortTerm,
+                {},
+            )
+            cache_key_1 = stmt._generate_cache_key()
+            stmt2 = _generate_statistics_during_period_stmt(
+                columns,
+                dt_util.utcnow(),
+                dt_util.utcnow(),
+                [0],
+                StatisticsShortTerm,
+                {},
+            )
+            cache_key_2 = stmt2._generate_cache_key()
+            assert cache_key_1 == cache_key_2
+            columns2 = select(
+                StatisticsShortTerm.metadata_id,
+                StatisticsShortTerm.start_ts,
+                StatisticsShortTerm.sum,
+                StatisticsShortTerm.mean,
+            )
+            stmt3 = _generate_statistics_during_period_stmt(
+                columns2,
+                dt_util.utcnow(),
+                dt_util.utcnow(),
+                [0],
+                StatisticsShortTerm,
+                {"max", "mean"},
+            )
+            cache_key_3 = stmt3._generate_cache_key()
+            assert cache_key_1 != cache_key_3
+            if iteration == 0:
+                query_cache_copy = temp_cache.copy()
+
+    assert temp_cache == query_cache_copy
+    assert len(temp_cache) == 8

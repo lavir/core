@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 import contextlib
 import dataclasses
 from datetime import datetime, timedelta
@@ -22,7 +22,11 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, StatementError
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import literal_column, true
-from sqlalchemy.sql.lambdas import StatementLambdaElement
+from sqlalchemy.sql.lambdas import (
+    AnalyzedFunction,
+    NonAnalyzedFunction,
+    StatementLambdaElement,
+)
 import voluptuous as vol
 
 from homeassistant.const import ATTR_UNIT_OF_MEASUREMENT
@@ -85,6 +89,10 @@ from .util import (
 if TYPE_CHECKING:
     from . import Recorder
 
+
+_QUERY_CACHE: MutableMapping[
+    tuple[Any, ...], NonAnalyzedFunction | AnalyzedFunction
+] = {}
 QUERY_STATISTICS = (
     Statistics.metadata_id,
     Statistics.start_ts,
@@ -645,7 +653,8 @@ def _compile_hourly_statistics_summary_mean_stmt(
         .filter(StatisticsShortTerm.start_ts >= start_time_ts)
         .filter(StatisticsShortTerm.start_ts < end_time_ts)
         .group_by(StatisticsShortTerm.metadata_id)
-        .order_by(StatisticsShortTerm.metadata_id)
+        .order_by(StatisticsShortTerm.metadata_id),
+        lambda_cache=_QUERY_CACHE,
     )
 
 
@@ -663,7 +672,8 @@ def _compile_hourly_statistics_last_sum_stmt(
             )
         )
         .filter(subquery.c.rownum == 1)
-        .order_by(subquery.c.metadata_id)
+        .order_by(subquery.c.metadata_id),
+        lambda_cache=_QUERY_CACHE,
     )
 
 
@@ -865,7 +875,10 @@ def _generate_get_metadata_stmt(
     statistic_source: str | None = None,
 ) -> StatementLambdaElement:
     """Generate a statement to fetch metadata."""
-    stmt = lambda_stmt(lambda: select(*QUERY_STATISTIC_META))
+    stmt = lambda_stmt(
+        lambda: select(*QUERY_STATISTIC_META),
+        lambda_cache=_QUERY_CACHE,
+    )
     if statistic_ids:
         stmt += lambda q: q.where(
             # https://github.com/python/mypy/issues/2608
@@ -1271,7 +1284,10 @@ def _generate_statistics_during_period_stmt(
     This prepares a lambda_stmt query, so we don't insert the parameters yet.
     """
     start_time_ts = start_time.timestamp()
-    stmt = lambda_stmt(lambda: columns.filter(table.start_ts >= start_time_ts))
+    stmt = lambda_stmt(
+        lambda: columns.filter(table.start_ts >= start_time_ts),
+        lambda_cache=_QUERY_CACHE,
+    )
     if end_time is not None:
         end_time_ts = end_time.timestamp()
         stmt += lambda q: q.filter(table.start_ts < end_time_ts)
@@ -1291,7 +1307,10 @@ def _generate_max_mean_min_statistic_in_sub_period_stmt(
     table: type[StatisticsBase],
     metadata_id: int,
 ) -> StatementLambdaElement:
-    stmt = lambda_stmt(lambda: columns.filter(table.metadata_id == metadata_id))
+    stmt = lambda_stmt(
+        lambda: columns.filter(table.metadata_id == metadata_id),
+        lambda_cache=_QUERY_CACHE,
+    )
     if start_time is not None:
         start_time_ts = start_time.timestamp()
         stmt += lambda q: q.filter(table.start_ts >= start_time_ts)
@@ -1421,7 +1440,8 @@ def _first_statistic(
         lambda: select(table.start_ts)
         .filter(table.metadata_id == metadata_id)
         .order_by(table.start_ts.asc())
-        .limit(1)
+        .limit(1),
+        lambda_cache=_QUERY_CACHE,
     )
     if stats := cast(Sequence[Row], execute_stmt_lambda_element(session, stmt)):
         return dt_util.utc_from_timestamp(stats[0].start_ts)
@@ -1451,7 +1471,8 @@ def _get_oldest_sum_statistic(
             .filter(table.metadata_id == metadata_id)
             .filter(table.sum.is_not(None))
             .order_by(table.start_ts.asc())
-            .limit(1)
+            .limit(1),
+            lambda_cache=_QUERY_CACHE,
         )
         if start_time is not None:
             start_time = start_time + table.duration - timedelta.resolution
@@ -1537,7 +1558,8 @@ def _get_newest_sum_statistic(
             .filter(table.metadata_id == metadata_id)
             .filter(table.sum.is_not(None))
             .order_by(table.start_ts.desc())
-            .limit(1)
+            .limit(1),
+            lambda_cache=_QUERY_CACHE,
         )
         if start_time is not None:
             start_time_ts = start_time.timestamp()
@@ -1836,7 +1858,8 @@ def _get_last_statistics_stmt(
         lambda: select(*QUERY_STATISTICS)
         .filter_by(metadata_id=metadata_id)
         .order_by(Statistics.metadata_id, Statistics.start_ts.desc())
-        .limit(number_of_stats)
+        .limit(number_of_stats),
+        lambda_cache=_QUERY_CACHE,
     )
 
 
@@ -1852,7 +1875,8 @@ def _get_last_statistics_short_term_stmt(
         lambda: select(*QUERY_STATISTICS_SHORT_TERM)
         .filter_by(metadata_id=metadata_id)
         .order_by(StatisticsShortTerm.metadata_id, StatisticsShortTerm.start_ts.desc())
-        .limit(number_of_stats)
+        .limit(number_of_stats),
+        lambda_cache=_QUERY_CACHE,
     )
 
 
@@ -1926,7 +1950,9 @@ def _latest_short_term_statistics_stmt(
     metadata_ids: list[int],
 ) -> StatementLambdaElement:
     """Create the statement for finding the latest short term stat rows."""
-    stmt = lambda_stmt(lambda: select(*QUERY_STATISTICS_SHORT_TERM))
+    stmt = lambda_stmt(
+        lambda: select(*QUERY_STATISTICS_SHORT_TERM), lambda_cache=_QUERY_CACHE
+    )
     stmt += lambda s: s.join(
         (
             most_recent_statistic_row := (
@@ -2011,7 +2037,8 @@ def _generate_statistics_at_time_stmt(
                 table.start_ts == most_recent_statistic_ids.c.max_start_ts,
                 table.metadata_id == most_recent_statistic_ids.c.max_metadata_id,
             ),
-        )
+        ),
+        lambda_cache=_QUERY_CACHE,
     )
 
 
