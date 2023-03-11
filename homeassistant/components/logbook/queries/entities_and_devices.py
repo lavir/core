@@ -1,16 +1,11 @@
 """Entities and Devices queries for logbook."""
 from __future__ import annotations
 
-from collections.abc import Iterable, MutableMapping
-from typing import Any
+from collections.abc import Iterable
 
 from sqlalchemy import lambda_stmt, select, union_all
 from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy.sql.lambdas import (
-    AnalyzedFunction,
-    NonAnalyzedFunction,
-    StatementLambdaElement,
-)
+from sqlalchemy.sql.lambdas import StatementLambdaElement
 from sqlalchemy.sql.selectable import CTE, CompoundSelect, Select
 
 from homeassistant.components.recorder.db_schema import (
@@ -34,10 +29,6 @@ from .entities import (
     apply_event_entity_id_matchers,
     states_select_for_entity_ids,
 )
-
-_QUERY_CACHE: MutableMapping[
-    tuple[Any, ...], NonAnalyzedFunction | AnalyzedFunction
-] = {}
 
 
 def _select_entities_device_id_context_ids_sub_query(
@@ -129,8 +120,7 @@ def entities_devices_stmt(
             entity_ids,
             json_quoted_entity_ids,
             json_quoted_device_ids,
-        ).order_by(Events.time_fired_ts),
-        lambda_cache=_QUERY_CACHE,
+        ).order_by(Events.time_fired_ts)
     )
     return stmt
 

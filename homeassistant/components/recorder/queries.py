@@ -20,9 +20,6 @@ from .db_schema import (
     StatisticsShortTerm,
 )
 
-_QUERY_CACHE = {}
-
-<<<<<<< HEAD
 
 def select_event_type_ids(event_types: tuple[str, ...]) -> Select:
     """Generate a select for event type ids.
@@ -34,16 +31,13 @@ def select_event_type_ids(event_types: tuple[str, ...]) -> Select:
         EventTypes.event_type.in_(event_types)
     )
 
-=======
->>>>>>> cache_per_module_sq
 
 def get_shared_attributes(hashes: list[int]) -> StatementLambdaElement:
     """Load shared attributes from the database."""
     return lambda_stmt(
         lambda: select(
             StateAttributes.attributes_id, StateAttributes.shared_attrs
-        ).where(StateAttributes.hash.in_(hashes)),
-        lambda_cache=_QUERY_CACHE,
+        ).where(StateAttributes.hash.in_(hashes))
     )
 
 
@@ -52,9 +46,7 @@ def get_shared_event_datas(hashes: list[int]) -> StatementLambdaElement:
     return lambda_stmt(
         lambda: select(EventData.data_id, EventData.shared_data).where(
             EventData.hash.in_(hashes)
-        ),
-        lambda_cache=_QUERY_CACHE,
-<<<<<<< HEAD
+        )
     )
 
 
@@ -64,8 +56,6 @@ def find_event_type_ids(event_types: Iterable[str]) -> StatementLambdaElement:
         lambda: select(EventTypes.event_type_id, EventTypes.event_type).filter(
             EventTypes.event_type.in_(event_types)
         )
-=======
->>>>>>> cache_per_module_sq
     )
 
 
@@ -76,8 +66,7 @@ def find_shared_attributes_id(
     return lambda_stmt(
         lambda: select(StateAttributes.attributes_id)
         .filter(StateAttributes.hash == data_hash)
-        .filter(StateAttributes.shared_attrs == shared_attrs),
-        lambda_cache=_QUERY_CACHE,
+        .filter(StateAttributes.shared_attrs == shared_attrs)
     )
 
 
@@ -86,8 +75,7 @@ def find_shared_data_id(attr_hash: int, shared_data: str) -> StatementLambdaElem
     return lambda_stmt(
         lambda: select(EventData.data_id)
         .filter(EventData.hash == attr_hash)
-        .filter(EventData.shared_data == shared_data),
-        lambda_cache=_QUERY_CACHE,
+        .filter(EventData.shared_data == shared_data)
     )
 
 
@@ -105,8 +93,7 @@ def attributes_ids_exist_in_states_with_fast_in_distinct(
     return lambda_stmt(
         lambda: select(distinct(States.attributes_id)).filter(
             States.attributes_id.in_(attributes_ids)
-        ),
-        lambda_cache=_QUERY_CACHE,
+        )
     )
 
 
@@ -318,8 +305,7 @@ def attributes_ids_exist_in_states(
             _state_attrs_exist(attr98),
             _state_attrs_exist(attr99),
             _state_attrs_exist(attr100),
-        ),
-        lambda_cache=_QUERY_CACHE,
+        )
     )
 
 
@@ -328,8 +314,7 @@ def data_ids_exist_in_events_with_fast_in_distinct(
 ) -> StatementLambdaElement:
     """Find data ids that exist in the events table."""
     return lambda_stmt(
-        lambda: select(distinct(Events.data_id)).filter(Events.data_id.in_(data_ids)),
-        lambda_cache=_QUERY_CACHE,
+        lambda: select(distinct(Events.data_id)).filter(Events.data_id.in_(data_ids))
     )
 
 
@@ -548,8 +533,7 @@ def data_ids_exist_in_events(
             _event_data_id_exist(id98),
             _event_data_id_exist(id99),
             _event_data_id_exist(id100),
-        ),
-        lambda_cache=_QUERY_CACHE,
+        )
     )
 
 
@@ -559,8 +543,7 @@ def disconnect_states_rows(state_ids: Iterable[int]) -> StatementLambdaElement:
         lambda: update(States)
         .where(States.old_state_id.in_(state_ids))
         .values(old_state_id=None)
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -569,8 +552,7 @@ def delete_states_rows(state_ids: Iterable[int]) -> StatementLambdaElement:
     return lambda_stmt(
         lambda: delete(States)
         .where(States.state_id.in_(state_ids))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -579,8 +561,7 @@ def delete_event_data_rows(data_ids: Iterable[int]) -> StatementLambdaElement:
     return lambda_stmt(
         lambda: delete(EventData)
         .where(EventData.data_id.in_(data_ids))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -591,8 +572,7 @@ def delete_states_attributes_rows(
     return lambda_stmt(
         lambda: delete(StateAttributes)
         .where(StateAttributes.attributes_id.in_(attributes_ids))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -603,8 +583,7 @@ def delete_statistics_runs_rows(
     return lambda_stmt(
         lambda: delete(StatisticsRuns)
         .where(StatisticsRuns.run_id.in_(statistics_runs))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -615,8 +594,7 @@ def delete_statistics_short_term_rows(
     return lambda_stmt(
         lambda: delete(StatisticsShortTerm)
         .where(StatisticsShortTerm.id.in_(short_term_statistics))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -627,8 +605,7 @@ def delete_event_rows(
     return lambda_stmt(
         lambda: delete(Events)
         .where(Events.event_id.in_(event_ids))
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -640,8 +617,7 @@ def delete_recorder_runs_rows(
         lambda: delete(RecorderRuns)
         .filter(RecorderRuns.start < purge_before)
         .filter(RecorderRuns.run_id != current_run_id)
-        .execution_options(synchronize_session=False),
-        lambda_cache=_QUERY_CACHE,
+        .execution_options(synchronize_session=False)
     )
 
 
@@ -650,8 +626,7 @@ def find_events_to_purge(purge_before: float) -> StatementLambdaElement:
     return lambda_stmt(
         lambda: select(Events.event_id, Events.data_id)
         .filter(Events.time_fired_ts < purge_before)
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -660,8 +635,7 @@ def find_states_to_purge(purge_before: float) -> StatementLambdaElement:
     return lambda_stmt(
         lambda: select(States.state_id, States.attributes_id)
         .filter(States.last_updated_ts < purge_before)
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -673,8 +647,7 @@ def find_short_term_statistics_to_purge(
     return lambda_stmt(
         lambda: select(StatisticsShortTerm.id)
         .filter(StatisticsShortTerm.start_ts < purge_before_ts)
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -685,8 +658,7 @@ def find_statistics_runs_to_purge(
     return lambda_stmt(
         lambda: select(StatisticsRuns.run_id)
         .filter(StatisticsRuns.start < purge_before)
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -694,9 +666,7 @@ def find_latest_statistics_runs_run_id() -> StatementLambdaElement:
     """Find the latest statistics_runs run_id."""
     # https://github.com/sqlalchemy/sqlalchemy/issues/9189
     # pylint: disable-next=not-callable
-    return lambda_stmt(
-        lambda: select(func.max(StatisticsRuns.run_id)), lambda_cache=_QUERY_CACHE
-    )
+    return lambda_stmt(lambda: select(func.max(StatisticsRuns.run_id)))
 
 
 def find_legacy_event_state_and_attributes_and_data_ids_to_purge(
@@ -709,8 +679,7 @@ def find_legacy_event_state_and_attributes_and_data_ids_to_purge(
         )
         .outerjoin(States, Events.event_id == States.event_id)
         .filter(Events.time_fired_ts < purge_before)
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -718,10 +687,7 @@ def find_legacy_row() -> StatementLambdaElement:
     """Check if there are still states in the table with an event_id."""
     # https://github.com/sqlalchemy/sqlalchemy/issues/9189
     # pylint: disable-next=not-callable
-    return lambda_stmt(
-        lambda: select(func.max(States.event_id)),
-        lambda_cache=_QUERY_CACHE,
-    )
+    return lambda_stmt(lambda: select(func.max(States.event_id)))
 
 
 def find_events_context_ids_to_migrate() -> StatementLambdaElement:
@@ -734,9 +700,7 @@ def find_events_context_ids_to_migrate() -> StatementLambdaElement:
             Events.context_parent_id,
         )
         .filter(Events.context_id_bin.is_(None))
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
-<<<<<<< HEAD
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -749,8 +713,6 @@ def find_event_type_to_migrate() -> StatementLambdaElement:
         )
         .filter(Events.event_type_id.is_(None))
         .limit(SQLITE_MAX_BIND_VARS)
-=======
->>>>>>> cache_per_module_sq
     )
 
 
@@ -771,9 +733,7 @@ def find_states_context_ids_to_migrate() -> StatementLambdaElement:
             States.context_parent_id,
         )
         .filter(States.context_id_bin.is_(None))
-        .limit(SQLITE_MAX_BIND_VARS),
-        lambda_cache=_QUERY_CACHE,
-<<<<<<< HEAD
+        .limit(SQLITE_MAX_BIND_VARS)
     )
 
 
@@ -800,6 +760,4 @@ def delete_event_types_rows(event_type_ids: Iterable[int]) -> StatementLambdaEle
         lambda: delete(EventTypes)
         .where(EventTypes.event_type_id.in_(event_type_ids))
         .execution_options(synchronize_session=False)
-=======
->>>>>>> cache_per_module_sq
     )

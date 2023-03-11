@@ -16,11 +16,7 @@ from sqlalchemy.orm.properties import MappedColumn
 from sqlalchemy.orm.query import Query
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import literal
-from sqlalchemy.sql.lambdas import (
-    AnalyzedFunction,
-    NonAnalyzedFunction,
-    StatementLambdaElement,
-)
+from sqlalchemy.sql.lambdas import StatementLambdaElement
 
 from homeassistant.const import COMPRESSED_STATE_LAST_UPDATED, COMPRESSED_STATE_STATE
 from homeassistant.core import HomeAssistant, State, split_entity_id
@@ -63,9 +59,7 @@ NEED_ATTRIBUTE_DOMAINS = {
     "water_heater",
 }
 
-_QUERY_CACHE: MutableMapping[
-    tuple[Any, ...], NonAnalyzedFunction | AnalyzedFunction
-] = {}
+
 _BASE_STATES = (
     States.entity_id,
     States.state,
@@ -176,30 +170,21 @@ def lambda_stmt_and_join_attributes(
         if schema_version >= 31:
             if include_last_changed:
                 return (
-                    lambda_stmt(
-                        lambda: select(*_QUERY_STATE_NO_ATTR), lambda_cache=_QUERY_CACHE
-                    ),
+                    lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR)),
                     False,
                 )
             return (
-                lambda_stmt(
-                    lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED),
-                    lambda_cache=_QUERY_CACHE,
-                ),
+                lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED)),
                 False,
             )
         if include_last_changed:
             return (
-                lambda_stmt(
-                    lambda: select(*_QUERY_STATE_NO_ATTR_PRE_SCHEMA_31),
-                    lambda_cache=_QUERY_CACHE,
-                ),
+                lambda_stmt(lambda: select(*_QUERY_STATE_NO_ATTR_PRE_SCHEMA_31)),
                 False,
             )
         return (
             lambda_stmt(
-                lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED_PRE_SCHEMA_31),
-                lambda_cache=_QUERY_CACHE,
+                lambda: select(*_QUERY_STATE_NO_ATTR_NO_LAST_CHANGED_PRE_SCHEMA_31)
             ),
             False,
         )
@@ -209,48 +194,25 @@ def lambda_stmt_and_join_attributes(
     if schema_version < 25:
         if include_last_changed:
             return (
-                lambda_stmt(
-                    lambda: select(*_QUERY_STATES_PRE_SCHEMA_25),
-                    lambda_cache=_QUERY_CACHE,
-                ),
+                lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_25)),
                 False,
             )
         return (
-            lambda_stmt(
-                lambda: select(*_QUERY_STATES_PRE_SCHEMA_25_NO_LAST_CHANGED),
-                lambda_cache=_QUERY_CACHE,
-            ),
+            lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_25_NO_LAST_CHANGED)),
             False,
         )
 
     if schema_version >= 31:
         if include_last_changed:
-            return (
-                lambda_stmt(lambda: select(*_QUERY_STATES), lambda_cache=_QUERY_CACHE),
-                True,
-            )
-        return (
-            lambda_stmt(
-                lambda: select(*_QUERY_STATES_NO_LAST_CHANGED),
-                lambda_cache=_QUERY_CACHE,
-            ),
-            True,
-        )
+            return lambda_stmt(lambda: select(*_QUERY_STATES)), True
+        return lambda_stmt(lambda: select(*_QUERY_STATES_NO_LAST_CHANGED)), True
     # Finally if no migration is in progress and no_attributes
     # was not requested, we query both attributes columns and
     # join state_attributes
     if include_last_changed:
-        return (
-            lambda_stmt(
-                lambda: select(*_QUERY_STATES_PRE_SCHEMA_31), lambda_cache=_QUERY_CACHE
-            ),
-            True,
-        )
+        return lambda_stmt(lambda: select(*_QUERY_STATES_PRE_SCHEMA_31)), True
     return (
-        lambda_stmt(
-            lambda: select(*_QUERY_STATES_NO_LAST_CHANGED_PRE_SCHEMA_31),
-            lambda_cache=_QUERY_CACHE,
-        ),
+        lambda_stmt(lambda: select(*_QUERY_STATES_NO_LAST_CHANGED_PRE_SCHEMA_31)),
         True,
     )
 
