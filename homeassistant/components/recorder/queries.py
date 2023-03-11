@@ -22,6 +22,7 @@ from .db_schema import (
 
 _QUERY_CACHE = {}
 
+<<<<<<< HEAD
 
 def select_event_type_ids(event_types: tuple[str, ...]) -> Select:
     """Generate a select for event type ids.
@@ -33,6 +34,8 @@ def select_event_type_ids(event_types: tuple[str, ...]) -> Select:
         EventTypes.event_type.in_(event_types)
     )
 
+=======
+>>>>>>> cache_per_module_sq
 
 def get_shared_attributes(hashes: list[int]) -> StatementLambdaElement:
     """Load shared attributes from the database."""
@@ -51,6 +54,7 @@ def get_shared_event_datas(hashes: list[int]) -> StatementLambdaElement:
             EventData.hash.in_(hashes)
         ),
         lambda_cache=_QUERY_CACHE,
+<<<<<<< HEAD
     )
 
 
@@ -60,6 +64,8 @@ def find_event_type_ids(event_types: Iterable[str]) -> StatementLambdaElement:
         lambda: select(EventTypes.event_type_id, EventTypes.event_type).filter(
             EventTypes.event_type.in_(event_types)
         )
+=======
+>>>>>>> cache_per_module_sq
     )
 
 
@@ -730,6 +736,7 @@ def find_events_context_ids_to_migrate() -> StatementLambdaElement:
         .filter(Events.context_id_bin.is_(None))
         .limit(SQLITE_MAX_BIND_VARS),
         lambda_cache=_QUERY_CACHE,
+<<<<<<< HEAD
     )
 
 
@@ -742,6 +749,8 @@ def find_event_type_to_migrate() -> StatementLambdaElement:
         )
         .filter(Events.event_type_id.is_(None))
         .limit(SQLITE_MAX_BIND_VARS)
+=======
+>>>>>>> cache_per_module_sq
     )
 
 
@@ -764,6 +773,7 @@ def find_states_context_ids_to_migrate() -> StatementLambdaElement:
         .filter(States.context_id_bin.is_(None))
         .limit(SQLITE_MAX_BIND_VARS),
         lambda_cache=_QUERY_CACHE,
+<<<<<<< HEAD
     )
 
 
@@ -790,4 +800,6 @@ def delete_event_types_rows(event_type_ids: Iterable[int]) -> StatementLambdaEle
         lambda: delete(EventTypes)
         .where(EventTypes.event_type_id.in_(event_type_ids))
         .execution_options(synchronize_session=False)
+=======
+>>>>>>> cache_per_module_sq
     )
