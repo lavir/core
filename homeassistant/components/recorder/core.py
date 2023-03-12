@@ -65,6 +65,7 @@ from .db_schema import (
     EventTypes,
     StateAttributes,
     States,
+    StatesMeta,
     Statistics,
     StatisticsRuns,
     StatisticsShortTerm,
@@ -83,10 +84,12 @@ from .queries import (
     find_shared_data_id,
     get_shared_attributes,
     get_shared_event_datas,
+    has_entity_ids_to_migrate,
     has_event_type_to_migrate,
 )
 from .run_history import RunHistory
 from .table_managers.event_types import EventTypeManager
+from .table_managers.states_meta import StatesMetaManager
 from .tasks import (
     AdjustLRUSizeTask,
     AdjustStatisticsTask,
@@ -95,6 +98,7 @@ from .tasks import (
     CommitTask,
     ContextIDMigrationTask,
     DatabaseLockTask,
+    EntityIDMigrationTask,
     EventTask,
     EventTypeIDMigrationTask,
     ImportStatisticsTask,
@@ -217,6 +221,7 @@ class Recorder(threading.Thread):
         self._state_attributes_ids: LRU = LRU(STATE_ATTRIBUTES_ID_CACHE_SIZE)
         self._event_data_ids: LRU = LRU(EVENT_DATA_ID_CACHE_SIZE)
         self.event_type_manager = EventTypeManager()
+        self.states_meta_manager = StatesMetaManager()
         self._pending_state_attributes: dict[str, StateAttributes] = {}
         self._pending_event_data: dict[str, EventData] = {}
         self._pending_expunge: list[States] = []
@@ -715,6 +720,11 @@ class Recorder(threading.Thread):
             else:
                 _LOGGER.debug("Activating event type manager as all data is migrated")
                 self.event_type_manager.active = True
+            if session.execute(has_entity_ids_to_migrate()).scalar():
+                self.queue_task(EntityIDMigrationTask())
+            else:
+                _LOGGER.debug("Activating states meta manager as all data is migrated")
+                self.states_meta_manager.active = True
 
     def _run_event_loop(self) -> None:
         """Run the event loop for the recorder."""
@@ -752,6 +762,7 @@ class Recorder(threading.Thread):
         self._pre_process_state_change_events(state_change_events)
         self._pre_process_non_state_change_events(non_state_change_events)
         self.event_type_manager.load(non_state_change_events, self.event_session)
+        self.states_meta_manager.load(state_change_events, self.event_session)
 
     def _pre_process_state_change_events(self, events: list[Event]) -> None:
         """Load startup state attributes from the database.
@@ -1035,12 +1046,25 @@ class Recorder(threading.Thread):
 
     def _process_state_changed_event_into_session(self, event: Event) -> None:
         """Process a state_changed event into the session."""
-        assert self.event_session is not None
         dbstate = States.from_event(event)
-        if not (
+        if (entity_id := dbstate.entity_id) is None or not (
             shared_attrs_bytes := self._serialize_state_attributes_from_event(event)
         ):
             return
+
+        assert self.event_session is not None
+        event_session = self.event_session
+        # Map the entity_id to the StatesMeta table
+        states_meta_manager = self.states_meta_manager
+        if pending_states_meta := states_meta_manager.get_pending(entity_id):
+            dbstate.states_meta_rel = pending_states_meta
+        elif metadata_id := states_meta_manager.get(entity_id, event_session):
+            dbstate.metadata_id = metadata_id
+        else:
+            states_meta = StatesMeta(entity_id=entity_id)
+            states_meta_manager.add_pending(states_meta)
+            event_session.add(states_meta)
+            dbstate.states_meta_rel = states_meta
 
         shared_attrs = shared_attrs_bytes.decode("utf-8")
         dbstate.attributes = None
@@ -1065,16 +1089,20 @@ class Recorder(threading.Thread):
                 self._pending_state_attributes[shared_attrs] = dbstate_attributes
                 self.event_session.add(dbstate_attributes)
 
-        if old_state := self._old_states.pop(dbstate.entity_id, None):
+        if old_state := self._old_states.pop(entity_id, None):
             if old_state.state_id:
                 dbstate.old_state_id = old_state.state_id
             else:
                 dbstate.old_state = old_state
         if event.data.get("new_state"):
-            self._old_states[dbstate.entity_id] = dbstate
+            self._old_states[entity_id] = dbstate
             self._pending_expunge.append(dbstate)
         else:
             dbstate.state = None
+
+        if states_meta_manager.active:
+            dbstate.entity_id = None
+
         self.event_session.add(dbstate)
 
     def _handle_database_error(self, err: Exception) -> bool:
@@ -1140,6 +1168,7 @@ class Recorder(threading.Thread):
             self._event_data_ids[event_data.shared_data] = event_data.data_id
         self._pending_event_data = {}
         self.event_type_manager.post_commit_pending()
+        self.states_meta_manager.post_commit_pending()
 
         # Expire is an expensive operation (frequently more expensive
         # than the flush and commit itself) so we only
@@ -1167,6 +1196,7 @@ class Recorder(threading.Thread):
         self._pending_state_attributes.clear()
         self._pending_event_data.clear()
         self.event_type_manager.reset()
+        self.states_meta_manager.reset()
 
         if not self.event_session:
             return
@@ -1200,6 +1230,14 @@ class Recorder(threading.Thread):
     def _migrate_event_type_ids(self) -> bool:
         """Migrate event type ids if needed."""
         return migration.migrate_event_type_ids(self)
+
+    def _migrate_entity_ids(self) -> bool:
+        """Migrate entity_ids if needed."""
+        return migration.migrate_entity_ids(self)
+
+    def _post_migrate_entity_ids(self) -> bool:
+        """Post migrate entity_ids if needed."""
+        return migration.post_migrate_entity_ids(self)
 
     def _send_keep_alive(self) -> None:
         """Send a keep alive to keep the db connection open."""
