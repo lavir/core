@@ -64,7 +64,7 @@ from .tasks import (
     PostSchemaMigrationTask,
     StatisticsTimestampMigrationCleanupTask,
 )
-from .util import database_job_retry_wrapper, session_scope
+from .util import database_job_retry_wrapper, retryable_database_job, session_scope
 
 if TYPE_CHECKING:
     from . import Recorder
@@ -1301,6 +1301,7 @@ def _context_id_to_bytes(context_id: str | None) -> bytes | None:
     return None
 
 
+@retryable_database_job("migrate states context_ids to binary format")
 def migrate_states_context_ids(instance: Recorder) -> bool:
     """Migrate states context_ids to use binary format."""
     _to_bytes = _context_id_to_bytes
@@ -1334,6 +1335,7 @@ def migrate_states_context_ids(instance: Recorder) -> bool:
     return is_done
 
 
+@retryable_database_job("migrate events context_ids to binary format")
 def migrate_events_context_ids(instance: Recorder) -> bool:
     """Migrate events context_ids to use binary format."""
     _to_bytes = _context_id_to_bytes
@@ -1367,6 +1369,7 @@ def migrate_events_context_ids(instance: Recorder) -> bool:
     return is_done
 
 
+@retryable_database_job("migrate events event_types to event_type_ids")
 def migrate_event_type_ids(instance: Recorder) -> bool:
     """Migrate event_type to event_type_ids."""
     session_maker = instance.get_session
@@ -1423,6 +1426,7 @@ def migrate_event_type_ids(instance: Recorder) -> bool:
     return is_done
 
 
+@retryable_database_job("migrate states entity_ids to states_meta")
 def migrate_entity_ids(instance: Recorder) -> bool:
     """Migrate entity_ids to states_meta.
 
@@ -1484,6 +1488,7 @@ def migrate_entity_ids(instance: Recorder) -> bool:
     return is_done
 
 
+@retryable_database_job("post migrate states entity_ids to states_meta")
 def post_migrate_entity_ids(instance: Recorder) -> bool:
     """Remove old entity_id strings from states.
 
