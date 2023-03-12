@@ -61,12 +61,12 @@ def find_event_type_ids(event_types: Iterable[str]) -> StatementLambdaElement:
 
 
 def find_all_states_metadata_ids() -> StatementLambdaElement:
-    """Find an metadata_id by entity_id."""
+    """Find all metadata_ids and entity_ids."""
     return lambda_stmt(lambda: select(StatesMeta.metadata_id, StatesMeta.entity_id))
 
 
 def find_states_metadata_ids(entity_ids: Iterable[str]) -> StatementLambdaElement:
-    """Find an metadata_id by entity_id."""
+    """Find metadata_ids by entity_ids."""
     return lambda_stmt(
         lambda: select(StatesMeta.metadata_id, StatesMeta.entity_id).filter(
             StatesMeta.entity_id.in_(entity_ids)
@@ -732,7 +732,7 @@ def find_event_type_to_migrate() -> StatementLambdaElement:
 
 
 def find_entity_ids_to_migrate() -> StatementLambdaElement:
-    """Find events entity_id to migrate."""
+    """Find entity_id to migrate."""
     return lambda_stmt(
         lambda: select(
             States.state_id,
@@ -744,7 +744,7 @@ def find_entity_ids_to_migrate() -> StatementLambdaElement:
 
 
 def batch_cleanup_entity_ids() -> StatementLambdaElement:
-    """Find events entity_id to cleanup."""
+    """Find entity_id to cleanup."""
     # Self join because This version of MariaDB doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery'
     return lambda_stmt(
         lambda: update(States)
@@ -762,6 +762,20 @@ def batch_cleanup_entity_ids() -> StatementLambdaElement:
             )
         )
         .values(entity_id=None)
+    )
+
+
+def has_events_context_ids_to_migrate() -> StatementLambdaElement:
+    """Check if there are events context ids to migrate."""
+    return lambda_stmt(
+        lambda: select(Events.event_id).filter(Events.context_id_bin.is_(None)).limit(1)
+    )
+
+
+def has_states_context_ids_to_migrate() -> StatementLambdaElement:
+    """Check if there are states context ids to migrate."""
+    return lambda_stmt(
+        lambda: select(States.state_id).filter(States.context_id_bin.is_(None)).limit(1)
     )
 
 
