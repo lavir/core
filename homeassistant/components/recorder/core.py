@@ -657,8 +657,9 @@ class Recorder(threading.Thread):
             self.migration_is_live = migration.live_migration(schema_status)
 
         self.hass.add_job(self.async_connection_success)
+        database_was_ready = self.migration_is_live or schema_status.valid
 
-        if self.migration_is_live or schema_status.valid:
+        if database_was_ready:
             # If the migrate is live or the schema is valid, we need to
             # wait for startup to complete. If its not live, we need to continue
             # on.
@@ -673,7 +674,6 @@ class Recorder(threading.Thread):
                 # Make sure we cleanly close the run if
                 # we restart before startup finishes
                 self._shutdown()
-                self._activate_and_set_db_ready()
                 return
 
         if not schema_status.valid:
@@ -695,7 +695,8 @@ class Recorder(threading.Thread):
                 self._shutdown()
                 return
 
-        self._activate_and_set_db_ready()
+        if not database_was_ready:
+            self._activate_and_set_db_ready()
 
         # Catch up with missed statistics
         with session_scope(session=self.get_session()) as session:
