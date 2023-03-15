@@ -1,7 +1,7 @@
 """Purge old data helper."""
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from datetime import datetime
 from itertools import zip_longest
 import logging
@@ -14,7 +14,7 @@ from sqlalchemy.orm.session import Session
 import homeassistant.util.dt as dt_util
 
 from .const import SQLITE_MAX_BIND_VARS
-from .db_schema import Events, EventTypes, States, StatesMeta
+from .db_schema import Events, States, StatesMeta
 from .models import DatabaseEngine
 from .queries import (
     attributes_ids_exist_in_states,
@@ -143,11 +143,9 @@ def _purge_legacy_format(
     ) = _select_legacy_event_state_and_attributes_and_data_ids_to_purge(
         session, purge_before
     )
-    if state_ids:
-        _purge_state_ids(instance, session, state_ids)
+    _purge_state_ids(instance, session, state_ids)
     _purge_unused_attributes_ids(instance, session, attributes_ids)
-    if event_ids:
-        _purge_event_ids(session, event_ids)
+    _purge_event_ids(session, event_ids)
     _purge_unused_data_ids(instance, session, data_ids)
     return bool(event_ids or state_ids or attributes_ids or data_ids)
 
@@ -447,6 +445,8 @@ def _select_legacy_event_state_and_attributes_and_data_ids_to_purge(
 
 def _purge_state_ids(instance: Recorder, session: Session, state_ids: set[int]) -> None:
     """Disconnect states and delete by state id."""
+    if not state_ids:
+        return
 
     # Update old_state_id to NULL before deleting to ensure
     # the delete does not fail due to a foreign key constraint
@@ -558,8 +558,10 @@ def _purge_short_term_statistics(
     _LOGGER.debug("Deleted %s short term statistics", deleted_rows)
 
 
-def _purge_event_ids(session: Session, event_ids: Iterable[int]) -> None:
+def _purge_event_ids(session: Session, event_ids: set[int]) -> None:
     """Delete by event id."""
+    if not event_ids:
+        return
     deleted_rows = session.execute(delete_event_rows(event_ids))
     _LOGGER.debug("Deleted %s events", deleted_rows)
 
@@ -636,15 +638,18 @@ def _purge_filtered_data(instance: Recorder, session: Session) -> bool:
         )
 
     # Check if excluded event_types are in database
-    excluded_event_type_ids: list[str] = [
-        event_type_id
-        for (event_type_id, event_type) in session.query(
-            EventTypes.event_type_id, EventTypes.event_type
-        ).all()
-        if event_type in instance.exclude_event_types
-    ]
     has_more_events_to_purge = False
-    if excluded_event_type_ids:
+    if (
+        event_type_to_event_type_ids := instance.event_type_manager.get_many(
+            instance.exclude_event_types, session
+        )
+    ) and (
+        excluded_event_type_ids := [
+            event_type_id
+            for event_type_id in event_type_to_event_type_ids.values()
+            if event_type_id is not None
+        ]
+    ):
         has_more_events_to_purge = _purge_filtered_events(
             instance, session, excluded_event_type_ids, now_timestamp
         )
@@ -677,7 +682,7 @@ def _purge_filtered_states(
     if not to_purge:
         return True
     state_ids, attributes_ids, event_ids = zip(*to_purge)
-    filtered_event_ids = [id_ for id_ in event_ids if id_ is not None]
+    filtered_event_ids = {id_ for id_ in event_ids if id_ is not None}
     _LOGGER.debug(
         "Selected %s state_ids to remove that should be filtered", len(state_ids)
     )
@@ -696,7 +701,7 @@ def _purge_filtered_states(
 def _purge_filtered_events(
     instance: Recorder,
     session: Session,
-    excluded_event_type_ids: list[str],
+    excluded_event_type_ids: list[int],
     purge_before_timestamp: float,
 ) -> bool:
     """Remove filtered events and linked states.
@@ -715,15 +720,20 @@ def _purge_filtered_events(
     if not to_purge:
         return True
     event_ids, data_ids = zip(*to_purge)
+    event_ids_set = set(event_ids)
     _LOGGER.debug(
-        "Selected %s event_ids to remove that should be filtered", len(event_ids)
+        "Selected %s event_ids to remove that should be filtered", len(event_ids_set)
     )
     states: list[Row[tuple[int]]] = (
-        session.query(States.state_id).filter(States.event_id.in_(event_ids)).all()
+        session.query(States.state_id).filter(States.event_id.in_(event_ids_set)).all()
     )
-    state_ids: set[int] = {state.state_id for state in states}
-    _purge_state_ids(instance, session, state_ids)
-    _purge_event_ids(session, event_ids)
+    if states:
+        # These are legacy states that are linked to an event that are no longer
+        # created but since we did not remove them when we stopped adding new ones
+        # we will need to purge them here.
+        state_ids: set[int] = {state.state_id for state in states}
+        _purge_state_ids(instance, session, state_ids)
+    _purge_event_ids(session, event_ids_set)
     if unused_data_ids_set := _select_unused_event_data_ids(
         session, set(data_ids), database_engine
     ):
