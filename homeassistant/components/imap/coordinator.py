@@ -44,6 +44,7 @@ class ImapDataUpdateCoordinator(DataUpdateCoordinator[int]):
         self.hass = hass
         self.imap_client = imap_client
         self.support_push = imap_client.has_capability("IDLE")
+        self._push_wait_task: asyncio.Task[None] | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -77,7 +78,14 @@ class ImapDataUpdateCoordinator(DataUpdateCoordinator[int]):
                 f"Invalid response for search '{self.config_entry.data[CONF_SEARCH]}': {result} / {lines[0]}"
             )
         if self.support_push:
-            self.hass.async_create_task(self.async_wait_server_push())
+            if self._push_wait_task and not self._push_wait_task.done():
+                _LOGGER.warning(
+                    "The previous IMAP push wait task is taking longer than the update interval"
+                )
+            else:
+                self._push_wait_task = self.hass.async_create_background_task(
+                    self.async_wait_server_push(), "Wait for IMAP data push"
+                )
         return len(lines[0].split())
 
     async def async_wait_server_push(self) -> None:
@@ -100,5 +108,7 @@ class ImapDataUpdateCoordinator(DataUpdateCoordinator[int]):
     async def shutdown(self, *_) -> None:
         """Close resources."""
         if self.imap_client:
+            if self.imap_client.has_pending_idle():
+                self.imap_client.idle_done()
             await self.imap_client.stop_wait_server_push()
             await self.imap_client.logout()
