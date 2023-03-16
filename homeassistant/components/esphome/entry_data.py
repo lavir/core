@@ -205,7 +205,7 @@ class RuntimeEntryData:
         current_state = current_state_by_type.get(key, _SENTINEL)
         if current_state == state:
             _LOGGER.debug(
-                "%s: ignoring duplicate update with and key %s: %s",
+                "%s: ignoring duplicate update with key %s: %s",
                 self.name,
                 key,
                 state,
