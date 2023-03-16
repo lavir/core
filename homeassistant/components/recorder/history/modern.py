@@ -701,7 +701,7 @@ def _sorted_states_to_dict(
     # Append all changes to it
     for metadata_id, group in states_iter:
         attr_cache: dict[str, dict[str, Any]] = {}
-        prev_state: Column | str
+        prev_state: Column | str | None = None
         if not (entity_id := metadata_id_to_entity_id.get(metadata_id)):
             continue
         ent_results = result[entity_id]
@@ -757,7 +757,7 @@ def _sorted_states_to_dict(
         _utc_from_timestamp = dt_util.utc_from_timestamp
         ent_results.extend(
             {
-                attr_state: (prev_state := state),
+                attr_state: (prev_state := state),  # noqa: F841
                 attr_time: _utc_from_timestamp(row[last_updated_ts_idx]).isoformat(),
             }
             for row in group
