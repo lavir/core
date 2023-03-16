@@ -672,7 +672,7 @@ class Recorder(threading.Thread):
                     "Database Migration Failed",
                     "recorder_database_migration",
                 )
-                self._activate_and_set_db_ready()
+                self.hass.add_job(self.async_set_db_ready)
                 self._shutdown()
                 return
 
@@ -691,7 +691,14 @@ class Recorder(threading.Thread):
 
     def _activate_and_set_db_ready(self) -> None:
         """Activate the table managers or schedule migrations and mark the db as ready."""
-        with session_scope(session=self.get_session()) as session:
+        with session_scope(session=self.get_session(), read_only=True) as session:
+            # Prime the statistics meta manager as soon as possible
+            # since we want the frontend queries to avoid a thundering
+            # herd of queries to find the statistics meta data if
+            # there are a lot of statistics graphs on the frontend.
+            if self.schema_version >= 23:
+                self.statistics_meta_manager.load(session)
+
             if (
                 self.schema_version < 36
                 or session.execute(has_events_context_ids_to_migrate()).scalar()
@@ -767,7 +774,6 @@ class Recorder(threading.Thread):
         self.event_type_manager.load(non_state_change_events, session)
         self.states_meta_manager.load(state_change_events, session)
         self.state_attributes_manager.load(state_change_events, session)
-        self.statistics_meta_manager.load(session)
 
     def _guarded_process_one_task_or_recover(self, task: RecorderTask) -> None:
         """Process a task, guarding against exceptions to ensure the loop does not collapse."""
