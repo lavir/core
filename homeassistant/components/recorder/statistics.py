@@ -716,6 +716,7 @@ def compile_missing_statistics(instance: Recorder) -> bool:
             _compile_statistics(instance, session, start, end >= last_period)
             if periods_without_commit == commit_interval:
                 session.commit()
+                session.expunge_all()
                 periods_without_commit = 0
             start = end
 
