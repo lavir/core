@@ -28,6 +28,7 @@
   },
   "entity_component": {
     "_": {
+      "name": "[%key:component::alarm_control_panel::title%]",
       "state": {
         "armed": "Armed",
         "disarmed": "Disarmed",
@@ -40,6 +41,17 @@
         "arming": "Arming",
         "disarming": "Disarming",
         "triggered": "Triggered"
+      },
+      "state_attributes": {
+        "code_format": {
+          "name": "Code format"
+        },
+        "changed_by": {
+          "name": "Changed by"
+        },
+        "code_arm_required": {
+          "name": "Code for arming required"
+        }
       }
     }
   }
