@@ -128,7 +128,7 @@ def is_entity_recorded(hass: HomeAssistant, entity_id: str) -> bool:
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the recorder."""
-    exclude_attributes_by_domain: dict[str, frozenset[str]] = {}
+    exclude_attributes_by_domain: dict[str, set[str]] = {}
     hass.data[EXCLUDE_ATTRIBUTES] = exclude_attributes_by_domain
     conf = config[DOMAIN]
     entity_filter = convert_include_exclude_filter(conf)
@@ -160,10 +160,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         exclude_attributes_by_domain=exclude_attributes_by_domain,
     )
     instance.async_initialize()
-    # Do not set hass.data[DATA_INSTANCE] until after async_initialize
-    # to ensure we prime the recorder cache before we accept events
-    # to be recorded.
-    hass.data[DATA_INSTANCE] = instance
     instance.async_register()
     instance.start()
     async_register_services(hass, instance)

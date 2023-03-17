@@ -35,9 +35,7 @@ class StateAttributesManager(BaseLRUTableManager[StateAttributes]):
     """Manage the StateAttributes table."""
 
     def __init__(
-        self,
-        recorder: Recorder,
-        exclude_attributes_by_domain: dict[str, frozenset[str]],
+        self, recorder: Recorder, exclude_attributes_by_domain: dict[str, set[str]]
     ) -> None:
         """Initialize the event type manager."""
         super().__init__(recorder, CACHE_SIZE)
