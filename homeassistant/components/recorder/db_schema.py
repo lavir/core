@@ -581,7 +581,7 @@ class StateAttributes(Base):
         if state is None:
             return b"{}"
         domain = split_entity_id(state.entity_id)[0]
-        base_platform_attrs = exclude_attrs_by_domain.get(domain) or _EMPTY_FROZEN_SET
+        base_platform_attrs = exclude_attrs_by_domain.get(domain, _EMPTY_FROZEN_SET)
         integration_attrs = _EMPTY_FROZEN_SET
         if entity_info := entity_sources.get(state.entity_id):
             integration_attrs = exclude_attrs_by_domain.get(
