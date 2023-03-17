@@ -745,10 +745,10 @@ def _compile_statistics(
 ) -> bool:
     """Compile 5-minute statistics for all integrations with a recorder platform.
 
-    This is a helper function for compile_statistics and compile_missing_statistics.
-    to that does not retry on database errors.
+    This is a helper function for compile_statistics and compile_missing_statistics
+    that does not retry on database errors since both callers already retry.
 
-    return True if metadata was modified
+    returns True if metadata was modified, False otherwise
     """
     assert start.tzinfo == dt_util.UTC, "start must be in UTC"
     end = start + timedelta(minutes=5)
