@@ -18,10 +18,6 @@ class ReadOnlyDict(dict[_KT, _VT]):
         """Return the hash of the dict."""
         return id(self)
 
-    def __eq__(self, other: object) -> bool:
-        """Return if the dict is equal to another object."""
-        return id(self) == id(other)
-
     __setitem__ = _readonly
     __delitem__ = _readonly
     pop = _readonly
