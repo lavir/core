@@ -713,8 +713,10 @@ def compile_missing_statistics(instance: Recorder) -> bool:
             periods_without_commit += 1
             end = start + timedelta(minutes=period_size)
             _LOGGER.debug("Compiling missing statistics for %s-%s", start, end)
-            _compile_statistics(instance, session, start, end >= last_period)
-            if periods_without_commit == commit_interval:
+            metadata_modified = _compile_statistics(
+                instance, session, start, end >= last_period
+            )
+            if periods_without_commit == commit_interval or metadata_modified:
                 session.commit()
                 session.expunge_all()
                 periods_without_commit = 0
@@ -740,20 +742,23 @@ def compile_statistics(instance: Recorder, start: datetime, fire_events: bool) -
 
 def _compile_statistics(
     instance: Recorder, session: Session, start: datetime, fire_events: bool
-) -> None:
+) -> bool:
     """Compile 5-minute statistics for all integrations with a recorder platform.
 
     This is a helper function for compile_statistics and compile_missing_statistics.
     to that does not retry on database errors.
+
+    return True if metadata was modified
     """
     assert start.tzinfo == dt_util.UTC, "start must be in UTC"
     end = start + timedelta(minutes=5)
     statistics_meta_manager = instance.statistics_meta_manager
+    metadata_modified = False
 
     # Return if we already have 5-minute statistics for the requested period
     if session.query(StatisticsRuns).filter_by(start=start).first():
         _LOGGER.debug("Statistics already compiled for %s-%s", start, end)
-        return
+        return metadata_modified
 
     _LOGGER.debug("Compiling statistics for %s-%s", start, end)
     platform_stats: list[StatisticResult] = []
@@ -777,9 +782,10 @@ def _compile_statistics(
 
     # Insert collected statistics in the database
     for stats in platform_stats:
-        metadata_id = statistics_meta_manager.update_or_add(
+        updated, metadata_id = statistics_meta_manager.update_or_add(
             session, stats["meta"], current_metadata
         )
+        metadata_modified |= updated
         _insert_statistics(
             session,
             StatisticsShortTerm,
@@ -797,6 +803,8 @@ def _compile_statistics(
         instance.hass.bus.fire(EVENT_RECORDER_5MIN_STATISTICS_GENERATED)
         if start.minute == 55:
             instance.hass.bus.fire(EVENT_RECORDER_HOURLY_STATISTICS_GENERATED)
+
+    return metadata_modified
 
 
 def _adjust_sum_statistics(
