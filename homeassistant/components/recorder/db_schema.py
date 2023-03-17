@@ -522,7 +522,7 @@ class States(Base):
         )
 
 
-@lru_cache(maxsize=2048)
+@lru_cache
 def _cached_attrs_json_bytes_strip_null(
     attrs: ReadOnlyDict[str, Any],
     base_platform_attrs: frozenset[str],
@@ -535,7 +535,7 @@ def _cached_attrs_json_bytes_strip_null(
     )
 
 
-@lru_cache(maxsize=2048)
+@lru_cache
 def _cached_attrs_json_bytes(
     attrs: ReadOnlyDict[str, Any],
     base_platform_attrs: frozenset[str],
