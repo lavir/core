@@ -275,7 +275,20 @@ class DenonDevice(MediaPlayerEntity):
         property_hash = hash(property_values)
         if property_hash != self._property_hash:
             self._property_hash = property_hash
+            _LOGGER.warning(
+                "Properties have changed, updating state: %s %s %s",
+                zone,
+                event,
+                parameter,
+            )
             self.async_write_ha_state()
+        else:
+            _LOGGER.warning(
+                "Properties have NOT changed, skipping state update: %s %s %s",
+                zone,
+                event,
+                parameter,
+            )
 
     async def async_added_to_hass(self) -> None:
         """Register for telnet events."""
