@@ -163,17 +163,6 @@ def _significant_states_stmt(
             | (States.last_changed_ts == States.last_updated_ts)
             | States.last_changed_ts.is_(None)
         )
-    elif (
-        entity_ids and significant_changes_only and metadata_ids_in_significant_domains
-    ):
-        # Since we are filtering on entity_id we can avoid the join of the
-        # states_meta table since we already know which metadata_ids are
-        # in the significant domains
-        stmt += lambda q: q.filter(
-            States.metadata_id.in_(metadata_ids_in_significant_domains)
-            | (States.last_changed_ts == States.last_updated_ts)
-            | States.last_changed_ts.is_(None)
-        )
     elif significant_changes_only:
         # This is the case where we are not filtering on entity_id
         # so we need to join the states_meta table to filter out
