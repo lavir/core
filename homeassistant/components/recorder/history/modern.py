@@ -142,7 +142,6 @@ def _ignore_domains_filter(query: Query) -> Query:
 def _significant_states_stmt(
     start_time: datetime,
     end_time: datetime | None,
-    entity_ids: list[str] | None,
     metadata_ids: list[int] | None,
     metadata_ids_in_significant_domains: list[int],
     filters: Filters | None,
@@ -261,7 +260,6 @@ def get_significant_states_with_session(
     stmt = _significant_states_stmt(
         start_time,
         end_time,
-        entity_ids,
         metadata_ids,
         metadata_ids_in_significant_domains,
         filters,
