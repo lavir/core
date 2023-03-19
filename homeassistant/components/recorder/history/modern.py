@@ -144,6 +144,7 @@ def _significant_states_stmt(
     end_time: datetime | None,
     entity_ids: list[str] | None,
     metadata_ids: list[int] | None,
+    metadata_ids_in_significant_domains: list[int],
     filters: Filters | None,
     significant_changes_only: bool,
     no_attributes: bool,
@@ -161,6 +162,17 @@ def _significant_states_stmt(
     ):
         stmt += lambda q: q.filter(
             (States.last_changed_ts == States.last_updated_ts)
+            | States.last_changed_ts.is_(None)
+        )
+    elif (
+        entity_ids and significant_changes_only and metadata_ids_in_significant_domains
+    ):
+        # Since we are filtering on entity_id we can avoid the join of the
+        # states_meta table since we already know which metadata_ids are
+        # in the significant domains
+        stmt += lambda q: q.filter(
+            States.metadata_id.in_(metadata_ids_in_significant_domains)
+            | (States.last_changed_ts == States.last_updated_ts)
             | States.last_changed_ts.is_(None)
         )
     elif significant_changes_only:
@@ -235,6 +247,7 @@ def get_significant_states_with_session(
     """
     metadata_ids: list[int] | None = None
     entity_id_to_metadata_id: dict[str, int | None] | None = None
+    metadata_ids_in_significant_domains: list[int] = []
     if entity_ids:
         instance = recorder.get_instance(hass)
         if not (
@@ -243,11 +256,19 @@ def get_significant_states_with_session(
             )
         ) or not (metadata_ids := extract_metadata_ids(entity_id_to_metadata_id)):
             return {}
+        if significant_changes_only:
+            metadata_ids_in_significant_domains = [
+                metadata_id
+                for entity_id, metadata_id in entity_id_to_metadata_id.items()
+                if metadata_id is not None
+                and split_entity_id(entity_id)[0] in SIGNIFICANT_DOMAINS
+            ]
     stmt = _significant_states_stmt(
         start_time,
         end_time,
         entity_ids,
         metadata_ids,
+        metadata_ids_in_significant_domains,
         filters,
         significant_changes_only,
         no_attributes,
