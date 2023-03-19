@@ -154,14 +154,13 @@ def _significant_states_stmt(
         no_attributes, include_last_changed=not significant_changes_only
     )
     join_states_meta = False
-    if (
-        entity_ids
-        and len(entity_ids) == 1
-        and significant_changes_only
-        and split_entity_id(entity_ids[0])[0] not in SIGNIFICANT_DOMAINS
-    ):
+    if metadata_ids and significant_changes_only:
+        # Since we are filtering on entity_id (metadata_id) we can avoid
+        # the join of the states_meta table since we already know which
+        # metadata_ids are in the significant domains.
         stmt += lambda q: q.filter(
-            (States.last_changed_ts == States.last_updated_ts)
+            States.metadata_id.in_(metadata_ids_in_significant_domains)
+            | (States.last_changed_ts == States.last_updated_ts)
             | States.last_changed_ts.is_(None)
         )
     elif (
@@ -176,6 +175,13 @@ def _significant_states_stmt(
             | States.last_changed_ts.is_(None)
         )
     elif significant_changes_only:
+        # This is the case where we are not filtering on entity_id
+        # so we need to join the states_meta table to filter out
+        # the domains we do not care about. This query path was
+        # only used by the old history page to show all entities
+        # in the UI. The new history page filters on entity_id
+        # so this query path is not used anymore except for third
+        # party integrations that use the history API.
         stmt += lambda q: q.filter(
             or_(
                 *[
