@@ -502,6 +502,7 @@ class Recorder(threading.Thread):
         new_size = self.hass.states.async_entity_ids_count() * 2
         self.state_attributes_manager.adjust_lru_size(new_size)
         self.states_meta_manager.adjust_lru_size(new_size)
+        self.statistics_meta_manager.adjust_lru_size(new_size)
 
     @callback
     def async_periodic_statistics(self) -> None:
@@ -620,6 +621,13 @@ class Recorder(threading.Thread):
             return SHUTDOWN_TASK
 
     def run(self) -> None:
+        """Run the recorder thread."""
+        try:
+            self._run()
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Unexpected error in recorder thread")
+
+    def _run(self) -> None:
         """Start processing events to save."""
         self.thread_id = threading.get_ident()
         setup_result = self._setup_recorder()

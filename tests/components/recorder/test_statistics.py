@@ -85,7 +85,7 @@ def test_compile_hourly_statistics(hass_recorder: Callable[..., HomeAssistant]) 
 
     # Should not fail if there is nothing there yet
     stats = get_latest_short_term_statistics(
-        hass, ["sensor.test1"], {"last_reset", "max", "mean", "min", "state", "sum"}
+        hass, {"sensor.test1"}, {"last_reset", "max", "mean", "min", "state", "sum"}
     )
     assert stats == {}
 
@@ -170,15 +170,15 @@ def test_compile_hourly_statistics(hass_recorder: Callable[..., HomeAssistant]) 
     assert stats == {"sensor.test1": [expected_2]}
 
     stats = get_latest_short_term_statistics(
-        hass, ["sensor.test1"], {"last_reset", "max", "mean", "min", "state", "sum"}
+        hass, {"sensor.test1"}, {"last_reset", "max", "mean", "min", "state", "sum"}
     )
     assert stats == {"sensor.test1": [expected_2]}
 
-    metadata = get_metadata(hass, statistic_ids=['sensor.test1"'])
+    metadata = get_metadata(hass, statistic_ids={"sensor.test1"})
 
     stats = get_latest_short_term_statistics(
         hass,
-        ["sensor.test1"],
+        {"sensor.test1"},
         {"last_reset", "max", "mean", "min", "state", "sum"},
         metadata=metadata,
     )
@@ -214,7 +214,7 @@ def test_compile_hourly_statistics(hass_recorder: Callable[..., HomeAssistant]) 
     instance.get_session().query(StatisticsShortTerm).delete()
     # Should not fail there is nothing in the table
     stats = get_latest_short_term_statistics(
-        hass, ["sensor.test1"], {"last_reset", "max", "mean", "min", "state", "sum"}
+        hass, {"sensor.test1"}, {"last_reset", "max", "mean", "min", "state", "sum"}
     )
     assert stats == {}
 
@@ -244,7 +244,7 @@ def mock_sensor_statistics():
                 sensor_stats("sensor.test3", start),
             ],
             get_metadata(
-                _hass, statistic_ids=["sensor.test1", "sensor.test2", "sensor.test3"]
+                _hass, statistic_ids={"sensor.test1", "sensor.test2", "sensor.test3"}
             ),
         )
 
@@ -384,6 +384,19 @@ def test_rename_entity(hass_recorder: Callable[..., HomeAssistant]) -> None:
 
     stats = statistics_during_period(hass, zero, period="5minute")
     assert stats == {"sensor.test99": expected_stats99, "sensor.test2": expected_stats2}
+
+
+def test_statistics_during_period_set_back_compat(
+    hass_recorder: Callable[..., HomeAssistant]
+) -> None:
+    """Test statistics_during_period can handle a list instead of a set."""
+    hass = hass_recorder()
+    setup_component(hass, "sensor", {})
+    # This should not throw an exception when passed a list instead of a set
+    assert (
+        statistics_during_period(hass, dt_util.utcnow(), statistic_ids=["sensor.test1"])
+        == {}
+    )
 
 
 def test_rename_entity_collision(
@@ -596,7 +609,7 @@ async def test_import_statistics(
             "unit_class": "energy",
         }
     ]
-    metadata = get_metadata(hass, statistic_ids=(statistic_id,))
+    metadata = get_metadata(hass, statistic_ids={statistic_id})
     assert metadata == {
         statistic_id: (
             1,
@@ -693,7 +706,7 @@ async def test_import_statistics(
             "unit_class": "energy",
         }
     ]
-    metadata = get_metadata(hass, statistic_ids=(statistic_id,))
+    metadata = get_metadata(hass, statistic_ids={statistic_id})
     assert metadata == {
         statistic_id: (
             1,
@@ -815,7 +828,7 @@ def test_external_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("sensor.total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"sensor.total_energy_import"}) == {}
 
     # Attempt to insert statistics for the wrong domain
     external_metadata = {**_external_metadata, "source": "other"}
@@ -825,7 +838,7 @@ def test_external_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("test:total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"test:total_energy_import"}) == {}
 
     # Attempt to insert statistics for a naive starting time
     external_metadata = {**_external_metadata}
@@ -838,7 +851,7 @@ def test_external_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("test:total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"test:total_energy_import"}) == {}
 
     # Attempt to insert statistics for an invalid starting time
     external_metadata = {**_external_metadata}
@@ -848,7 +861,7 @@ def test_external_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("test:total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"test:total_energy_import"}) == {}
 
     # Attempt to insert statistics with a naive last_reset
     external_metadata = {**_external_metadata}
@@ -861,7 +874,7 @@ def test_external_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("test:total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"test:total_energy_import"}) == {}
 
 
 def test_import_statistics_errors(
@@ -904,7 +917,7 @@ def test_import_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("test:total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"test:total_energy_import"}) == {}
 
     # Attempt to insert statistics for the wrong domain
     external_metadata = {**_external_metadata, "source": "sensor"}
@@ -914,7 +927,7 @@ def test_import_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("sensor.total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"sensor.total_energy_import"}) == {}
 
     # Attempt to insert statistics for a naive starting time
     external_metadata = {**_external_metadata}
@@ -927,7 +940,7 @@ def test_import_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("sensor.total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"sensor.total_energy_import"}) == {}
 
     # Attempt to insert statistics for an invalid starting time
     external_metadata = {**_external_metadata}
@@ -937,7 +950,7 @@ def test_import_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("sensor.total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"sensor.total_energy_import"}) == {}
 
     # Attempt to insert statistics with a naive last_reset
     external_metadata = {**_external_metadata}
@@ -950,7 +963,7 @@ def test_import_statistics_errors(
     wait_recording_done(hass)
     assert statistics_during_period(hass, zero, period="hour") == {}
     assert list_statistic_ids(hass) == []
-    assert get_metadata(hass, statistic_ids=("sensor.total_energy_import",)) == {}
+    assert get_metadata(hass, statistic_ids={"sensor.total_energy_import"}) == {}
 
 
 @pytest.mark.parametrize("timezone", ["America/Regina", "Europe/Vienna", "UTC"])
