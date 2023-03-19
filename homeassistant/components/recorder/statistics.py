@@ -967,8 +967,14 @@ async def async_list_statistic_ids(
         metadata = statistics_meta_manager.get_from_cache_threadsafe(statistic_ids)
         if not statistic_ids.difference(metadata):
             result = _statistic_by_id_from_metadata(hass, metadata)
+            _LOGGER.warning("Cache hit for statistic_ids: %s", statistic_ids)
             return _flatten_list_statistic_ids_metadata_result(result)
 
+    _LOGGER.warning(
+        "Cache miss for statistic_ids=%s statistic_type=%s",
+        statistic_ids,
+        statistic_type,
+    )
     return await instance.async_add_executor_job(
         list_statistic_ids,
         hass,
