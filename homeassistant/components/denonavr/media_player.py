@@ -249,11 +249,6 @@ class DenonDevice(MediaPlayerEntity):
 
         self._telnet_was_healthy: bool | None = None
 
-        self._properties = [
-            k for k, v in self.__class__.__dict__.items() if isinstance(v, property)
-        ]
-        self._property_hash = hash(0)
-
     async def _telnet_callback(self, zone, event, parameter) -> None:
         """Process a telnet command callback."""
         # There are multiple checks implemented which reduce unnecessary updates of the ha state machine
@@ -267,28 +262,7 @@ class DenonDevice(MediaPlayerEntity):
             return
         if event == "HD" and not parameter.startswith("ALBUM"):
             return
-        # Some event types fire more events than there are changes.
-        # Thus, we check if there are changes before calling self.async_write_ha_state.
-        property_values = ""
-        for prop in self._properties:
-            property_values += str(getattr(self, prop, ""))
-        property_hash = hash(property_values)
-        if property_hash != self._property_hash:
-            self._property_hash = property_hash
-            _LOGGER.warning(
-                "Properties have changed, updating state: %s %s %s",
-                zone,
-                event,
-                parameter,
-            )
-            self.async_write_ha_state()
-        else:
-            _LOGGER.warning(
-                "Properties have NOT changed, skipping state update: %s %s %s",
-                zone,
-                event,
-                parameter,
-            )
+        self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """Register for telnet events."""
