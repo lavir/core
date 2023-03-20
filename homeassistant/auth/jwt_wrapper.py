@@ -7,18 +7,20 @@ to speed up the process.
 from __future__ import annotations
 
 from datetime import timedelta
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Any
 
 from jwt import DecodeError, PyJWS, PyJWT
 
 from homeassistant.util.json import json_loads
 
+JWT_TOKEN_CACHE_SIZE = 16
+
 
 class _PyJWSWithLoadCache(PyJWS):
     """PyJWS with a dedicated load implementation."""
 
-    @lru_cache(maxsize=16)
+    @lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)
     # We only ever have a global instance of this class
     # so we do not have to worry about the LRU growing
     # each time we create a new instance.
@@ -81,9 +83,12 @@ class _PyJWTWithVerify(PyJWT):
 
 _jwt = _PyJWTWithVerify()  # type: ignore[no-untyped-call]
 verify = _jwt.verify
-decode_payload = _jwt.decode_payload
+_unverified_decoder = partial(
+    _jwt.decode_payload, algorithms=["HS256"], options={"verify_signature": False}
+)
+unverified_token_decode = lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)(_unverified_decoder)
 
 __all__ = [
-    "decode_payload",
+    "unverified_token_decode",
     "verify",
 ]

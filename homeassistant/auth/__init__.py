@@ -555,9 +555,7 @@ class AuthManager:
     ) -> models.RefreshToken | None:
         """Return refresh token if an access token is valid."""
         try:
-            unverif_claims = jwt_wrapper.decode_payload(
-                token, algorithms=["HS256"], options={"verify_signature": False}
-            )
+            unverif_claims = jwt_wrapper.unverified_token_decode(token)
         except jwt.InvalidTokenError:
             return None
 
