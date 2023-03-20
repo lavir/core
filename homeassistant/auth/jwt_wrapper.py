@@ -19,6 +19,9 @@ class _PyJWSWithLoadCache(PyJWS):
     """PyJWS with a dedicated load implementation."""
 
     @lru_cache(maxsize=16)
+    # We only ever have a global instance of this class
+    # so we do not have to worry about the LRU growing
+    # each time we create a new instance.
     def _load(self, jwt: str | bytes) -> tuple[bytes, bytes, dict, bytes]:
         """Load a JWS."""
         return super()._load(jwt)
