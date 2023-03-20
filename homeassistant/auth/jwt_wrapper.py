@@ -57,14 +57,15 @@ class _PyJWTWithVerify(PyJWT):
         leeway: int | float | timedelta,
     ) -> None:
         """Verify a JWT's signature and claims."""
+        options = {"verify_signature": True}
         self._validate_claims(  # type: ignore[no-untyped-call]
             payload=self.decode_payload(
                 jwt=jwt,
                 key=key,
-                options={"verify_signature": True},
+                options=options,
                 algorithms=algorithms,
             ),
-            options={**self.options, "verify_signature": True},
+            options={**self.options, **options},
             issuer=issuer,
             leeway=leeway,
         )
