@@ -5,13 +5,16 @@ import asyncio
 from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import timedelta
+from functools import lru_cache, partial
 from typing import Any, cast
 
 import jwt
+from jwt import DecodeError
 
 from homeassistant import data_entry_flow
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.json import json_loads
 from homeassistant.util import dt as dt_util
 
 from . import auth_store, models
@@ -34,6 +37,48 @@ class InvalidAuthError(Exception):
 
 class InvalidProvider(Exception):
     """Authentication provider not found."""
+
+
+class _PyJWTWithVerify(jwt.PyJWT):
+    """PyJWT with a dedicated verify implementation."""
+
+    def verify(
+        self,
+        jwt: str,
+        key: str,
+        algorithms: list[str],
+        issuer: str | None,
+        leeway: int | float | timedelta,
+    ) -> None:
+        """Verify a JWT's signature and claims."""
+        # https://pyjwt.readthedocs.io/en/stable/api.html#jwt.api_jwt.decode_complete
+        try:
+            payload = json_loads(
+                self.decode_complete(
+                    jwt=jwt,
+                    key=key,
+                    algorithms=algorithms,
+                    options={"verify_signature": True},
+                )["payload"]
+            )
+        except ValueError as e:
+            raise DecodeError(f"Invalid payload string: {e}")
+        if not isinstance(payload, dict):
+            raise DecodeError("Invalid payload string: must be a json object")
+
+        self._validate_claims(
+            payload=payload,
+            options={**self.options, "verify_signature": True},
+            issuer=issuer,
+            leeway=leeway,
+        )
+
+
+_jwt = _PyJWTWithVerify()
+_unverified_decoder = partial(
+    _jwt.decode, algorithms=["HS256"], options={"verify_signature": False}
+)
+_cached_token_decode = lru_cache(maxsize=16)(_unverified_decoder)
 
 
 async def auth_manager_from_config(
@@ -555,9 +600,7 @@ class AuthManager:
     ) -> models.RefreshToken | None:
         """Return refresh token if an access token is valid."""
         try:
-            unverif_claims = jwt.decode(
-                token, algorithms=["HS256"], options={"verify_signature": False}
-            )
+            unverif_claims = _cached_token_decode(token)
         except jwt.InvalidTokenError:
             return None
 
@@ -573,7 +616,7 @@ class AuthManager:
             issuer = refresh_token.id
 
         try:
-            jwt.decode(token, jwt_key, leeway=10, issuer=issuer, algorithms=["HS256"])
+            _jwt.verify(token, jwt_key, leeway=10, issuer=issuer, algorithms=["HS256"])
         except jwt.InvalidTokenError:
             return None
 
