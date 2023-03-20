@@ -271,23 +271,41 @@ class WebSocketHandler:
             async_dispatcher_send(self.hass, SIGNAL_WEBSOCKET_CONNECTED)
 
             #
-            # https://github.com/aio-libs/aiohttp/issues/1367 added drains
-            # to the websocket writer to handle malicious clients and
-            # network issues. However, this causes a problem for us since
-            # we don't want to wait for the buffer to drain before we send
-            # the next one since it backs up into the queue which uses more memory.
             #
-            # Set the limit to 512KiB since the default limit of 16KiB is way too
-            # low for our use case since the registries can be quite large.
+            # Our websocket implementation is backed by an asyncio.Queue
+            #
+            # As back-pressure builds, the queue will back up and use more memory
+            # until we disconnect the client when the queue size reaches
+            # MAX_PENDING_MSG. When we are generating a high volume of websocket messages,
+            # we hit a bottleneck in aiohttp where it will wait for
+            # the buffer to drain before sending the next message and messages
+            # start backing up in the queue.
+            #
+            # https://github.com/aio-libs/aiohttp/issues/1367 added drains
+            # to the websocket writer to handle malicious clients and network issues.
+            # The drain causes multiple problems for us since the buffer cannot be
+            # drained fast enough when we deliver a high volume or large messages:
+            #
+            # - We end up disconnecting the client. The client will then reconnect,
+            # and the cycle repeats itself, which results in a significant amount of
+            # CPU usage.
+            #
+            # - Messages latency increases because messages cannot be moved into
+            # the buffer because it is blocked waiting for the drain to happen because
+            # of the low default limit of 16KiB. By increasing the limit, we instead
+            # rely on the underlying TCP buffer and stack to deliver the messages which
+            # can typically happen much faster.
+            #
+            # After the auth phase is completed, and we are not concerned about
+            # the user being a malicious client, we set the limit to force a drain
+            # to 2MiB. 2MiB is the maximum expected size of the serialized entity
+            # registry, which is the largest message we usually send.
             #
             # https://github.com/aio-libs/aiohttp/commit/b3c80ee3f7d5d8f0b8bc27afe52e4d46621eaf99
-            # added a way to set the limit but there is no way to actually
-            # reach the code to set the limit so we have to set it directly.
+            # added a way to set the limit, but there is no way to actually
+            # reach the code to set the limit, so we have to set it directly.
             #
-            # We already authenticated so we are less concerned about malicious
-            # clients at this point.
-            #
-            wsock._writer._limit = 2**19  # type: ignore[union-attr] # pylint: disable=protected-access
+            wsock._writer._limit = 2 * 2**20  # type: ignore[union-attr] # pylint: disable=protected-access
 
             # Command phase
             while not wsock.closed:
