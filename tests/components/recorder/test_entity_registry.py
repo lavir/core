@@ -14,6 +14,7 @@ from homeassistant.setup import setup_component
 from homeassistant.util import dt as dt_util
 
 from .common import (
+    ForceReturnConnectionToPool,
     assert_dict_of_states_equal_without_context_and_last_changed,
     async_wait_recording_done,
     record_states,
@@ -92,7 +93,12 @@ async def test_rename_entity_on_mocked_platform(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test states meta is migrated when entity_id is changed."""
+    """Test states meta is migrated when entity_id is changed when using a mocked platform.
+
+    This test will call async_remove on the entity so we can make
+    sure that we do not record the entity as removed in the database
+    when we rename it.
+    """
     instance = await async_setup_recorder_instance(hass)
     entity_reg = er.async_get(hass)
     start = dt_util.utcnow()
@@ -125,6 +131,14 @@ async def test_rename_entity_on_mocked_platform(
     )
 
     entity_reg.async_update_entity("sensor.test1", new_entity_id="sensor.test99")
+    await hass.async_block_till_done()
+    # We have to call the remove method ourselves since we are mocking the platform
+    hass.states.async_remove("sensor.test1")
+
+    # The remove will trigger a lookup of the non-existing entity_id in the database
+    # so we need to force the recorder to return the connection to the pool
+    # since our test setup only allows one connection at a time.
+    instance.queue_task(ForceReturnConnectionToPool())
 
     await async_wait_recording_done(hass)
 
@@ -213,18 +227,7 @@ def test_rename_entity_collision(
     assert len(hist["sensor.test99"]) == 2
 
     with session_scope(hass=hass) as session:
-        assert (
-            len(
-                list(
-                    session.execute(
-                        select(StatesMeta).filter(
-                            StatesMeta.entity_id == "sensor.test99"
-                        )
-                    )
-                )
-            )
-            == 1
-        )
+        assert _count_entity_id_in_states_meta(hass, session, "sensor.test99") == 1
 
     hass.states.set("sensor.test99", "post_migrate")
     wait_recording_done(hass)
@@ -233,61 +236,7 @@ def test_rename_entity_collision(
     assert len(hist["sensor.test99"]) == 2
 
     with session_scope(hass=hass) as session:
-        assert (
-            len(
-                list(
-                    session.execute(
-                        select(StatesMeta).filter(
-                            StatesMeta.entity_id == "sensor.test99"
-                        )
-                    )
-                )
-            )
-            == 1
-        )
-        assert (
-            len(
-                list(
-                    session.execute(
-                        select(StatesMeta).filter(
-                            StatesMeta.entity_id == "sensor.test1"
-                        )
-                    )
-                )
-            )
-            == 1
-        )
-
-    hass.states.set("sensor.test99", "post_migrate")
-    wait_recording_done(hass)
-    new_hist = history.get_significant_states(hass, zero, dt_util.utcnow())
-    assert new_hist["sensor.test99"][-1].state == "post_migrate"
-    assert len(hist["sensor.test99"]) == 2
-
-    with session_scope(hass=hass) as session:
-        assert (
-            len(
-                list(
-                    session.execute(
-                        select(StatesMeta).filter(
-                            StatesMeta.entity_id == "sensor.test99"
-                        )
-                    )
-                )
-            )
-            == 1
-        )
-        assert (
-            len(
-                list(
-                    session.execute(
-                        select(StatesMeta).filter(
-                            StatesMeta.entity_id == "sensor.test1"
-                        )
-                    )
-                )
-            )
-            == 1
-        )
+        assert _count_entity_id_in_states_meta(hass, session, "sensor.test99") == 1
+        assert _count_entity_id_in_states_meta(hass, session, "sensor.test1") == 1
 
     assert "the new entity_id is already in use" in caplog.text
