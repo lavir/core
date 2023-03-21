@@ -234,8 +234,8 @@ class WebSocketHandler:
         auth = AuthPhase(
             self._logger, self.hass, self._send_message, self._cancel, request
         )
-        disconnect_warn = None
         connection = None
+        disconnect_warn = None
 
         try:
             self._send_message(auth_required_message())
@@ -252,9 +252,7 @@ class WebSocketHandler:
                 raise Disconnect
 
             if msg.type != WSMsgType.TEXT:
-                disconnect_warn = (
-                    f"Received non-Text message with type: {msg.type}: {msg.data}."
-                )
+                disconnect_warn = "Received non-Text message."
                 raise Disconnect
 
             try:
@@ -291,21 +289,21 @@ class WebSocketHandler:
             # CPU usage.
             #
             # - Messages latency increases because messages cannot be moved into
-            # the buffer because it is blocked waiting for the drain to happen because
+            # the TCP buffer because it is blocked waiting for the drain to happen because
             # of the low default limit of 16KiB. By increasing the limit, we instead
             # rely on the underlying TCP buffer and stack to deliver the messages which
             # can typically happen much faster.
             #
             # After the auth phase is completed, and we are not concerned about
             # the user being a malicious client, we set the limit to force a drain
-            # to 2MiB. 2MiB is the maximum expected size of the serialized entity
+            # to 1MiB. 1MiB is the maximum expected size of the serialized entity
             # registry, which is the largest message we usually send.
             #
             # https://github.com/aio-libs/aiohttp/commit/b3c80ee3f7d5d8f0b8bc27afe52e4d46621eaf99
             # added a way to set the limit, but there is no way to actually
             # reach the code to set the limit, so we have to set it directly.
             #
-            wsock._writer._limit = 2 * 2**20  # type: ignore[union-attr] # pylint: disable=protected-access
+            wsock._writer._limit = 2**20  # type: ignore[union-attr] # pylint: disable=protected-access
 
             # Command phase
             while not wsock.closed:
@@ -315,9 +313,7 @@ class WebSocketHandler:
                     break
 
                 if msg.type != WSMsgType.TEXT:
-                    disconnect_warn = (
-                        f"Received non-Text message with type: {msg.type}: {msg.data}."
-                    )
+                    disconnect_warn = "Received non-Text message."
                     break
 
                 try:
