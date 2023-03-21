@@ -95,13 +95,13 @@ class _PyJWTWithVerify(PyJWT):
 
 _jwt = _PyJWTWithVerify()  # type: ignore[no-untyped-call]
 verify_and_decode = _jwt.verify_and_decode
-unverified_token_decode = lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)(
+unverified_hs256_token_decode = lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)(
     partial(
         _jwt.decode_payload, key="", algorithms=["HS256"], options=_NO_VERIFY_OPTIONS
     )
 )
 
 __all__ = [
-    "unverified_token_decode",
+    "unverified_hs256_token_decode",
     "verify_and_decode",
 ]
