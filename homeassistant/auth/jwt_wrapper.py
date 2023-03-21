@@ -16,6 +16,13 @@ from homeassistant.util.json import json_loads
 
 JWT_TOKEN_CACHE_SIZE = 16
 
+_VERIFY_KEYS = ("signature", "exp", "nbf", "iat", "aud", "iss")
+
+_VERIFY_OPTIONS: dict[str, Any] = {f"verify_{key}": True for key in _VERIFY_KEYS} | {
+    "require": []
+}
+_NO_VERIFY_OPTIONS = {f"verify_{key}": False for key in _VERIFY_KEYS}
+
 
 class _PyJWSWithLoadCache(PyJWS):
     """PyJWS with a dedicated load implementation."""
@@ -32,63 +39,69 @@ class _PyJWSWithLoadCache(PyJWS):
 _jws = _PyJWSWithLoadCache()
 
 
+@lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)
+def _decode_payload(json_payload: str) -> dict[str, Any]:
+    """Decode the payload from a JWS dictionary."""
+    try:
+        payload = json_loads(json_payload)
+    except ValueError as err:
+        raise DecodeError(f"Invalid payload string: {err}") from err
+    if not isinstance(payload, dict):
+        raise DecodeError("Invalid payload string: must be a json object")
+    return payload
+
+
 class _PyJWTWithVerify(PyJWT):
-    """PyJWT with a dedicated verify implementation."""
+    """PyJWT with a fast decode implementation."""
 
     def decode_payload(
-        self,
-        jwt: str,
-        options: dict[str, Any],
-        algorithms: list[str],
-        key: str | None = None,
+        self, jwt: str, key: str, options: dict[str, Any], algorithms: list[str]
     ) -> dict[str, Any]:
         """Decode a JWT's payload."""
-        try:
-            payload = json_loads(
-                _jws.decode_complete(
-                    jwt=jwt,
-                    key=key or "",
-                    algorithms=algorithms,
-                    options=options,
-                )["payload"]
-            )
-        except ValueError as err:
-            raise DecodeError(f"Invalid payload string: {err}") from err
-        if not isinstance(payload, dict):
-            raise DecodeError("Invalid payload string: must be a json object")
-        return payload
+        return _decode_payload(
+            _jws.decode_complete(
+                jwt=jwt,
+                key=key,
+                algorithms=algorithms,
+                options=options,
+            )["payload"]
+        )
 
-    def verify(
+    def verify_and_decode(
         self,
         jwt: str,
         key: str,
         algorithms: list[str],
-        issuer: str | None,
-        leeway: int | float | timedelta,
-    ) -> None:
+        issuer: str | None = None,
+        leeway: int | float | timedelta = 0,
+        options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Verify a JWT's signature and claims."""
-        options = {"verify_signature": True}
+        merged_options = {**_VERIFY_OPTIONS, **(options or {})}
+        payload = self.decode_payload(
+            jwt=jwt,
+            key=key,
+            options=merged_options,
+            algorithms=algorithms,
+        )
         self._validate_claims(  # type: ignore[no-untyped-call]
-            payload=self.decode_payload(
-                jwt=jwt,
-                key=key,
-                options=options,
-                algorithms=algorithms,
-            ),
-            options={**self.options, **options},
+            payload=payload,
+            options=merged_options,
             issuer=issuer,
             leeway=leeway,
         )
+        return payload
 
 
 _jwt = _PyJWTWithVerify()  # type: ignore[no-untyped-call]
-verify = _jwt.verify
-_unverified_decoder = partial(
-    _jwt.decode_payload, algorithms=["HS256"], options={"verify_signature": False}
+verify_and_decode = _jwt.verify_and_decode
+unverified_token_decode = lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)(
+    partial(
+        _jwt.decode_payload, key="", algorithms=["HS256"], options=_NO_VERIFY_OPTIONS
+    )
 )
-unverified_token_decode = lru_cache(maxsize=JWT_TOKEN_CACHE_SIZE)(_unverified_decoder)
 
 __all__ = [
     "unverified_token_decode",
-    "verify",
+    "verify_and_decode",
 ]
