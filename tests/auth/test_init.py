@@ -1127,3 +1127,56 @@ async def test_event_user_updated_fires(hass: HomeAssistant) -> None:
 
     await hass.async_block_till_done()
     assert len(events) == 1
+
+
+async def test_access_token_with_invalid_signature(mock_hass) -> None:
+    """Test rejecting access tokens with an invalid signature."""
+    manager = await auth.auth_manager_from_config(mock_hass, [], [])
+    user = MockUser().add_to_auth_manager(manager)
+    refresh_token = await manager.async_create_refresh_token(
+        user,
+        client_name="Good Client",
+        token_type=auth_models.TOKEN_TYPE_LONG_LIVED_ACCESS_TOKEN,
+        access_token_expiration=timedelta(days=3000),
+    )
+    assert refresh_token.token_type == auth_models.TOKEN_TYPE_LONG_LIVED_ACCESS_TOKEN
+    access_token = manager.async_create_access_token(refresh_token)
+
+    rt = await manager.async_validate_access_token(access_token)
+    assert rt.id == refresh_token.id
+
+    # Now we corrupt the signature
+    header, payload, signature = access_token.split(".")
+    invalid_signature = "a" * len(signature)
+    invalid_token = f"{header}.{payload}.{invalid_signature}"
+
+    assert access_token != invalid_token
+
+    result = await manager.async_validate_access_token(invalid_token)
+    assert result is None
+
+
+async def test_reject_access_token_with_impossible_large_size(mock_hass) -> None:
+    """Test rejecting access tokens with impossible sizes."""
+    manager = await auth.auth_manager_from_config(mock_hass, [], [])
+    assert await manager.async_validate_access_token("a" * 10000) is None
+
+
+async def test_reject_token_with_invalid_json_payload(mock_hass) -> None:
+    """Test rejecting access tokens with invalid json payload."""
+    jws = jwt.PyJWS()
+    token_with_invalid_json = jws.encode(
+        b"invalid", b"invalid", "HS256", {"alg": "HS256", "typ": "JWT"}
+    )
+    manager = await auth.auth_manager_from_config(mock_hass, [], [])
+    assert await manager.async_validate_access_token(token_with_invalid_json) is None
+
+
+async def test_reject_token_with_not_dict_json_payload(mock_hass) -> None:
+    """Test rejecting access tokens with not a dict json payload."""
+    jws = jwt.PyJWS()
+    token_not_a_dict_json = jws.encode(
+        b'["invalid"]', b"invalid", "HS256", {"alg": "HS256", "typ": "JWT"}
+    )
+    manager = await auth.auth_manager_from_config(mock_hass, [], [])
+    assert await manager.async_validate_access_token(token_not_a_dict_json) is None
