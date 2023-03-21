@@ -571,7 +571,7 @@ class AuthManager:
             issuer = refresh_token.id
 
         try:
-            jwt_wrapper.verify(
+            jwt_wrapper.verify_and_decode(
                 token, jwt_key, leeway=10, issuer=issuer, algorithms=["HS256"]
             )
         except jwt.InvalidTokenError:
