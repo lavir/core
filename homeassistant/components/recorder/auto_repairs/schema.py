@@ -44,37 +44,48 @@ def validate_table_schema_supports_utf8(
 ) -> set[str]:
     """Do some basic checks for common schema errors caused by manual migration."""
     schema_errors: set[str] = set()
-
     # Lack of full utf8 support is only an issue for MySQL / MariaDB
     if instance.dialect_name != SupportedDialect.MYSQL:
         return schema_errors
 
-    session_maker = instance.get_session
-    # Try inserting some data which needs utf8mb4 support
     try:
-        # Mark the session as read_only to ensure that the test data is not committed
-        # to the database and we always rollback when the scope is exited
-        with session_scope(session=session_maker(), read_only=True) as session:
-            db_object = table_object(**{column: UTF8_NAME for column in columns})
-            table = table_object.__tablename__
-            session.add(db_object)
-            try:
-                session.flush()
-            except OperationalError as err:
-                if err.orig and err.orig.args[0] == MYSQL_ERR_INCORRECT_STRING_VALUE:
-                    _LOGGER.debug(
-                        "Database %s statistics_meta does not support 4-byte UTF-8",
-                        table,
-                    )
-                    schema_errors.add(f"{table}.4-byte UTF-8")
-                    session.rollback()
-                else:
-                    session.rollback()
-                    raise
+        schema_errors = _validate_table_schema_supports_utf8(
+            instance, table_object, columns
+        )
     except Exception as exc:  # pylint: disable=broad-except
         _LOGGER.exception("Error when validating DB schema: %s", exc)
 
     _log_schema_errors(table_object, schema_errors)
+    return schema_errors
+
+
+def _validate_table_schema_supports_utf8(
+    instance: Recorder,
+    table_object: type[DeclarativeBase],
+    columns: tuple[str, ...],
+) -> set[str]:
+    """Do some basic checks for common schema errors caused by manual migration."""
+    schema_errors: set[str] = set()
+    # Mark the session as read_only to ensure that the test data is not committed
+    # to the database and we always rollback when the scope is exited
+    with session_scope(session=instance.get_session(), read_only=True) as session:
+        db_object = table_object(**{column: UTF8_NAME for column in columns})
+        table = table_object.__tablename__
+        # Try inserting some data which needs utf8mb4 support
+        session.add(db_object)
+        try:
+            session.flush()
+        except OperationalError as err:
+            if err.orig and err.orig.args[0] == MYSQL_ERR_INCORRECT_STRING_VALUE:
+                _LOGGER.debug(
+                    "Database %s statistics_meta does not support 4-byte UTF-8",
+                    table,
+                )
+                schema_errors.add(f"{table}.4-byte UTF-8")
+                return schema_errors
+            raise
+        finally:
+            session.rollback()
     return schema_errors
 
 
@@ -90,16 +101,28 @@ def validate_db_schema_precision(
         SupportedDialect.POSTGRESQL,
     ):
         return schema_errors
-
-    columns = _get_precision_column_types(table_object)
-    session_maker = instance.get_session
-
     try:
-        # Mark the session as read_only to ensure that the test data is not committed
-        # to the database and we always rollback when the scope is exited
-        with session_scope(session=session_maker(), read_only=True) as session:
-            db_object = table_object(**{column: PRECISE_NUMBER for column in columns})
-            table = table_object.__tablename__
+        schema_errors = _validate_db_schema_precision(instance, table_object)
+    except Exception as exc:  # pylint: disable=broad-except
+        _LOGGER.exception("Error when validating DB schema: %s", exc)
+
+    _log_schema_errors(table_object, schema_errors)
+    return schema_errors
+
+
+def _validate_db_schema_precision(
+    instance: Recorder,
+    table_object: type[DeclarativeBase],
+) -> set[str]:
+    """Do some basic checks for common schema errors caused by manual migration."""
+    schema_errors: set[str] = set()
+    columns = _get_precision_column_types(table_object)
+    # Mark the session as read_only to ensure that the test data is not committed
+    # to the database and we always rollback when the scope is exited
+    with session_scope(session=instance.get_session(), read_only=True) as session:
+        db_object = table_object(**{column: PRECISE_NUMBER for column in columns})
+        table = table_object.__tablename__
+        try:
             session.add(db_object)
             session.flush()
             session.refresh(db_object)
@@ -111,10 +134,8 @@ def validate_db_schema_precision(
                 table_name=table,
                 supports="double precision",
             )
-    except Exception as exc:  # pylint: disable=broad-except
-        _LOGGER.exception("Error when validating DB schema: %s", exc)
-
-    _log_schema_errors(table_object, schema_errors)
+        finally:
+            session.rollback()
     return schema_errors
 
 
