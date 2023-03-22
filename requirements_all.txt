@@ -625,7 +625,7 @@ dynalite_devices==0.1.47
 eagle100==0.1.1
 
 # homeassistant.components.easyenergy
-easyenergy==0.2.1
+easyenergy==0.2.2
 
 # homeassistant.components.ebusd
 ebusdpy==0.0.17
@@ -868,7 +868,7 @@ ha-philipsjs==3.0.0
 habitipy==0.2.0
 
 # homeassistant.components.cloud
-hass-nabucasa==0.61.1
+hass-nabucasa==0.62.0
 
 # homeassistant.components.splunk
 hass_splunk==0.1.1
@@ -1421,7 +1421,7 @@ pushbullet.py==0.11.0
 pushover_complete==1.1.1
 
 # homeassistant.components.pvoutput
-pvo==0.2.2
+pvo==1.0.0
 
 # homeassistant.components.canary
 py-canary==0.5.3
@@ -2638,7 +2638,7 @@ wirelesstagpy==0.8.1
 withings-api==2.4.0
 
 # homeassistant.components.wled
-wled==0.15.0
+wled==0.16.0
 
 # homeassistant.components.wolflink
 wolf_smartset==0.1.11
