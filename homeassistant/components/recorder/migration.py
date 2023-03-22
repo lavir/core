@@ -28,6 +28,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util.enum import try_parse_enum
 from homeassistant.util.ulid import ulid_to_bytes
 
+from .auto_repairs.states.schema import (
+    correct_db_schema as states_correct_db_schema,
+    validate_db_schema as states_validate_db_schema,
+)
 from .auto_repairs.statistics.duplicates import (
     delete_statistics_duplicates,
     delete_statistics_meta_duplicates,
@@ -151,7 +155,7 @@ class SchemaValidationStatus:
     """Store schema validation status."""
 
     current_version: int
-    statistics_schema_errors: set[str]
+    schema_errors: set[str]
     valid: bool
 
 
@@ -178,11 +182,21 @@ def validate_db_schema(
     if is_current := _schema_is_current(current_version):
         # We can only check for further errors if the schema is current, because
         # columns may otherwise not exist etc.
-        schema_errors |= statistics_validate_db_schema(hass, instance, session_maker)
+        schema_errors = _find_schema_errors(hass, instance, session_maker)
 
     valid = is_current and not schema_errors
 
     return SchemaValidationStatus(current_version, schema_errors, valid)
+
+
+def _find_schema_errors(
+    hass: HomeAssistant, instance: Recorder, session_maker: Callable[[], Session]
+) -> set[str]:
+    """Find schema errors."""
+    schema_errors: set[str] = set()
+    schema_errors |= statistics_validate_db_schema(hass, instance, session_maker)
+    schema_errors |= states_validate_db_schema(hass, instance, session_maker)
+    return schema_errors
 
 
 def live_migration(schema_status: SchemaValidationStatus) -> bool:
@@ -226,12 +240,13 @@ def migrate_schema(
         # so its clear that the upgrade is done
         _LOGGER.warning("Upgrade to version %s done", new_version)
 
-    if schema_errors := schema_status.statistics_schema_errors:
+    if schema_errors := schema_status.schema_errors:
         _LOGGER.warning(
             "Database is about to correct DB schema errors: %s",
             ", ".join(sorted(schema_errors)),
         )
         statistics_correct_db_schema(instance, engine, session_maker, schema_errors)
+        states_correct_db_schema(instance, engine, session_maker, schema_errors)
 
     if current_version != SCHEMA_VERSION:
         instance.queue_task(PostSchemaMigrationTask(current_version, SCHEMA_VERSION))

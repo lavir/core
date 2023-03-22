@@ -5,16 +5,10 @@ from datetime import datetime
 from unittest.mock import ANY, DEFAULT, MagicMock, patch
 
 import pytest
-from sqlalchemy.exc import OperationalError
 
-from homeassistant.components.recorder.auto_repairs.statistics.schema import (
-    _get_future_year,
-)
+from homeassistant.components.recorder.auto_repairs.schema import _get_future_year
 from homeassistant.components.recorder.statistics import (
     _statistics_during_period_with_session,
-)
-from homeassistant.components.recorder.table_managers.statistics_meta import (
-    StatisticsMetaManager,
 )
 from homeassistant.core import HomeAssistant
 import homeassistant.util.dt as dt_util
@@ -24,29 +18,7 @@ from ...common import async_wait_recording_done
 from tests.typing import RecorderInstanceGenerator
 
 
-@pytest.mark.parametrize("enable_statistics_table_validation", [True])
-@pytest.mark.parametrize("db_engine", ("mysql", "postgresql"))
-async def test_validate_db_schema(
-    async_setup_recorder_instance: RecorderInstanceGenerator,
-    hass: HomeAssistant,
-    caplog: pytest.LogCaptureFixture,
-    db_engine,
-) -> None:
-    """Test validating DB schema with MySQL and PostgreSQL.
-
-    Note: The test uses SQLite, the purpose is only to exercise the code.
-    """
-    with patch(
-        "homeassistant.components.recorder.core.Recorder.dialect_name", db_engine
-    ):
-        await async_setup_recorder_instance(hass)
-        await async_wait_recording_done(hass)
-    assert "Schema validation failed" not in caplog.text
-    assert "Detected statistics schema errors" not in caplog.text
-    assert "Database is about to correct DB schema errors" not in caplog.text
-
-
-@pytest.mark.parametrize("enable_statistics_table_validation", [True])
+@pytest.mark.parametrize("enable_schema_validation", [True])
 async def test_validate_db_schema_fix_utf8_issue(
     async_setup_recorder_instance: RecorderInstanceGenerator,
     hass: HomeAssistant,
@@ -56,15 +28,11 @@ async def test_validate_db_schema_fix_utf8_issue(
 
     Note: The test uses SQLite, the purpose is only to exercise the code.
     """
-    orig_error = MagicMock()
-    orig_error.args = [1366]
-    utf8_error = OperationalError("", "", orig=orig_error)
     with patch(
         "homeassistant.components.recorder.core.Recorder.dialect_name", "mysql"
     ), patch(
-        "homeassistant.components.recorder.table_managers.statistics_meta.StatisticsMetaManager.update_or_add",
-        wraps=StatisticsMetaManager.update_or_add,
-        side_effect=[utf8_error, DEFAULT, DEFAULT],
+        "homeassistant.components.recorder.auto_repairs.statistics.schema.validate_table_schema_supports_utf8",
+        return_value={"statistics_meta.4-byte UTF-8"},
     ):
         await async_setup_recorder_instance(hass)
         await async_wait_recording_done(hass)
@@ -80,7 +48,7 @@ async def test_validate_db_schema_fix_utf8_issue(
     )
 
 
-@pytest.mark.parametrize("enable_statistics_table_validation", [True])
+@pytest.mark.parametrize("enable_schema_validation", [True])
 @pytest.mark.parametrize("db_engine", ("mysql", "postgresql"))
 @pytest.mark.parametrize(
     ("table", "replace_index"), (("statistics", 0), ("statistics_short_term", 1))
@@ -128,7 +96,7 @@ async def test_validate_db_schema_fix_float_issue(
     with patch(
         "homeassistant.components.recorder.core.Recorder.dialect_name", db_engine
     ), patch(
-        "homeassistant.components.recorder.auto_repairs.statistics.schema._get_future_year",
+        "homeassistant.components.recorder.auto_repairs.schema._get_future_year",
         return_value=fixed_future_year,
     ), patch(
         "homeassistant.components.recorder.auto_repairs.statistics.schema._statistics_during_period_with_session",
@@ -155,7 +123,7 @@ async def test_validate_db_schema_fix_float_issue(
     modify_columns_mock.assert_called_once_with(ANY, ANY, table, modification)
 
 
-@pytest.mark.parametrize("enable_statistics_table_validation", [True])
+@pytest.mark.parametrize("enable_schema_validation", [True])
 @pytest.mark.parametrize(
     ("db_engine", "modification"),
     (
