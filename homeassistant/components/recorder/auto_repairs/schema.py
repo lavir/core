@@ -1,20 +1,16 @@
 """Schema repairs."""
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-import contextlib
-from datetime import datetime
+from collections.abc import Callable, Iterable, Mapping
 import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy import text
-from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.session import Session
 
-from homeassistant.util import dt as dt_util
-
 from ..const import SupportedDialect
+from ..db_schema import DOUBLE_PRECISION_TYPE_SQL, DOUBLE_TYPE
 from ..util import session_scope
 
 if TYPE_CHECKING:
@@ -31,18 +27,15 @@ UTF8_NAME = "𓆚𓃗"
 PRECISE_NUMBER = 1.000000000000001
 
 
-def _get_future_year() -> int:
-    """Get a year in the future."""
-    return datetime.now().year + 1
-
-
-def get_precise_datetime() -> datetime:
-    """Get a datetime with a precise microsecond.
-
-    This time can't be accurately represented unless datetimes have µs precision
-    """
-    future_year = _get_future_year()
-    return datetime(future_year, 10, 6, microsecond=1, tzinfo=dt_util.UTC)
+def get_precision_column_types(
+    table_object: type[DeclarativeBase],
+) -> list[str]:
+    """Get the column names for the columns that need to be checked for precision."""
+    return [
+        column.key
+        for column in table_object.__table__.columns
+        if column.type is DOUBLE_TYPE
+    ]
 
 
 def validate_table_schema_supports_utf8(
@@ -77,6 +70,7 @@ def validate_table_schema_supports_utf8(
                     schema_errors.add(f"{table}.4-byte UTF-8")
                     session.rollback()
                 else:
+                    session.rollback()
                     raise
     except Exception as exc:  # pylint: disable=broad-except
         _LOGGER.exception("Error when validating DB schema: %s", exc)
@@ -86,7 +80,6 @@ def validate_table_schema_supports_utf8(
 def validate_db_schema_precision(
     instance: Recorder,
     table_object: type[DeclarativeBase],
-    columns: tuple[str, ...],
     session_maker: Callable[[], Session],
 ) -> set[str]:
     """Do some basic checks for common schema errors caused by manual migration."""
@@ -98,13 +91,13 @@ def validate_db_schema_precision(
     ):
         return schema_errors
 
-    precise_time_ts = get_precise_datetime().timestamp()
+    columns = get_precision_column_types(table_object)
 
     try:
         # Mark the session as read_only to ensure that the test data is not committed
         # to the database and we always rollback when the scope is exited
         with session_scope(session=session_maker(), read_only=True) as session:
-            db_object = table_object(**{column: precise_time_ts for column in columns})
+            db_object = table_object(**{column: PRECISE_NUMBER for column in columns})
             table = table_object.__tablename__
             session.add(db_object)
             session.flush()
@@ -112,10 +105,10 @@ def validate_db_schema_precision(
             check_columns(
                 schema_errors=schema_errors,
                 stored={column: getattr(db_object, column) for column in columns},
-                expected={column: precise_time_ts for column in columns},
+                expected={column: PRECISE_NUMBER for column in columns},
                 columns=columns,
                 table_name=table,
-                supports="µs precision",
+                supports="double precision",
             )
     except Exception as exc:  # pylint: disable=broad-except
         _LOGGER.exception("Error when validating DB schema: %s", exc)
@@ -127,7 +120,7 @@ def check_columns(
     schema_errors: set[str],
     stored: Mapping,
     expected: Mapping,
-    columns: tuple[str, ...],
+    columns: Iterable[str],
     table_name: str,
     supports: str,
 ) -> None:
@@ -148,37 +141,10 @@ def check_columns(
             )
 
 
-def correct_table_character_set_and_collation(
-    table: str,
-    session_maker: Callable[[], Session],
-) -> None:
-    """Correct issues detected by validate_db_schema."""
-    # Attempt to convert the table to utf8mb4
-    _LOGGER.warning(
-        "Updating character set and collation of table %s to utf8mb4. "
-        "Note: this can take several minutes on large databases and slow "
-        "computers. Please be patient!",
-        table,
-    )
-    with contextlib.suppress(SQLAlchemyError), session_scope(
-        session=session_maker()
-    ) as session:
-        connection = session.connection()
-        connection.execute(
-            # Using LOCK=EXCLUSIVE to prevent the database from corrupting
-            # https://github.com/home-assistant/core/issues/56104
-            text(
-                f"ALTER TABLE {table} CONVERT TO CHARACTER SET utf8mb4"
-                " COLLATE utf8mb4_unicode_ci, LOCK=EXCLUSIVE"
-            )
-        )
-
-
 def validate_db_schema_utf8_and_precision(
     instance: Recorder,
     table_object: type[DeclarativeBase],
     utf8_columns: tuple[str, ...],
-    precision_columns: dict[str, str],
 ) -> set[str]:
     """Do some basic checks for common schema errors caused by manual migration."""
     schema_errors: set[str] = set()
@@ -186,9 +152,7 @@ def validate_db_schema_utf8_and_precision(
     schema_errors |= validate_table_schema_supports_utf8(
         instance, table_object, utf8_columns, session_maker
     )
-    schema_errors |= validate_db_schema_precision(
-        instance, table_object, tuple(precision_columns), session_maker
-    )
+    schema_errors |= validate_db_schema_precision(instance, table_object, session_maker)
     if schema_errors:
         _LOGGER.debug(
             "Detected %s schema errors: %s",
@@ -201,25 +165,47 @@ def validate_db_schema_utf8_and_precision(
 def correct_db_schema_utf8_and_precision(
     instance: Recorder,
     table_object: type[DeclarativeBase],
-    precision_columns: dict[str, str],
     schema_errors: set[str],
 ) -> None:
     """Correct issues detected by validate_db_schema."""
-    from ..migration import _modify_columns  # pylint: disable=import-outside-toplevel
+    correct_db_schema_utf8(instance, table_object, schema_errors)
+    correct_db_schema_precision(instance, table_object, schema_errors)
 
+
+def correct_db_schema_utf8(
+    instance: Recorder, table_object: type[DeclarativeBase], schema_errors: set[str]
+) -> None:
+    """Correct utf8 issues detected by validate_db_schema."""
     table_name = table_object.__tablename__
-    session_maker = instance.get_session
-    engine = instance.engine
-    assert engine is not None, "Engine should be set"
-
     if f"{table_name}.4-byte UTF-8" in schema_errors:
-        correct_table_character_set_and_collation(table_name, session_maker)
+        from ..migration import (  # pylint: disable=import-outside-toplevel
+            _correct_table_character_set_and_collation,
+        )
 
-    if f"{table_name}.µs precision" in schema_errors:
+        _correct_table_character_set_and_collation(table_name, instance.get_session)
+
+
+def correct_db_schema_precision(
+    instance: Recorder,
+    table_object: type[DeclarativeBase],
+    schema_errors: set[str],
+) -> None:
+    """Correct precision issues detected by validate_db_schema."""
+    table_name = table_object.__tablename__
+
+    if f"{table_name}.double precision" in schema_errors:
+        from ..migration import (  # pylint: disable=import-outside-toplevel
+            _modify_columns,
+        )
+
+        precision_columns = get_precision_column_types(table_object)
         # Attempt to convert timestamp columns to µs precision
+        session_maker = instance.get_session
+        engine = instance.engine
+        assert engine is not None, "Engine should be set"
         _modify_columns(
             session_maker,
             engine,
             table_name,
-            [f"{column} {sql_type}" for column, sql_type in precision_columns.items()],
+            [f"{column} {DOUBLE_PRECISION_TYPE_SQL}" for column in precision_columns],
         )
