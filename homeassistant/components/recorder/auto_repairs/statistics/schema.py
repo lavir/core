@@ -5,13 +5,17 @@ from collections.abc import Callable
 import logging
 from typing import TYPE_CHECKING
 
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm.session import Session
 
 from homeassistant.core import HomeAssistant
 
 from ...const import DOMAIN, SupportedDialect
-from ...db_schema import Statistics, StatisticsMeta, StatisticsShortTerm
+from ...db_schema import (
+    DOUBLE_PRECISION_TYPE_SQL,
+    Statistics,
+    StatisticsMeta,
+    StatisticsShortTerm,
+)
 from ...models import StatisticData, StatisticMetaData, datetime_to_timestamp_or_none
 from ...statistics import (
     _import_statistics_with_session,
@@ -32,6 +36,8 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 STATISTIC_ID = f"{DOMAIN}.db_test"
+
+DOUBLE_PRECISION_COLUMNS = ("mean", "min", "max", "state", "sum")
 
 
 def _validate_db_schema(
@@ -116,7 +122,7 @@ def _validate_db_schema(
                     schema_errors=schema_errors,
                     stored=last_stored_statistic,
                     expected=statistics,
-                    columns=("max", "mean", "min", "state", "sum"),
+                    columns=DOUBLE_PRECISION_COLUMNS,
                     table_name=table.__tablename__,
                     supports="double precision",
                 )
@@ -130,7 +136,7 @@ def _validate_db_schema(
                         ),
                         "start": datetime_to_timestamp_or_none(statistics["start"]),
                     },
-                    columns=("start", "last_reset"),
+                    columns=("last_reset", "start"),
                     table_name=table.__tablename__,
                     supports="µs precision",
                 )
@@ -141,15 +147,14 @@ def _validate_db_schema(
     return schema_errors
 
 
-def validate_db_schema(
-    hass: HomeAssistant, instance: Recorder, session_maker: Callable[[], Session]
-) -> set[str]:
+def validate_db_schema(instance: Recorder) -> set[str]:
     """Do some basic checks for common schema errors caused by manual migration."""
     schema_errors: set[str] = set()
+    session_maker = instance.get_session
     schema_errors |= validate_table_schema_supports_utf8(
         instance, StatisticsMeta, ("statistic_id",), session_maker
     )
-    schema_errors |= _validate_db_schema(hass, instance, session_maker)
+    schema_errors |= _validate_db_schema(instance.hass, instance, session_maker)
     if schema_errors:
         _LOGGER.debug(
             "Detected statistics schema errors: %s", ", ".join(sorted(schema_errors))
@@ -159,12 +164,14 @@ def validate_db_schema(
 
 def correct_db_schema(
     instance: Recorder,
-    engine: Engine,
-    session_maker: Callable[[], Session],
     schema_errors: set[str],
 ) -> None:
     """Correct issues detected by validate_db_schema."""
     from ...migration import _modify_columns  # pylint: disable=import-outside-toplevel
+
+    engine = instance.engine
+    session_maker = instance.get_session
+    assert engine is not None
 
     if "statistics_meta.4-byte UTF-8" in schema_errors:
         correct_table_character_set_and_collation("statistics_meta", session_maker)
@@ -181,11 +188,8 @@ def correct_db_schema(
                 engine,
                 table.__tablename__,
                 [
-                    "mean DOUBLE PRECISION",
-                    "min DOUBLE PRECISION",
-                    "max DOUBLE PRECISION",
-                    "state DOUBLE PRECISION",
-                    "sum DOUBLE PRECISION",
+                    f"{column} {DOUBLE_PRECISION_TYPE_SQL}"
+                    for column in DOUBLE_PRECISION_COLUMNS
                 ],
             )
         if f"{table.__tablename__}.µs precision" in schema_errors:
@@ -195,7 +199,7 @@ def correct_db_schema(
                 engine,
                 table.__tablename__,
                 [
-                    "last_reset_ts DOUBLE PRECISION",
-                    "start_ts DOUBLE PRECISION",
+                    f"{column} {DOUBLE_PRECISION_TYPE_SQL}"
+                    for column in ("last_reset_ts", "start_ts")
                 ],
             )
