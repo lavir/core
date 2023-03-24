@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from datetime import datetime, timedelta
-import json
 import logging
 import logging.handlers
 import os
@@ -35,7 +34,6 @@ from .helpers import (
     template,
 )
 from .helpers.dispatcher import async_dispatcher_send
-from .helpers.frame import report
 from .helpers.typing import ConfigType
 from .setup import (
     DATA_SETUP,
@@ -104,18 +102,6 @@ STAGE_1_INTEGRATIONS = {
     # Ensure supervisor is available
     "hassio",
 }
-
-
-_original_json_loads = json.loads
-
-
-def _json_loads_wrapper(*args: Any, **kwargs: Any) -> Any:
-    """Wrap json.loads to warn about usage."""
-    report("json.loads is being used. This is a slow.", error_if_core=False)
-    return _original_json_loads(*args, **kwargs)
-
-
-json.loads = _json_loads_wrapper
 
 
 async def async_setup_hass(
