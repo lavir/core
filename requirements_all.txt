@@ -291,7 +291,7 @@ aiosyncthing==0.5.1
 aiotractive==0.5.5
 
 # homeassistant.components.unifi
-aiounifi==45
+aiounifi==46
 
 # homeassistant.components.vlc_telnet
 aiovlc==0.1.0
@@ -1091,9 +1091,6 @@ lxml==4.9.1
 
 # homeassistant.components.nmap_tracker
 mac-vendor-lookup==0.1.12
-
-# homeassistant.components.magicseaweed
-magicseaweed==1.0.3
 
 # homeassistant.components.matrix
 matrix-client==0.4.0
