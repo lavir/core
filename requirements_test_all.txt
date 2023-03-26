@@ -36,7 +36,7 @@ PyRMVtransport==0.3.3
 PySocks==1.7.1
 
 # homeassistant.components.switchbot
-PySwitchbot==0.37.4
+PySwitchbot==0.37.5
 
 # homeassistant.components.transport_nsw
 PyTransportNSW==0.1.1
@@ -1844,7 +1844,7 @@ vilfo-api-client==0.3.2
 volvooncall==0.10.2
 
 # homeassistant.components.verisure
-vsure==1.8.1
+vsure==2.6.1
 
 # homeassistant.components.vulcan
 vulcan-api==2.3.0
