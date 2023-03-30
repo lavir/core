@@ -319,6 +319,13 @@ class ConfigEntry:
         self._tasks: set[asyncio.Future[Any]] = set()
         self._background_tasks: set[asyncio.Future[Any]] = set()
 
+    def __repr__(self) -> str:
+        """Return the representation."""
+        return (
+            f"<ConfigEntry {self.domain}: {self.title} ({self.entry_id}) "
+            f"state={self.state}>"
+        )
+
     async def async_setup(
         self,
         hass: HomeAssistant,
