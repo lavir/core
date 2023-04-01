@@ -90,7 +90,6 @@ def async_dispatcher_send(hass: HomeAssistant, signal: str, *args: Any) -> None:
     target_list: dict[
         Callable[..., Any], HassJob[..., None | Coroutine[Any, Any, None]] | None
     ] = hass.data.get(DATA_DISPATCHER, {}).get(signal, {})
-    _LOGGER.warning("async_dispatcher_send: %s (%s) -> %s", signal, args, target_list)
 
     run: list[HassJob[..., None | Coroutine[Any, Any, None]]] = []
     for target, job in target_list.items():
