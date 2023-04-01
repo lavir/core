@@ -502,6 +502,7 @@ def _log_object_sources(
     new_objects_overflow = 0
     current_ids = set()
     new_stats: dict[str, int] = {}
+    had_new_object_growth = False
     try:
         for _object in objects:
             object_type = type(_object).__name__
@@ -520,6 +521,7 @@ def _log_object_sources(
                     new_objects_overflow += 1
 
         for _object in new_objects:
+            had_new_object_growth = True
             object_type = type(_object).__name__
             _LOGGER.critical(
                 "New object %s (%s/%s) at %s: %s",
@@ -546,3 +548,5 @@ def _log_object_sources(
 
     if new_objects_overflow:
         _LOGGER.critical("New objects overflowed by %s", new_objects_overflow)
+    elif not had_new_object_growth:
+        _LOGGER.critical("No new object growth found")
