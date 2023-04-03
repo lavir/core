@@ -219,7 +219,7 @@ async def async_setup_entry(  # noqa: C901
         )
         _LOGGER.critical(
             "Cache stats for LRU template_states_no_collect: %s",
-            template.CACHED_TEMPLATE_LRU.get_stats(),  # type: ignore[attr-defined]
+            template.CACHED_TEMPLATE_NO_COLLECT_LRU.get_stats(),  # type: ignore[attr-defined]
         )
 
         for lru in objgraph.by_type(_SQLALCHEMY_LRU_OBJECT):
