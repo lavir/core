@@ -20,6 +20,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL, CONF_TYPE
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import template
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.json import ExtendedJSONEncoder
@@ -211,6 +212,15 @@ async def async_setup_entry(  # noqa: C901
                             _get_function_absfile(class_with_lru_attr) or "unknown",
                             maybe_lru.get_stats(),
                         )
+
+        _LOGGER.critical(
+            "Cache stats for LRU template_states: %s",
+            template.CACHED_TEMPLATE_LRU.get_stats(),  # type: ignore[attr-defined]
+        )
+        _LOGGER.critical(
+            "Cache stats for LRU template_states_no_collect: %s",
+            template.CACHED_TEMPLATE_LRU.get_stats(),  # type: ignore[attr-defined]
+        )
 
         for lru in objgraph.by_type(_SQLALCHEMY_LRU_OBJECT):
             if (data := getattr(lru, "_data", None)) and isinstance(data, dict):
