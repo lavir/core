@@ -210,7 +210,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator.async_setup()
     try:
         await coordinator.async_config_entry_first_refresh()
-        await coordinator.sensor_coordinator.async_config_entry_first_refresh()
     except ConfigEntryNotReady:
         connection.async_stop()
         raise
@@ -227,7 +226,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     domain_data = hass.data[DOMAIN]
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         coordinator: LIFXUpdateCoordinator = domain_data.pop(entry.entry_id)
-        coordinator.async_stop()
+        coordinator.connection.async_stop()
     # Only the DATA_LIFX_MANAGER left, remove it.
     if len(domain_data) == 1:
         manager: LIFXManager = domain_data.pop(DATA_LIFX_MANAGER)
