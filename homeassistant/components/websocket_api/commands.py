@@ -240,6 +240,7 @@ def handle_get_states(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
 ) -> None:
     """Handle get states command."""
+    raise RuntimeError("Deprecated, use subscribe_entities instead")
     states = _async_get_allowed_states(hass, connection)
 
     # JSON serialize here so we can recover if it blows up due to the
