@@ -570,7 +570,7 @@ freebox-api==1.1.0
 
 # homeassistant.components.fritz
 # homeassistant.components.fritzbox_callmonitor
-fritzconnection==1.11.0
+fritzconnection==1.12.0
 
 # homeassistant.components.google_translate
 gTTS==2.2.4
@@ -1673,7 +1673,7 @@ simplehound==0.3
 simplepush==2.1.1
 
 # homeassistant.components.simplisafe
-simplisafe-python==2022.12.0
+simplisafe-python==2023.04.0
 
 # homeassistant.components.slack
 slackclient==2.5.0
