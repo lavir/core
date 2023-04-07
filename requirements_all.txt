@@ -2692,13 +2692,13 @@ zamg==0.2.2
 zengge==0.2
 
 # homeassistant.components.zeroconf
-zeroconf==0.55.0
+zeroconf==0.56.0
 
 # homeassistant.components.zeversolar
 zeversolar==0.3.1
 
 # homeassistant.components.zha
-zha-quirks==0.0.95
+zha-quirks==0.0.96
 
 # homeassistant.components.zhong_hong
 zhong_hong_hvac==1.0.9
