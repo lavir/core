@@ -7,13 +7,13 @@ DOMAIN = "lifx"
 TARGET_ANY = "00:00:00:00:00:00"
 
 DISCOVERY_INTERVAL = 10
-MESSAGE_TIMEOUT = 1.65
-MESSAGE_RETRIES = 5
-OVERALL_TIMEOUT = 9
+MESSAGE_TIMEOUT = 18
+MESSAGE_RETRIES = 1
+OVERALL_TIMEOUT = 15
 UNAVAILABLE_GRACE = 90
 
 # The number of times to retry a request message
-DEFAULT_ATTEMPTS = 3
+DEFAULT_ATTEMPTS = 5
 # The maximum time to wait for a bulb to respond to an update
 MAX_UPDATE_TIME = 90
 # The number of tries to send each request message to a bulb during an update
