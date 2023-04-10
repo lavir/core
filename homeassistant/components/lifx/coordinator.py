@@ -237,7 +237,7 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
             methods.append(self.device.get_multizone_effect)
         elif is_legacy_multizone:
             methods.extend(self._async_build_color_zones_update_requests())
-            methods.extend(self.device.get_multizone_effect)
+            methods.append(self.device.get_multizone_effect)
         if features["hev"]:
             methods.append(self.device.get_hev_cycle)
         if features["infrared"]:
@@ -256,7 +256,7 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
 
         if is_extended_multizone or is_legacy_multizone:
             self.active_effect = FirmwareEffect[self.device.effect.get("effect", "OFF")]
-        elif is_legacy_multizone and num_zones != len(device.color_zones):
+        if is_legacy_multizone and num_zones != len(device.color_zones):
             # The number of zones has changed so we need
             # to update the zones again. This happens rarely.
             await self.async_get_color_zones()
