@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from datetime import timedelta
 from enum import IntEnum
 from functools import partial
 from math import floor, log10
-import sys
 from typing import Any, cast
 
 from aiolifx.aiolifx import (
@@ -29,37 +28,34 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     _LOGGER,
     ATTR_REMAINING,
+    DEFAULT_ATTEMPTS,
     DOMAIN,
     IDENTIFY_WAVEFORM,
     MESSAGE_RETRIES,
     MESSAGE_TIMEOUT,
+    OVERALL_TIMEOUT,
+    TARGET_ANY,
     UNAVAILABLE_GRACE,
 )
 from .util import (
     async_execute_lifx,
+    async_multi_execute_lifx_with_retries,
     get_real_mac_addr,
     infrared_brightness_option_to_value,
     infrared_brightness_value_to_option,
     lifx_features,
 )
 
-if sys.version_info[:2] < (3, 11):
-    from async_timeout import timeout as asyncio_timeout
-else:
-    from asyncio import timeout as asyncio_timeout
-
-
 LIGHT_UPDATE_INTERVAL = 10
 SENSOR_UPDATE_INTERVAL = 30
 REQUEST_REFRESH_DELAY = 0.35
 LIFX_IDENTIFY_DELAY = 3.0
 RSSI_DBM_FW = AwesomeVersion("2.77")
-MAX_TIMEOUTS_TO_DECLARE_UPDATE_FAILED = 3
 
 
 class FirmwareEffect(IntEnum):
@@ -89,7 +85,6 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
         self._update_rssi: bool = False
         self._rssi: int = 0
         self.last_used_theme: str = ""
-        self._offline_time: float = 0.0
 
         super().__init__(
             hass,
@@ -194,83 +189,87 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
             platform, DOMAIN, f"{self.serial_number}_{key}"
         )
 
+    async def _async_populate_device_info(self) -> None:
+        """Populate device info."""
+        methods: list[Callable] = []
+        device = self.device
+        if self.device.host_firmware_version is None:
+            methods.append(device.get_hostfirmware)
+        if self.device.product is None:
+            methods.append(device.get_version)
+        if self.device.group is None:
+            methods.append(device.get_group)
+        assert methods, "Device info already populated"
+        await async_multi_execute_lifx_with_retries(
+            methods, DEFAULT_ATTEMPTS, OVERALL_TIMEOUT
+        )
+
+    @callback
+    def _async_build_color_zones_update_requests(self) -> list[Callable]:
+        """Build a color zones update request."""
+        device = self.device
+        return [
+            partial(device.get_color_zones, start_index=zone)
+            for zone in range(0, len(device.color_zones), 8)
+        ]
+
     async def _async_update_data(self) -> None:
         """Fetch all device data from the api."""
+        device = self.device
+        if (
+            device.host_firmware_version is None
+            or device.product is None
+            or device.group is None
+        ):
+            await self._async_populate_device_info()
 
-        for _ in range(MAX_TIMEOUTS_TO_DECLARE_UPDATE_FAILED - 1):
-            try:
-                tasks: list[Awaitable] = [async_execute_lifx(self.device.get_color)]
+        num_zones = len(device.color_zones) if device.color_zones is not None else 0
+        features = lifx_features(self.device)
+        is_extended_multizone = features["extended_multizone"]
+        is_legacy_multizone = (
+            features["multizone"] and not features["extended_multizone"]
+        )
+        update_rssi = self._update_rssi
+        methods: list[Callable] = [self.device.get_color]
+        if update_rssi:
+            methods.append(self.device.get_wifiinfo)
+        if is_extended_multizone:
+            methods.append(self.device.get_extended_color_zones)
+            methods.append(self.device.get_multizone_effect)
+        elif is_legacy_multizone:
+            methods.append(self.device.get_extended_color_zones)
+            methods.extend(self._async_build_color_zones_update_requests())
+        if features["hev"]:
+            methods.append(self.device.get_hev_cycle)
+        if features["infrared"]:
+            methods.append(self.device.get_infrared)
 
-                if self.device.host_firmware_version is None:
-                    tasks.append(async_execute_lifx(self.device.get_hostfirmware))
-                if self.device.product is None:
-                    tasks.append(async_execute_lifx(self.device.get_version))
-                if self.device.group is None:
-                    tasks.append(async_execute_lifx(self.device.get_group))
+        responses = await async_multi_execute_lifx_with_retries(
+            methods, DEFAULT_ATTEMPTS, OVERALL_TIMEOUT
+        )
+        # device.mac_addr is not the mac_address, its the serial number
+        if device.mac_addr == TARGET_ANY:
+            device.mac_addr = responses[0].target_addr
 
-                await asyncio.gather(*tasks)
+        if update_rssi:
+            # We always send the rssi request second
+            self._rssi = int(floor(10 * log10(responses[1].signal) + 0.5))
 
-                events = []
-                for _response, event, _callb in self.device.message.values():
-                    if isinstance(event, asyncio.Event):
-                        events.append(event.wait())
-                if events:
-                    async with asyncio_timeout(MESSAGE_TIMEOUT):
-                        await asyncio.gather(*events)
-
-                if self._update_rssi is True:
-                    await self.async_update_rssi()
-
-                # Update extended multizone devices
-                if lifx_features(self.device)["extended_multizone"]:
-                    await async_execute_lifx(self.device.get_extended_color_zones)
-                    await self.async_get_multizone_effect()
-                # use legacy methods for older devices
-                elif lifx_features(self.device)["multizone"]:
-                    await self.async_get_color_zones()
-                    await self.async_get_multizone_effect()
-
-                if lifx_features(self.device)["hev"]:
-                    await self.async_get_hev_cycle()
-
-                if lifx_features(self.device)["infrared"]:
-                    await async_execute_lifx(self.device.get_infrared)
-
-                break
-
-            except asyncio.TimeoutError:
-                _LOGGER.debug(
-                    "Time out updating %s (%s): will retry update",
-                    self.device.label or self.device.ip_addr,
-                    self.device.mac_addr,
-                )
-
-        else:
-            _LOGGER.error(
-                "Marking %s (%s) as offline after three failed update attempts",
-                self.device.label or self.device.ip_addr,
-                self.device.mac_addr,
-            )
-
-            raise UpdateFailed(
-                f"The device failed to respond after {MAX_TIMEOUTS_TO_DECLARE_UPDATE_FAILED} attempts"
-            )
+        if is_extended_multizone:
+            self.active_effect = FirmwareEffect[self.device.effect.get("effect", "OFF")]
+        elif is_legacy_multizone and num_zones != len(device.color_zones):
+            # The number of zones has changed so we need
+            # to update the zones again. This should only
+            # happen once after a device is added.
+            await self.async_get_color_zones()
 
     async def async_get_color_zones(self) -> None:
         """Get updated color information for each zone."""
-        zone = 0
-        top = 1
-        while zone < top:
-            # Each get_color_zones can update 8 zones at once
-            resp = await async_execute_lifx(
-                partial(self.device.get_color_zones, start_index=zone)
-            )
-            zone += 8
-            top = resp.count
-
-            # We only await multizone responses so don't ask for just one
-            if zone == top - 1:
-                zone -= 1
+        await async_multi_execute_lifx_with_retries(
+            self._async_build_color_zones_update_requests(),
+            DEFAULT_ATTEMPTS,
+            OVERALL_TIMEOUT,
+        )
 
     async def async_get_extended_color_zones(self) -> None:
         """Get updated color information for all zones."""
@@ -353,11 +352,6 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
                 apply=apply,
             )
         )
-
-    async def async_get_multizone_effect(self) -> None:
-        """Update the device firmware effect running state."""
-        await async_execute_lifx(self.device.get_multizone_effect)
-        self.active_effect = FirmwareEffect[self.device.effect.get("effect", "OFF")]
 
     async def async_set_multizone_effect(
         self,
@@ -446,21 +440,11 @@ class LIFXUpdateCoordinator(DataUpdateCoordinator[None]):
         self._update_rssi = True
         return _async_disable_rssi_updates
 
-    async def async_update_rssi(self) -> None:
-        """Update RSSI value."""
-        resp = await async_execute_lifx(self.device.get_wifiinfo)
-        self._rssi = int(floor(10 * log10(resp.signal) + 0.5))
-
     def async_get_hev_cycle_state(self) -> bool | None:
         """Return the current HEV cycle state."""
         if self.device.hev_cycle is None:
             return None
         return bool(self.device.hev_cycle.get(ATTR_REMAINING, 0) > 0)
-
-    async def async_get_hev_cycle(self) -> None:
-        """Update the HEV cycle status from a LIFX Clean bulb."""
-        if lifx_features(self.device)["hev"]:
-            await async_execute_lifx(self.device.get_hev_cycle)
 
     async def async_set_hev_cycle_state(self, enable: bool, duration: int = 0) -> None:
         """Start or stop an HEV cycle on a LIFX Clean bulb."""

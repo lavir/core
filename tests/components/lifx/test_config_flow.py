@@ -21,7 +21,6 @@ from . import (
     MAC_ADDRESS,
     MODULE,
     SERIAL,
-    MockMessage,
     _mocked_bulb,
     _mocked_failing_bulb,
     _mocked_relay,
@@ -547,14 +546,11 @@ async def test_suggested_area(hass: HomeAssistant) -> None:
             self.bulb = bulb
             self.lifx_group = kwargs.get("lifx_group")
 
-        def __call__(self, *args, **kwargs):
+        def __call__(self, callb=None, *args, **kwargs):
             """Call command."""
-            if callb := kwargs.get("callb"):
-                callb(
-                    self.bulb,
-                    MockMessage(target_addr=MAC_ADDRESS, group_name=self.lifx_group),
-                )
             self.bulb.group = self.lifx_group
+            if callb:
+                callb(self.bulb, self.lifx_group)
 
     config_entry = MockConfigEntry(
         domain=DOMAIN, data={CONF_HOST: "1.2.3.4"}, unique_id=SERIAL
