@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import datetime
+import logging
 
 from homeassistant.components.recorder import get_instance, history
 from homeassistant.core import Event, HomeAssistant, State
@@ -12,6 +13,8 @@ import homeassistant.util.dt as dt_util
 from .helpers import async_calculate_period, floored_timestamp
 
 MIN_TIME_UTC = datetime.datetime.min.replace(tzinfo=dt_util.UTC)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -151,6 +154,11 @@ class HistoryStats:
             HistoryState(state.state, state.last_changed.timestamp())
             for state in states
         ]
+        _LOGGER.warning(
+            "%s: History current period: %s",
+            self.entity_id,
+            self._history_current_period,
+        )
 
     def _state_changes_during_period(
         self, start_ts: float, end_ts: float
