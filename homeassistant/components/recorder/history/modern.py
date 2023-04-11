@@ -51,16 +51,15 @@ _FIELD_MAP = {
     "metadata_id": 0,
     "state": 1,
     "last_updated_ts": 2,
-    "last_changed_ts": 3,
-    "attributes": 4,
-    "shared_attrs": 5,
 }
 
 
 CASTABLE_DOUBLE_TYPE = (
-    # sqlalchemy.exc.SAWarning: Datatype DOUBLE does not support CAST on MySQL/MariaDb; the CAST will be skipped.
     # MySQL/MariaDB < 10.4+ does not support casting to DOUBLE so we have to use Integer instead but it doesn't
     # matter because we don't use the value as its always set to NULL
+    #
+    # sqlalchemy.exc.SAWarning: Datatype DOUBLE does not support CAST on MySQL/MariaDb; the CAST will be skipped.
+    #
     Integer().with_variant(postgresql.DOUBLE_PRECISION(), "postgresql")
 )
 
@@ -652,7 +651,8 @@ def _sorted_states_to_dict(
     """
     field_map = _FIELD_MAP
     state_class: Callable[
-        [Row, dict[str, dict[str, Any]], float | None], State | dict[str, Any]
+        [Row, dict[str, dict[str, Any]], float | None, str, str, float | None],
+        State | dict[str, Any],
     ]
     if compressed_state_format:
         state_class = row_to_compressed_state
@@ -700,7 +700,14 @@ def _sorted_states_to_dict(
             or split_entity_id(entity_id)[0] in NEED_ATTRIBUTE_DOMAINS
         ):
             ent_results.extend(
-                state_class(db_state, attr_cache, start_time_ts, entity_id=entity_id)  # type: ignore[call-arg]
+                state_class(
+                    db_state,
+                    attr_cache,
+                    start_time_ts,
+                    entity_id,
+                    db_state[state_idx],
+                    db_state[last_updated_ts_idx],
+                )
                 for db_state in group
             )
             continue
@@ -714,7 +721,14 @@ def _sorted_states_to_dict(
                 continue
             prev_state = first_state[state_idx]
             ent_results.append(
-                state_class(first_state, attr_cache, start_time_ts, entity_id=entity_id)  # type: ignore[call-arg]
+                state_class(
+                    first_state,
+                    attr_cache,
+                    start_time_ts,
+                    entity_id,
+                    prev_state,  # type: ignore[arg-type]
+                    first_state[last_updated_ts_idx],
+                )
             )
 
         #
@@ -729,7 +743,7 @@ def _sorted_states_to_dict(
             ent_results.extend(
                 {
                     attr_state: (prev_state := state),
-                    attr_time: row[last_updated_ts_idx] or start_time_ts,
+                    attr_time: row[last_updated_ts_idx],
                 }
                 for row in group
                 if (state := row[state_idx]) != prev_state
@@ -741,9 +755,7 @@ def _sorted_states_to_dict(
         ent_results.extend(
             {
                 attr_state: (prev_state := state),  # noqa: F841
-                attr_time: _utc_from_timestamp(
-                    row[last_updated_ts_idx] or start_time_ts
-                ).isoformat(),
+                attr_time: _utc_from_timestamp(row[last_updated_ts_idx]).isoformat(),
             }
             for row in group
             if (state := row[state_idx]) != prev_state
