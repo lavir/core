@@ -28,7 +28,7 @@ from homeassistant.core import HomeAssistant, State, split_entity_id
 import homeassistant.util.dt as dt_util
 
 from ... import recorder
-from ..db_schema import StateAttributes, States
+from ..db_schema import DOUBLE_TYPE, StateAttributes, States
 from ..filters import Filters
 from ..models import (
     LazyState,
@@ -72,9 +72,13 @@ def _stmt_and_join_attributes_for_start_state(
 ) -> Select:
     """Return the statement and if StateAttributes should be joined."""
     _select = select(States.metadata_id, States.state)
-    _select = _select.add_columns(literal(value=None).label("last_updated_ts"))
+    _select = _select.add_columns(
+        literal(value=None).label("last_updated_ts").cast(DOUBLE_TYPE)
+    )
     if include_last_changed:
-        _select = _select.add_columns(literal(value=None).label("last_changed_ts"))
+        _select = _select.add_columns(
+            literal(value=None).label("last_changed_ts").cast(DOUBLE_TYPE)
+        )
     if not no_attributes:
         _select = _select.add_columns(States.attributes, StateAttributes.shared_attrs)
     return _select
@@ -143,11 +147,17 @@ def _significant_states_stmt(
         # Since we are filtering on entity_id (metadata_id) we can avoid
         # the join of the states_meta table since we already know which
         # metadata_ids are in the significant domains.
-        stmt = stmt.filter(
-            States.metadata_id.in_(metadata_ids_in_significant_domains)
-            | (States.last_changed_ts == States.last_updated_ts)
-            | States.last_changed_ts.is_(None)
-        )
+        if metadata_ids_in_significant_domains:
+            stmt = stmt.filter(
+                States.metadata_id.in_(metadata_ids_in_significant_domains)
+                | (States.last_changed_ts == States.last_updated_ts)
+                | States.last_changed_ts.is_(None)
+            )
+        else:
+            stmt = stmt.filter(
+                (States.last_changed_ts == States.last_updated_ts)
+                | States.last_changed_ts.is_(None)
+            )
     stmt = stmt.filter(States.metadata_id.in_(metadata_ids)).filter(
         States.last_updated_ts > start_time_ts
     )
@@ -248,6 +258,7 @@ def get_significant_states_with_session(
         ),
         track_on=[
             bool(single_metadata_id),
+            bool(metadata_ids_in_significant_domains),
             bool(end_time_ts),
             significant_changes_only,
             no_attributes,
@@ -324,30 +335,37 @@ def _state_changed_during_period_stmt(
         stmt = stmt.outerjoin(
             StateAttributes, States.attributes_id == StateAttributes.attributes_id
         )
-    if descending:
-        stmt = stmt.order_by(States.metadata_id, States.last_updated_ts.desc())
-    else:
-        stmt = stmt.order_by(States.metadata_id, States.last_updated_ts)
     if limit:
         stmt = stmt.limit(limit)
     if not include_start_time_state or not run_start_ts:
-        return stmt
-    return _select_from_subquery(
-        union_all(
-            _select_from_subquery(
-                _get_single_entity_start_time_stmt(
-                    start_time_ts,
-                    single_metadata_id,
-                    no_attributes,
-                    False,
-                ).subquery(),
+        return stmt.order_by(
+            States.metadata_id,
+            States.last_updated_ts.desc() if descending else States.last_updated_ts,
+        )
+
+    union_subquery = union_all(
+        _select_from_subquery(
+            _get_single_entity_start_time_stmt(
+                start_time_ts,
+                single_metadata_id,
                 no_attributes,
                 False,
-            ),
-            _select_from_subquery(stmt.subquery(), no_attributes, False),
-        ).subquery(),
-        no_attributes,
-        False,
+            ).subquery(),
+            no_attributes,
+            False,
+        ),
+        _select_from_subquery(
+            stmt.order_by(States.metadata_id, States.last_updated_ts).subquery(),
+            no_attributes,
+            False,
+        ),
+    ).subquery()
+    stmt = _select_from_subquery(union_subquery, no_attributes, False)
+    if not descending:
+        return stmt
+    # If descending, we need to reverse the results
+    return stmt.order_by(
+        union_subquery.c.metadata_id, union_subquery.c.last_updated_ts.desc()
     )
 
 
