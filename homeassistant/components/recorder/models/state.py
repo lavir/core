@@ -62,9 +62,6 @@ class LazyState(State):
         self.state = state or ""
         self._attributes: dict[str, Any] | None = None
         self._last_updated_ts: float | None = last_updated_ts or start_time_ts
-        assert (
-            self._last_updated_ts is not None
-        ), f"Last updated timestamp is None {last_updated_ts} {start_time_ts}"
         self._last_changed_ts: float | None = None
         self._context: Context | None = None
         self.attr_cache = attr_cache
