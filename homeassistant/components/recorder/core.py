@@ -645,6 +645,15 @@ class Recorder(threading.Thread):
             return SHUTDOWN_TASK
 
     def run(self) -> None:
+        """Run the recorder thread."""
+        try:
+            self._run()
+        finally:
+            # Ensure shutdown happens cleanly if
+            # anything goes wrong in the run loop
+            self._shutdown()
+
+    def _run(self) -> None:
         """Start processing events to save."""
         self.thread_id = threading.get_ident()
         setup_result = self._setup_recorder()
@@ -684,7 +693,6 @@ class Recorder(threading.Thread):
                 self.migration_in_progress = False
                 # Make sure we cleanly close the run if
                 # we restart before startup finishes
-                self._shutdown()
                 return
 
         if not schema_status.valid:
@@ -703,7 +711,6 @@ class Recorder(threading.Thread):
                     "recorder_database_migration",
                 )
                 self.hass.add_job(self.async_set_db_ready)
-                self._shutdown()
                 return
 
         if not database_was_ready:
@@ -715,7 +722,6 @@ class Recorder(threading.Thread):
         self._adjust_lru_size()
         self.hass.add_job(self._async_set_recorder_ready_migration_done)
         self._run_event_loop()
-        self._shutdown()
 
     def _activate_and_set_db_ready(self) -> None:
         """Activate the table managers or schedule migrations and mark the db as ready."""
