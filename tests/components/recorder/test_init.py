@@ -2264,6 +2264,7 @@ async def test_clean_shutdown_when_recorder_thread_raises_during_initialize_data
         await hass.async_block_till_done()
 
     instance = recorder.get_instance(hass)
+    await hass.async_stop()
     assert instance.engine is None
 
 
@@ -2290,6 +2291,7 @@ async def test_clean_shutdown_when_recorder_thread_raises_during_validate_db_sch
         await hass.async_block_till_done()
 
     instance = recorder.get_instance(hass)
+    await hass.async_stop()
     assert instance.engine is None
 
 
@@ -2322,4 +2324,5 @@ async def test_clean_shutdown_when_schema_migration_fails(hass: HomeAssistant) -
         await hass.async_block_till_done()
 
     instance = recorder.get_instance(hass)
+    await hass.async_stop()
     assert instance.engine is None
