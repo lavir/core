@@ -580,10 +580,9 @@ class WebHookManager:
             except NoURLAvailableError:
                 self._async_unregister_webhook()
 
-        with suppress(ValueError):
-            webhook.async_register(
-                self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
-            )
+        webhook.async_register(
+            self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
+        )
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
 
