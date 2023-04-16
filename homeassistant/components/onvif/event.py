@@ -341,18 +341,28 @@ class EventManager:
     async def async_renew(self) -> None:
         """Renew subscription."""
         if self._subscription:
-            with suppress(*SUBSCRIPTION_ERRORS):
+            try:
                 # The first time we renew, we may get a Fault error so we
                 # suppress it. The subscription will be restarted in
                 # async_restart later.
                 await self._subscription.Renew(_get_next_termination_time())
+            except SUBSCRIPTION_ERRORS as err:
+                LOGGER.debug(
+                    "Failed to renew ONVIF PullPoint subscription for '%s'; %s",
+                    self.unique_id,
+                    err,
+                )
 
         # TODO: know when to renew the notify service
-        if self._notify_service:
-            pass
-            # - figure out how to renew the notify service
-            # with suppress(*SUBSCRIPTION_ERRORS):
-            #     await self._notify_service.Renew(_get_next_termination_time())
+        if self._webhook_subscription:
+            try:
+                await self._webhook_subscription.Renew(_get_next_termination_time())
+            except SUBSCRIPTION_ERRORS as err:
+                LOGGER.debug(
+                    "Failed to renew ONVIF webhook subscription for '%s'; %s",
+                    self.unique_id,
+                    err,
+                )
 
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
