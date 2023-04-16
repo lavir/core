@@ -11,7 +11,7 @@ from httpx import RequestError
 import onvif
 from onvif import ONVIFCamera
 from onvif.exceptions import ONVIFError
-from zeep.exceptions import Fault
+from zeep.exceptions import Fault, XMLParseError
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -267,8 +267,8 @@ class ONVIFDevice:
             snapshot = media_capabilities and media_capabilities.SnapshotUri
 
         pullpoint = False
-        # with suppress(ONVIFError, Fault, RequestError, XMLParseError):
-        pullpoint = await self.events.async_start()
+        with suppress(ONVIFError, Fault, RequestError, XMLParseError):
+            pullpoint = await self.events.async_start()
 
         ptz = False
         with suppress(ONVIFError, Fault, RequestError):
