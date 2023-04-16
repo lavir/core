@@ -610,7 +610,7 @@ class WebHookManager:
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
 
-        LOGGER.debug("Registered webhook: %s", webhook_id)
+        LOGGER.debug("%s: Registered webhook: %s", self._name, webhook_id)
 
     @callback
     def _async_unregister_webhook(self):
