@@ -66,7 +66,9 @@ class EventManager:
 
         self._pullpoint_subscription: ONVIFService = None
         self._webhook_subscription: ONVIFService = None
-        self._pullpoint_service: ONVIFService = None
+
+        self._webhook_pullpoint_service: ONVIFService = None
+
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsub_refresh: CALLBACK_TYPE | None = None
@@ -130,7 +132,7 @@ class EventManager:
         self._webhook_subscription = self.device.create_subscription_service(
             "WebhookSubscription"
         )
-        self._pullpoint_service = self.device.create_onvif_service(
+        self._webhook_pullpoint_service = self.device.create_onvif_service(
             "pullpoint", port_type="WebhookSubscription"
         )
 
@@ -138,7 +140,7 @@ class EventManager:
         # Call SetSynchronizationPoint to generate a notification message
         # to ensure the webhooks are working.
         try:
-            result = await self._pullpoint_service.SetSynchronizationPoint()
+            result = await self._webhook_pullpoint_service.SetSynchronizationPoint()
         except SET_SYNCHRONIZATION_POINT_ERRORS:
             LOGGER.debug("%s: SetSynchronizationPoint failed", self.unique_id)
 
@@ -315,19 +317,19 @@ class EventManager:
             LOGGER.error("Error reading webhook: %s", ex)
             return
 
-        assert self._pullpoint_service is not None
-        assert self._pullpoint_service.transport is not None
+        assert self._webhook_pullpoint_service is not None
+        assert self._webhook_pullpoint_service.transport is not None
         try:
             doc = parse_xml(
                 content,  # type: ignore[arg-type]
-                self._pullpoint_service.transport,
+                self._webhook_pullpoint_service.transport,
                 settings=_DEFAULT_SETTINGS,
             )
         except XMLSyntaxError as exc:
             LOGGER.error("Received invalid XML: %s", exc)
             return
 
-        async_operation_proxy = self._pullpoint_service.ws_client.PullMessages
+        async_operation_proxy = self._webhook_pullpoint_service.ws_client.PullMessages
         op_name = async_operation_proxy._op_name  # pylint: disable=protected-access
         binding = (
             async_operation_proxy._proxy._binding  # pylint: disable=protected-access
