@@ -321,8 +321,10 @@ class EventManager:
 
         # TODO: know when to renew the notify service
         if self._notify_service:
-            with suppress(*SUBSCRIPTION_ERRORS):
-                await self._notify_service.Renew(_get_next_termination_time())
+            pass
+            # - figure out how to renew the notify service
+            # with suppress(*SUBSCRIPTION_ERRORS):
+            #     await self._notify_service.Renew(_get_next_termination_time())
 
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
