@@ -10,7 +10,9 @@ from logging import DEBUG, WARNING
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, TransportError
 from onvif import ONVIFCamera, ONVIFService
-from zeep.exceptions import Fault, XMLParseError
+from onvif.client import _DEFAULT_SETTINGS
+from zeep.exceptions import Fault, XMLParseError, XMLSyntaxError
+from zeep.loader import parse_xml
 
 from homeassistant.components import webhook
 from homeassistant.core import CALLBACK_TYPE, CoreState, HomeAssistant, callback
@@ -64,6 +66,7 @@ class EventManager:
         self.webhook_id: str | None = None
         self._base_url: str | None = None
         self._webhook_url: str | None = None
+        self._notify_service: ONVIFService | None = None
 
     @property
     def platforms(self) -> set[str]:
@@ -105,9 +108,9 @@ class EventManager:
         events_via_webhook = False
 
         if self._webhook_url:
-            notify_service = self.device.create_notification_service()
+            self._notify_service = self.device.create_notification_service()
             try:
-                await notify_service.Subscribe(
+                await self._notify_service.Subscribe(
                     {
                         "InitialTerminationTime": _get_next_termination_time(),
                         "ConsumerReference": {"Address": self._webhook_url},
@@ -179,11 +182,20 @@ class EventManager:
         """Handle incoming webhook."""
         LOGGER.warning("Received webhook %s: %s", webhook_id, request)
         try:
-            data = await request.text()
+            content = await request.text()
         except ConnectionResetError:
             return
 
-        LOGGER.warning("Received webhook %s: %s", webhook_id, data)
+        assert self._notify_service is not None
+        assert self._notify_service.transport is not None
+        try:
+            doc = parse_xml(
+                content, self._notify_service.transport, settings=_DEFAULT_SETTINGS
+            )
+        except XMLSyntaxError as exc:
+            LOGGER.error("Received invalid XML: %s", exc)
+
+        LOGGER.warning("Received webhook %s: %s: %s", webhook_id, content, doc)
 
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
