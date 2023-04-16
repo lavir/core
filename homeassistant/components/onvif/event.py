@@ -663,7 +663,8 @@ class WebHookManager:
         operation = binding.get(op_name)
         result = operation.process_reply(doc)
         LOGGER.debug(
-            "Processed webhook %s with %s events",
+            "%s: Processed webhook %s with %s event(s)",
+            self._name,
             webhook_id,
             len(result.NotificationMessage),
         )
