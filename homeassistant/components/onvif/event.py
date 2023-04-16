@@ -32,9 +32,9 @@ SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
 UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 
 
-SUBSCRIPTION_TIME = dt.timedelta(minutes=5)
+SUBSCRIPTION_TIME = dt.timedelta(minutes=3)
 SUBSCRIPTION_RELATIVE_TIME = (
-    "PT5M"  # use relative time since the time on the camera is not reliable
+    "PT3M"  # use relative time since the time on the camera is not reliable
 )
 SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
 
@@ -110,7 +110,6 @@ class EventManager:
     async def _async_start_webhook(self) -> bool:
         try:
             self._notify_service = self.device.create_notification_service()
-            self._pullpoint_service = self.device.create_onvif_service("pullpoint")
             notify_subscribe = await self._notify_service.Subscribe(
                 {
                     "InitialTerminationTime": _get_next_termination_time(),
@@ -126,6 +125,17 @@ class EventManager:
             self._webhook_subscription = self.device.create_subscription_service(
                 "WebhookSubscription"
             )
+            self._pullpoint_service = self.device.create_onvif_service(
+                "pullpoint", port_type="WebhookSubscription"
+            )
+
+            # 5.2.3 BASIC NOTIFICATION INTERFACE - NOTIFY
+            # Call SetSynchronizationPoint to generate a notification message
+            # to ensure the webhooks are working.
+            try:
+                await self._pullpoint_service.SetSynchronizationPoint()
+            except SET_SYNCHRONIZATION_POINT_ERRORS:
+                LOGGER.debug("%s: SetSynchronizationPoint failed", self.unique_id)
             return True
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             # Do not unregister the webhook because if its still
