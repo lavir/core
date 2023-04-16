@@ -109,7 +109,7 @@ class EventManager:
         if self.webhook_id is None:
             self.async_register_webhook()
         LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
-        self._pullpoint_service = self.device.create_pullpoint_service()
+        self._pullpoint_service = self.device.create_onvif_service("pullpoint")
         events_via_webhook = False
 
         if self._webhook_url:
@@ -154,10 +154,11 @@ class EventManager:
         # Renew immediately
         await self.async_renew()
 
+        pullpoint = self.device.create_pullpoint_service()
         # Initialize events
         with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-            await self._pullpoint_service.SetSynchronizationPoint()
-        response = await self._pullpoint_service.PullMessages(
+            await pullpoint.SetSynchronizationPoint()
+        response = await pullpoint.PullMessages(
             {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
         )
 
@@ -207,11 +208,11 @@ class EventManager:
             LOGGER.error("Error reading webhook: %s", ex)
             return
 
-        assert self._notify_service is not None
-        assert self._notify_service.transport is not None
+        assert self._pullpoint_service is not None
+        assert self._pullpoint_service.transport is not None
         try:
             doc = parse_xml(
-                content, self._notify_service.transport, settings=_DEFAULT_SETTINGS
+                content, self._pullpoint_service.transport, settings=_DEFAULT_SETTINGS
             )
         except XMLSyntaxError as exc:
             LOGGER.error("Received invalid XML: %s", exc)
@@ -292,14 +293,17 @@ class EventManager:
 
     async def async_renew(self) -> None:
         """Renew subscription."""
-        if not self._subscription:
-            return
+        if self._subscription:
+            with suppress(*SUBSCRIPTION_ERRORS):
+                # The first time we renew, we may get a Fault error so we
+                # suppress it. The subscription will be restarted in
+                # async_restart later.
+                await self._subscription.Renew(_get_next_termination_time())
 
-        with suppress(*SUBSCRIPTION_ERRORS):
-            # The first time we renew, we may get a Fault error so we
-            # suppress it. The subscription will be restarted in
-            # async_restart later.
-            await self._subscription.Renew(_get_next_termination_time())
+        # TODO: know when to renew the notify service
+        if self._notify_service:
+            with suppress(*SUBSCRIPTION_ERRORS):
+                await self._notify_service.Renew(_get_next_termination_time())
 
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
@@ -309,7 +313,8 @@ class EventManager:
         """Pull messages from device."""
         if self.hass.state == CoreState.running:
             try:
-                response = await self._pullpoint_service.PullMessages(
+                pullpoint = self.device.create_pullpoint_service()
+                response = await pullpoint.PullMessages(
                     {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
                 )
                 LOGGER.warning("Pulled messages: %s - %s", response, type(response))
