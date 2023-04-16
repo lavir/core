@@ -196,7 +196,7 @@ class PullPointManager:
     async def _async_start_pullpoint(self) -> bool:
         """Start pullpoint subscription."""
         try:
-            await self._async_create_pullpoint_subscription()
+            started = await self._async_create_pullpoint_subscription()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Device does not support PullPoint service or has too many subscriptions: %s",
@@ -204,8 +204,9 @@ class PullPointManager:
                 _stringify_onvif_error(err),
             )
             return False
-        self._async_schedule_pullpoint_renew()
-        return True
+        if started:
+            self._async_schedule_pullpoint_renew()
+        return started
 
     @callback
     def _async_schedule_pullpoint_renew(self) -> None:
@@ -226,7 +227,12 @@ class PullPointManager:
 
     @callback
     def async_schedule_pull(self) -> None:
-        """Schedule async_pull_messages to run."""
+        """Schedule async_pull_messages to run.
+
+        Used as fallback when webhook is not reachable.
+
+        Must not check if the webhook is reachable.
+        """
         self.async_cancel_pull_messages()
         if self._pullpoint_service:
             self._cancel_pull_messages = async_call_later(
@@ -265,6 +271,7 @@ class PullPointManager:
         if not await self._device.create_pullpoint_subscription(
             {"InitialTerminationTime": _get_next_termination_time()}
         ):
+            LOGGER.debug("%s: Failed to create PullPoint subscription", self._name)
             return False
 
         # Create subscription manager
@@ -272,20 +279,20 @@ class PullPointManager:
             "PullPointSubscription"
         )
 
-        # Renew immediately
-        await self._async_renew_pullpoint()
-
+        # Create the service that will be used to pull messages from the device.
         self._pullpoint_service = self._device.create_pullpoint_service()
+
         # Initialize events
         with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
             sync_result = await self._pullpoint_service.SetSynchronizationPoint()
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
-        response = await self._pullpoint_service.PullMessages(
-            {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
-        )
 
-        # Parse event initialization
-        await self._event_manager.async_parse_messages(response.NotificationMessage)
+        if response := await self._pullpoint_service.PullMessages(
+            {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
+        ):
+            # Parse event initialization
+            await self._event_manager.async_parse_messages(response.NotificationMessage)
+            self._event_manager.async_callback_listeners()
 
         if (
             self._event_manager.has_listeners
@@ -544,7 +551,7 @@ class WebHookManager:
 
         with suppress(ValueError):
             webhook.async_register(
-                self._hass, DOMAIN, webhook_id, webhook_id, self._handle_webhook
+                self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
             )
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
@@ -558,15 +565,32 @@ class WebHookManager:
         webhook.async_unregister(self._hass, self._webhook_id)
         self._webhook_id = None
 
-    async def _handle_webhook(
+    async def _async_handle_webhook(
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
         """Handle incoming webhook."""
         self._event_manager.webhook_is_reachable = True
+        content: bytes | None = None
         try:
             content = await request.read()
         except ConnectionResetError as ex:
             LOGGER.error("Error reading webhook: %s", ex)
+            return
+        except asyncio.CancelledError as ex:
+            LOGGER.error("Error reading webhook: %s", ex)
+            raise
+        finally:
+            self._hass.async_create_background_task(
+                self._async_process_webhook(hass, webhook_id, content),
+                f"ONVIF event webhook for {self._name}",
+            )
+
+    async def _async_process_webhook(
+        self, hass: HomeAssistant, webhook_id: str, content: bytes | None
+    ) -> None:
+        """Process incoming webhook data in the background."""
+        if content is None:
+            self._event_manager.pullpoint_manager.async_schedule_pull()
             return
 
         assert self._webhook_pullpoint_service is not None
@@ -589,7 +613,7 @@ class WebHookManager:
         operation = binding.get(op_name)
         result = operation.process_reply(doc)
         LOGGER.debug(
-            "Received webhook %s: %s: %s: %s", webhook_id, content, doc, result
+            "Processed webhook %s: %s: %s: %s", webhook_id, content, doc, result
         )
         await self._event_manager.async_parse_messages(result.NotificationMessage)
         self._event_manager.async_callback_listeners()
