@@ -106,6 +106,7 @@ class EventManager:
     async def _async_start_webhook(self) -> bool:
         try:
             self._notify_service = self.device.create_notification_service()
+            self._pullpoint_service = self.device.create_onvif_service("pullpoint")
             notify_subscribe = await self._notify_service.Subscribe(
                 {
                     "InitialTerminationTime": _get_next_termination_time(),
@@ -125,7 +126,7 @@ class EventManager:
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             # Do not unregister the webhook because if its still
             # subscribed to events, it will still receive them.
-            LOGGER.debug(
+            LOGGER.exception(
                 "%s: Device does not support notification service or too many subscriptions: %s",
                 self.unique_id,
                 err,
@@ -139,11 +140,10 @@ class EventManager:
             self.async_register_webhook()
         LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
         events_via_webhook = False
-        has_pull_point_support = False
+        event_via_pull_point = False
         try:
             event_service = self.device.create_events_service()
-            capabilities = await event_service.GetServiceCapabilities()
-            has_pull_point_support = capabilities.WSPullPointSupport
+            await event_service.GetServiceCapabilities()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Device does not support events service: %s",
@@ -152,23 +152,21 @@ class EventManager:
             )
         if self._webhook_url:
             events_via_webhook = await self._async_start_webhook()
-        await self._async_start_pull_point()
+        event_via_pull_point = await self._async_start_pull_point()
         # If we have a working webhook or the device supports pullpoint
         # we return true event if we failed to start one of them since
         # it may be able to start later.
-        if events_via_webhook or has_pull_point_support:
+        if events_via_webhook or event_via_pull_point:
             return True
         return False
 
-    async def _async_start_pull_point(self) -> None:
+    async def _async_start_pull_point(self) -> bool:
         LOGGER.debug("%s: Creating pullpoint subscription", self.unique_id)
         try:
             if not await self.device.create_pullpoint_subscription(
                 {"InitialTerminationTime": _get_next_termination_time()}
             ):
-                return
-
-            self._pullpoint_service = self.device.create_onvif_service("pullpoint")
+                return False
 
             # Create subscription manager
             self._subscription = self.device.create_subscription_service(
@@ -190,12 +188,14 @@ class EventManager:
             await self.async_parse_messages(response.NotificationMessage)
 
             self.started = True
+            return True
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Device does not support pullpoint service: %s",
                 self.unique_id,
                 err,
             )
+        return False
 
     @callback
     def async_register_webhook(self) -> None:
