@@ -65,8 +65,6 @@ class EventManager:
         self._base_url: str | None = None
         self._webhook_url: str | None = None
 
-        super().__init__()
-
     @property
     def platforms(self) -> set[str]:
         """Return platforms to setup."""
@@ -100,16 +98,30 @@ class EventManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
+        LOGGER.debug("Starting event manager for %s", self.unique_id)
         if self.webhook_id is None:
             self.async_register_webhook()
+        LOGGER.debug("Webhook registered: %s", self.webhook_id)
+        events_via_webhook = False
 
         if self._webhook_url:
-            self.device.create_events_service(self._webhook_url)
+            notify_service = self.device.create_notification_service()
+            try:
+                await notify_service.Subscribe(
+                    {
+                        "InitialTerminationTime": _get_next_termination_time(),
+                        "ConsumerReference": {"Address": self._webhook_url},
+                    }
+                )
+                events_via_webhook = True
+            except Fault as err:
+                LOGGER.debug("Device does not support notification service: %s", err)
 
+        LOGGER.debug("Creating pullpoint subscription")
         if not await self.device.create_pullpoint_subscription(
             {"InitialTerminationTime": _get_next_termination_time()}
         ):
-            return False
+            return events_via_webhook
 
         # Create subscription manager
         self._subscription = self.device.create_subscription_service(
@@ -164,7 +176,8 @@ class EventManager:
     async def _handle_webhook(
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
-        """Handle incoming webhook from Reolink for inbound messages and calls."""
+        """Handle incoming webhook."""
+        LOGGER.warning("Received webhook %s: %s", webhook_id, request)
         try:
             data = await request.text()
         except ConnectionResetError:
