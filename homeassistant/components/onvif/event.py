@@ -395,7 +395,7 @@ class EventManager:
 
     async def async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
-        if self.hass.state == CoreState.running:
+        if 0 and self.hass.state == CoreState.running:
             try:
                 pullpoint = self.device.create_pullpoint_service()
                 response = await pullpoint.PullMessages(
