@@ -358,7 +358,11 @@ class PullPointManager:
         return False
 
     async def _async_pull_messages_or_try_to_restart(self) -> None:
-        """Pull messages from device or try to restart the subscription."""
+        """Pull messages from device or try to restart the subscription.
+
+        This function must not be called directly, it should only
+        be called from _async_pull_messages
+        """
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         LOGGER.debug("%s: Pulling ONVIF PullPoint messages", self._name)
         try:
