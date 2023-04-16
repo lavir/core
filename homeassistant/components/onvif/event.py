@@ -381,6 +381,7 @@ class PullPointManager:
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
             # subscription is no longer valid.
+            self._event_manager.webhook_is_reachable = False
             self._async_cancel_pullpoint_renew()
             await self._async_renew_or_restart_pullpoint()
             return
