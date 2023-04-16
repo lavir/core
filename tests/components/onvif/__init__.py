@@ -111,6 +111,11 @@ def setup_mock_device(mock_device):
         video_source_token=None,
     )
     mock_device.profiles = [profile1]
+    mock_device.events = MagicMock(
+        webhook_is_reachable=True,
+        webhook_manager=MagicMock(started=True),
+        pullpoint_manager=MagicMock(started=True),
+    )
 
     def mock_constructor(hass, config):
         """Fake the controller constructor."""

@@ -72,4 +72,9 @@ async def test_diagnostics(
                 }
             ],
         },
+        "events": {
+            "pullpoint_manager_started": True,
+            "webhook_manager_started": True,
+            "webhook_reachable": True,
+        },
     }
