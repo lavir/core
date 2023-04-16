@@ -290,6 +290,7 @@ class PullPointManager:
         if response := await self._pullpoint_service.PullMessages(
             {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
         ):
+            LOGGER.debug("%s: PullMessages: %s", self._name, response)
             # Parse event initialization
             await self._event_manager.async_parse_messages(response.NotificationMessage)
             self._event_manager.async_callback_listeners()
