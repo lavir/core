@@ -133,9 +133,13 @@ class EventManager:
             # Call SetSynchronizationPoint to generate a notification message
             # to ensure the webhooks are working.
             try:
-                await self._pullpoint_service.SetSynchronizationPoint()
+                result = await self._pullpoint_service.SetSynchronizationPoint()
             except SET_SYNCHRONIZATION_POINT_ERRORS:
                 LOGGER.debug("%s: SetSynchronizationPoint failed", self.unique_id)
+
+            LOGGER.warning(
+                "%s: Webhook subscription created: %s", self.unique_id, result
+            )
             return True
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             # Do not unregister the webhook because if its still
@@ -210,7 +214,10 @@ class EventManager:
             pullpoint = self.device.create_pullpoint_service()
             # Initialize events
             with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-                await pullpoint.SetSynchronizationPoint()
+                sync_result = await pullpoint.SetSynchronizationPoint()
+                LOGGER.debug(
+                    "%s: SetSynchronizationPoint: %s", self.unique_id, sync_result
+                )
             response = await pullpoint.PullMessages(
                 {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
             )
