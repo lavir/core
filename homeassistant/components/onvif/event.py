@@ -42,7 +42,7 @@ SUBSCRIPTION_RELATIVE_TIME = (
     "PT3M"  # use relative time since the time on the camera is not reliable
 )
 SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
-SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR = 60
+SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR = 60.0
 
 PULLPOINT_POLL_TIME = dt.timedelta(seconds=60)
 PULLPOINT_INIT_POLL_TIME = dt.timedelta(seconds=5)
@@ -282,13 +282,13 @@ class PullPointManager:
         """Renew or start pullpoint subscription."""
         if self._hass.is_stopping or not self.started:
             return
-        next_attempt = SUBSCRIPTION_RENEW_INTERVAL
+        next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
         try:
             if (
-                not await self._async_renew_pullpoint()
-                and not await self._async_restart_pullpoint()
+                await self._async_renew_pullpoint()
+                or await self._async_restart_pullpoint()
             ):
-                next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
+                next_attempt = SUBSCRIPTION_RENEW_INTERVAL
         finally:
             self._async_schedule_pullpoint_renew(next_attempt)
 
@@ -584,13 +584,10 @@ class WebHookManager:
         """Renew or start webhook subscription."""
         if self._hass.is_stopping or not self.started:
             return
-        next_attempt = SUBSCRIPTION_RENEW_INTERVAL
+        next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
         try:
-            if (
-                not await self._async_renew_webhook()
-                and not await self._async_restart_webhook()
-            ):
-                next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
+            if await self._async_renew_webhook() or await self._async_restart_webhook():
+                next_attempt = SUBSCRIPTION_RENEW_INTERVAL
         finally:
             self._async_schedule_webhook_renew(next_attempt)
 
