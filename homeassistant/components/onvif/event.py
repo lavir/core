@@ -60,8 +60,9 @@ class EventManager:
         self.unique_id: str = unique_id
         self.started: bool = False
 
-        self._pullpoint_subscription: ONVIFService = None
+        self._subscription: ONVIFService = None
         self._webhook_subscription: ONVIFService = None
+        self._pullpoint_service: ONVIFService = None
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsub_refresh: CALLBACK_TYPE | None = None
@@ -108,6 +109,7 @@ class EventManager:
         if self.webhook_id is None:
             self.async_register_webhook()
         LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
+        self._pullpoint_service = self.device.create_pullpoint_service()
         events_via_webhook = False
 
         if self._webhook_url:
@@ -125,7 +127,7 @@ class EventManager:
                 ] = notify_subscribe.SubscriptionReference.Address._value_1
 
                 # Create subscription manager
-                self._pullpoint_subscription = self.device.create_subscription_service(
+                self._subscription = self.device.create_subscription_service(
                     "WebhookSubscription"
                 )
                 events_via_webhook = True
@@ -145,7 +147,7 @@ class EventManager:
             return events_via_webhook
 
         # Create subscription manager
-        self._pullpoint_subscription = self.device.create_subscription_service(
+        self._subscription = self.device.create_subscription_service(
             "PullPointSubscription"
         )
 
@@ -153,10 +155,9 @@ class EventManager:
         await self.async_renew()
 
         # Initialize events
-        pullpoint = self.device.create_pullpoint_service()
         with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-            await pullpoint.SetSynchronizationPoint()
-        response = await pullpoint.PullMessages(
+            await self._pullpoint_service.SetSynchronizationPoint()
+        response = await self._pullpoint_service.PullMessages(
             {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
         )
 
@@ -214,8 +215,22 @@ class EventManager:
             )
         except XMLSyntaxError as exc:
             LOGGER.error("Received invalid XML: %s", exc)
+            return
 
-        LOGGER.warning("Received webhook %s: %s: %s", webhook_id, content, doc)
+        async_operation_proxy = self._pullpoint_service.ws_client.PullMessages
+        op_name = async_operation_proxy._op_name  # pylint: disable=protected-access
+        binding = (
+            async_operation_proxy._proxy._binding  # pylint: disable=protected-access
+        )
+        operation = binding.get(op_name)
+        result = operation.process_reply(doc)
+        LOGGER.debug(
+            "Received webhook %s: %s: %s: %s", webhook_id, content, doc, result
+        )
+        await self.async_parse_messages(result.NotificationMessage)
+        # Update entities
+        for update_callback in self._listeners:
+            update_callback()
 
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
@@ -223,22 +238,22 @@ class EventManager:
         self.started = False
         self.async_unregister_webhook()
 
-        if not self._pullpoint_subscription:
+        if not self._subscription:
             return
 
         with suppress(*UNSUBSCRIBE_ERRORS):
-            await self._pullpoint_subscription.Unsubscribe()
-        self._pullpoint_subscription = None
+            await self._subscription.Unsubscribe()
+        self._subscription = None
 
     async def async_restart(self, _now: dt.datetime | None = None) -> None:
         """Restart the subscription assuming the camera rebooted."""
         if not self.started:
             return
 
-        if self._pullpoint_subscription:
+        if self._subscription:
             # Suppressed. The subscription may no longer exist.
             try:
-                await self._pullpoint_subscription.Unsubscribe()
+                await self._subscription.Unsubscribe()
             except UNSUBSCRIBE_ERRORS as err:
                 LOGGER.debug(
                     (
@@ -248,7 +263,7 @@ class EventManager:
                     self.unique_id,
                     err,
                 )
-            self._pullpoint_subscription = None
+            self._subscription = None
 
         try:
             restarted = await self.async_start()
@@ -277,14 +292,14 @@ class EventManager:
 
     async def async_renew(self) -> None:
         """Renew subscription."""
-        if not self._pullpoint_subscription:
+        if not self._subscription:
             return
 
         with suppress(*SUBSCRIPTION_ERRORS):
             # The first time we renew, we may get a Fault error so we
             # suppress it. The subscription will be restarted in
             # async_restart later.
-            await self._pullpoint_subscription.Renew(_get_next_termination_time())
+            await self._subscription.Renew(_get_next_termination_time())
 
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
@@ -294,10 +309,10 @@ class EventManager:
         """Pull messages from device."""
         if self.hass.state == CoreState.running:
             try:
-                pullpoint = self.device.create_pullpoint_service()
-                response = await pullpoint.PullMessages(
+                response = await self._pullpoint_service.PullMessages(
                     {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
                 )
+                LOGGER.warning("Pulled messages: %s - %s", response, type(response))
 
                 # Renew subscription if less than two hours is left
                 if (
