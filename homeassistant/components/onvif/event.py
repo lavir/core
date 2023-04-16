@@ -322,7 +322,7 @@ class PullPointManager:
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
-                    "Failed to unsubscribe ONVIF webhook subscription for '%s';"
+                    "Failed to unsubscribe ONVIF PullPoint subscription for '%s';"
                     " This is normal if the device restarted: %s"
                 ),
                 self._unique_id,
@@ -616,7 +616,7 @@ class WebHookManager:
             LOGGER.log(
                 DEBUG if isinstance(err, XMLParseError) else WARNING,
                 (
-                    "Failed to restart ONVIF PullPoint subscription for '%s'; "
+                    "Failed to restart ONVIF webhook subscription for '%s'; "
                     "Retrying later: %s"
                 ),
                 self._unique_id,
