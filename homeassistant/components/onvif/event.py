@@ -17,7 +17,7 @@ from zeep.loader import parse_xml
 
 from homeassistant.components import webhook
 from homeassistant.core import CALLBACK_TYPE, CoreState, HomeAssistant, callback
-from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.util import dt as dt_util
 
@@ -75,6 +75,7 @@ class EventManager:
         self._base_url: str | None = None
         self._webhook_url: str | None = None
         self._notify_service: ONVIFService | None = None
+        self._renew_or_start_interval: CALLBACK_TYPE | None = None
 
     @property
     def platforms(self) -> set[str]:
@@ -161,8 +162,25 @@ class EventManager:
         # we return true event if we failed to start one of them since
         # it may be able to start later.
         if events_via_webhook or event_via_pull_point:
+            self._renew_or_start_interval = async_track_time_interval(
+                self.hass,
+                self.async_renew_or_start,
+                dt.timedelta(seconds=SUBSCRIPTION_RENEW_INTERVAL),
+            )
             return True
         return False
+
+    async def async_renew_or_start(self, now: dt.datetime | None = None) -> None:
+        """Renew or start subscription."""
+        try:
+            await self.async_renew()
+        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+            LOGGER.debug(
+                "%s: Failed to renew subscription, trying to restart: %s",
+                self.unique_id,
+                err,
+            )
+            await self.async_restart()
 
     async def _async_start_pull_point(self) -> bool:
         LOGGER.debug("%s: Creating pullpoint subscription", self.unique_id)
@@ -271,6 +289,9 @@ class EventManager:
         """Unsubscribe from events."""
         self._listeners = []
         self.started = False
+        if self._renew_or_start_interval:
+            self._renew_or_start_interval()
+            self._renew_or_start_interval = None
         self.async_unregister_webhook()
 
         if self._subscription:
@@ -374,7 +395,7 @@ class EventManager:
 
     async def async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
-        if self.hass.state == CoreState.running:
+        if 0 and self.hass.state == CoreState.running:
             try:
                 pullpoint = self.device.create_pullpoint_service()
                 response = await pullpoint.PullMessages(
