@@ -631,15 +631,18 @@ class WebHookManager:
         self, hass: HomeAssistant, webhook_id: str, content: bytes | None
     ) -> None:
         """Process incoming webhook data in the background."""
+        event_manager = self._event_manager
         if content is None:
             # webhook is marked as not working as something
             # went wrong. We will mark it as working again
             # when we receive a valid notification.
-            self._event_manager.webhook_is_working = False
-            self._event_manager.pullpoint_manager.async_schedule_pull()
+            event_manager.webhook_is_working = False
+            event_manager.pullpoint_manager.async_schedule_pull()
             return
 
-        self._event_manager.webhook_is_working = True
+        if not event_manager.webhook_is_working:
+            LOGGER.debug("%s: Switching to webhook for events", self._name)
+        event_manager.webhook_is_working = True
         assert self._webhook_pullpoint_service is not None
         assert self._webhook_pullpoint_service.transport is not None
         try:
@@ -660,10 +663,12 @@ class WebHookManager:
         operation = binding.get(op_name)
         result = operation.process_reply(doc)
         LOGGER.debug(
-            "Processed webhook %s: %s: %s: %s", webhook_id, content, doc, result
+            "Processed webhook %s with %s events",
+            webhook_id,
+            len(result.NotificationMessage),
         )
-        await self._event_manager.async_parse_messages(result.NotificationMessage)
-        self._event_manager.async_callback_listeners()
+        await event_manager.async_parse_messages(result.NotificationMessage)
+        event_manager.async_callback_listeners()
 
     @callback
     def _async_cancel_webhook_renew(self) -> None:
