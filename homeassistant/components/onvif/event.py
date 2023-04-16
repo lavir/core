@@ -38,6 +38,10 @@ SUBSCRIPTION_RELATIVE_TIME = (
 SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
 SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR = 60
 
+PULLPOINT_POLL_TIME = dt.timedelta(seconds=60)
+PULLPOINT_INIT_POLL_TIME = dt.timedelta(seconds=5)
+PULLPOINT_MESSAGE_LIMIT = 100
+
 
 def _get_next_termination_time() -> str:
     """Get next termination time."""
@@ -289,7 +293,10 @@ class PullPointManager:
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
         if response := await self._pullpoint_service.PullMessages(
-            {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
+            {
+                "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
+                "Timeout": PULLPOINT_INIT_POLL_TIME,
+            }
         ):
             LOGGER.debug("%s: PullMessages: %s", self._name, response)
             # Parse event initialization
@@ -367,7 +374,10 @@ class PullPointManager:
         LOGGER.debug("%s: Pulling ONVIF PullPoint messages", self._name)
         try:
             response = await self._pullpoint_service.PullMessages(
-                {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
+                {
+                    "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
+                    "Timeout": PULLPOINT_POLL_TIME,
+                }
             )
         except RemoteProtocolError:
             # Likely a shutdown event, nothing to see here
