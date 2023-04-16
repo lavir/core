@@ -55,12 +55,13 @@ class EventManager:
     """ONVIF Event Manager."""
 
     def __init__(
-        self, hass: HomeAssistant, device: ONVIFCamera, unique_id: str
+        self, hass: HomeAssistant, device: ONVIFCamera, unique_id: str, name: str
     ) -> None:
         """Initialize event manager."""
-        self.hass: HomeAssistant = hass
-        self.device: ONVIFCamera = device
-        self.unique_id: str = unique_id
+        self.hass = hass
+        self.device = device
+        self.unique_id = unique_id
+        self.name = name
 
         self.webhook_manager = WebHookManager(self)
         self.pullpoint_manager = PullPointManager(self)
@@ -177,14 +178,18 @@ class PullPointManager:
         self._device = event_manager.device
         self._hass = event_manager.hass
         self._unique_id = event_manager.unique_id
+        self._name = event_manager.name
+
         self._pullpoint_subscription: ONVIFService = None
+        self._pullpoint_service: ONVIFService = None
+
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
         self._cancel_pullpoint_renew: CALLBACK_TYPE | None = None
 
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
         assert self.started is False, "PullPoint manager already started"
-        LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
+        LOGGER.debug("%s: Starting PullPoint manager", self._name)
         self.started = await self._async_start_pullpoint()
         return self.started
 
@@ -195,7 +200,7 @@ class PullPointManager:
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Device does not support PullPoint service or has too many subscriptions: %s",
-                self._unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
             return False
@@ -223,9 +228,10 @@ class PullPointManager:
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
         self.async_cancel_pull_messages()
-        self._cancel_pull_messages = async_call_later(
-            self._hass, 1, self._async_pull_messages
-        )
+        if self._pullpoint_service:
+            self._cancel_pull_messages = async_call_later(
+                self._hass, 1, self._async_pull_messages
+            )
 
     async def async_stop(self) -> None:
         """Unsubscribe from PullPoint and cancel callbacks."""
@@ -269,14 +275,12 @@ class PullPointManager:
         # Renew immediately
         await self._async_renew_pullpoint()
 
-        pullpoint = self._device.create_pullpoint_service()
+        self._pullpoint_service = self._device.create_pullpoint_service()
         # Initialize events
         with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-            sync_result = await pullpoint.SetSynchronizationPoint()
-            LOGGER.debug(
-                "%s: SetSynchronizationPoint: %s", self._unique_id, sync_result
-            )
-        response = await pullpoint.PullMessages(
+            sync_result = await self._pullpoint_service.SetSynchronizationPoint()
+            LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
+        response = await self._pullpoint_service.PullMessages(
             {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
         )
 
@@ -303,9 +307,7 @@ class PullPointManager:
         await self._async_unsubscribe_pullpoint()
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
-            LOGGER.debug(
-                "Restarted ONVIF PullPoint subscription for '%s'", self._unique_id
-            )
+            LOGGER.debug("Restarted ONVIF PullPoint subscription for '%s'", self._name)
             self.async_schedule_pull()
         return restarted
 
@@ -322,7 +324,7 @@ class PullPointManager:
                     "Failed to unsubscribe ONVIF PullPoint subscription for '%s';"
                     " This is normal if the device restarted: %s"
                 ),
-                self._unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
         self._pullpoint_subscription = None
@@ -336,23 +338,21 @@ class PullPointManager:
             # suppress it. The subscription will be restarted in
             # async_restart later.
             await self._pullpoint_subscription.Renew(_get_next_termination_time())
-            LOGGER.debug(
-                "Renewed ONVIF PullPoint subscription for '%s'", self._unique_id
-            )
+            LOGGER.debug("Renewed ONVIF PullPoint subscription for '%s'", self._name)
             return True
         except SUBSCRIPTION_ERRORS as err:
             LOGGER.debug(
                 "Failed to renew ONVIF PullPoint subscription for '%s'; %s",
-                self._event_manager.unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
         return False
 
     async def _async_pull_messages_or_try_to_restart(self) -> None:
         """Pull messages from device or try to restart the subscription."""
+        assert self._pullpoint_service is not None, "PullPoint service does not exist"
         try:
-            pullpoint_service = self._event_manager.device.create_pullpoint_service()
-            response = await pullpoint_service.PullMessages(
+            response = await self._pullpoint_service.PullMessages(
                 {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
             )
         except RemoteProtocolError:
@@ -403,6 +403,7 @@ class WebHookManager:
         self._device = event_manager.device
         self._hass = event_manager.hass
         self._unique_id = event_manager.unique_id
+        self._name = event_manager.name
 
         self._webhook_subscription: ONVIFService = None
         self._webhook_pullpoint_service: ONVIFService = None
@@ -416,7 +417,7 @@ class WebHookManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
-        LOGGER.debug("%s: Starting webhook manager", self._unique_id)
+        LOGGER.debug("%s: Starting webhook manager", self._name)
         assert self.started is False, "Webhook manager already started"
         assert self._webhook_id is None, "Webhook already registered"
         self._async_register_webhook()
@@ -468,9 +469,9 @@ class WebHookManager:
         try:
             await self._webhook_pullpoint_service.SetSynchronizationPoint()
         except SET_SYNCHRONIZATION_POINT_ERRORS:
-            LOGGER.debug("%s: SetSynchronizationPoint failed", self._unique_id)
+            LOGGER.debug("%s: SetSynchronizationPoint failed", self._name)
 
-        LOGGER.debug("%s: Webhook subscription created", self._unique_id)
+        LOGGER.debug("%s: Webhook subscription created", self._name)
 
     async def _async_start_webhook(self) -> bool:
         """Start webhook."""
@@ -481,7 +482,7 @@ class WebHookManager:
             # subscribed to events, it will still receive them.
             LOGGER.debug(
                 "%s: Device does not support notification service or too many subscriptions: %s",
-                self._unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
             return False
@@ -498,12 +499,12 @@ class WebHookManager:
         """Renew webhook subscription."""
         try:
             await self._webhook_subscription.Renew(_get_next_termination_time())
-            LOGGER.debug("%s: Webhook subscription renewed", self._unique_id)
+            LOGGER.debug("%s: Webhook subscription renewed", self._name)
             return True
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Failed to renew webhook subscription %s",
-                self._unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
         return False
@@ -613,7 +614,7 @@ class WebHookManager:
                     "Failed to unsubscribe ONVIF webhook subscription for '%s';"
                     " This is normal if the device restarted: %s"
                 ),
-                self._unique_id,
+                self._name,
                 _stringify_onvif_error(err),
             )
         self._webhook_subscription = None
