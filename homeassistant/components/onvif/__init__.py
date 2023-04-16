@@ -28,6 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_populate_options(hass, entry)
 
     device = ONVIFDevice(hass, entry)
+    await device.async_setup()
 
     try:
         await device.async_setup()
