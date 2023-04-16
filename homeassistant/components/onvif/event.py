@@ -38,6 +38,10 @@ SUBSCRIPTION_RELATIVE_TIME = (
 SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
 SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR = 60
 
+PULLPOINT_POLL_TIME = dt.timedelta(seconds=60)
+PULLPOINT_INIT_POLL_TIME = dt.timedelta(seconds=5)
+PULLPOINT_MESSAGE_LIMIT = 100
+
 
 def _get_next_termination_time() -> str:
     """Get next termination time."""
@@ -168,7 +172,12 @@ class EventManager:
 
 
 class PullPointManager:
-    """ONVIF PullPoint Manager."""
+    """ONVIF PullPoint Manager.
+
+    If the camera supports webhooks and the webhook is reachable, the pullpoint
+    manager will keep the pull point subscription alive, but will not poll for
+    messages unless the webhook fails.
+    """
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize pullpoint manager."""
@@ -289,7 +298,10 @@ class PullPointManager:
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
         if response := await self._pullpoint_service.PullMessages(
-            {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
+            {
+                "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
+                "Timeout": PULLPOINT_INIT_POLL_TIME,
+            }
         ):
             LOGGER.debug("%s: PullMessages: %s", self._name, response)
             # Parse event initialization
@@ -367,7 +379,10 @@ class PullPointManager:
         LOGGER.debug("%s: Pulling ONVIF PullPoint messages", self._name)
         try:
             response = await self._pullpoint_service.PullMessages(
-                {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
+                {
+                    "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
+                    "Timeout": PULLPOINT_POLL_TIME,
+                }
             )
         except RemoteProtocolError:
             # Likely a shutdown event, nothing to see here
@@ -398,12 +413,11 @@ class PullPointManager:
     async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
         self._cancel_pull_messages = None
-        if self._hass.state == CoreState.running:
-            if not self._pull_lock.locked():
-                # Pull messages if the lock is not already locked
-                # any pull will do, so we don't need to wait for the lock
-                async with self._pull_lock:
-                    await self._async_pull_messages_or_try_to_restart()
+        if self._hass.state == CoreState.running and not self._pull_lock.locked():
+            # Pull messages if the lock is not already locked
+            # any pull will do, so we don't need to wait for the lock
+            async with self._pull_lock:
+                await self._async_pull_messages_or_try_to_restart()
         if (
             self._event_manager.has_listeners
             and not self._event_manager.webhook_is_reachable
@@ -412,7 +426,12 @@ class PullPointManager:
 
 
 class WebHookManager:
-    """Manage ONVIF webhook subscriptions."""
+    """Manage ONVIF webhook subscriptions.
+
+    If the camera supports webhooks, we will use that instead of
+    pullpoint subscriptions as soon as we detect that the camera
+    can reach our webhook.
+    """
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize webhook manager."""
@@ -561,10 +580,9 @@ class WebHookManager:
             except NoURLAvailableError:
                 self._async_unregister_webhook()
 
-        with suppress(ValueError):
-            webhook.async_register(
-                self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
-            )
+        webhook.async_register(
+            self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
+        )
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
 
