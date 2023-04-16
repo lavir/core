@@ -184,20 +184,32 @@ class PullPointManager:
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
         assert self.started is False, "PullPoint manager already started"
+        LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
         return await self._async_start_pullpoint()
 
     async def _async_start_pullpoint(self) -> bool:
         """Start pullpoint subscription."""
-        LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
         try:
-            return await self._async_create_pullpoint_subscription()
+            await self._async_create_pullpoint_subscription()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
                 "%s: Device does not support PullPoint service or has too many subscriptions: %s",
                 self._unique_id,
                 _stringify_onvif_error(err),
             )
-        return False
+            return False
+        self._async_schedule_pullpoint_renew()
+        return True
+
+    @callback
+    def _async_schedule_pullpoint_renew(self) -> None:
+        """Schedule PullPoint subscription renewal."""
+        self._async_cancel_pullpoint_renew()
+        self._cancel_pullpoint_renew = async_call_later(
+            self._hass,
+            SUBSCRIPTION_RENEW_INTERVAL,
+            self._async_renew_or_restart_pullpoint,
+        )
 
     @callback
     def async_cancel_pull_messages(self) -> None:
@@ -269,13 +281,7 @@ class PullPointManager:
 
         # Parse event initialization
         await self._event_manager.async_parse_messages(response.NotificationMessage)
-
         self.started = True
-        self._cancel_pullpoint_renew = async_call_later(
-            self._hass,
-            SUBSCRIPTION_RENEW_INTERVAL,
-            self._async_renew_or_restart_pullpoint,
-        )
 
         if (
             self._event_manager.has_listeners
@@ -423,6 +429,16 @@ class WebHookManager:
         await self._async_unsubscribe_webhook()
         self._async_unregister_webhook()
 
+    @callback
+    def _async_schedule_webhook_renew(self) -> None:
+        """Schedule webhook subscription renewal."""
+        self._async_cancel_webhook_renew()
+        self._cancel_webhook_renew = async_call_later(
+            self._hass,
+            SUBSCRIPTION_RENEW_INTERVAL,
+            self._async_renew_or_restart_webhook,
+        )
+
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
         self._notify_service = self._device.create_notification_service()
@@ -469,11 +485,7 @@ class WebHookManager:
             )
             return False
 
-        self._cancel_webhook_renew = async_call_later(
-            self._hass,
-            SUBSCRIPTION_RENEW_INTERVAL,
-            self._async_renew_or_restart_webhook,
-        )
+        self._async_schedule_webhook_renew()
         return True
 
     async def _async_restart_webhook(self) -> bool:
