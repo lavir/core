@@ -90,7 +90,7 @@ class EventManager:
     def async_add_listener(self, update_callback: CALLBACK_TYPE) -> Callable[[], None]:
         """Listen for data updates."""
         # This is the first listener, set up polling.
-        if not self._listeners:
+        if not self._listeners and not self._webhook_is_reachable:
             self._async_schedule_pull()
 
         self._listeners.append(update_callback)
@@ -343,13 +343,15 @@ class EventManager:
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
         self._listeners = []
+
         self.pullpoint_started = False
-        self.webhook_started = False
         self._async_cancel_pullpoint_renew()
-        self._async_cancel_webhook_renew()
-        self._async_unregister_webhook()
         await self._async_unsubscribe_pullpoint()
+
+        self.webhook_started = False
+        self._async_cancel_webhook_renew()
         await self._async_unsubscribe_webhook()
+        self._async_unregister_webhook()
 
     @callback
     def _async_cancel_pullpoint_renew(self) -> None:
@@ -474,41 +476,43 @@ class EventManager:
             self._unsub_refresh = None
         self._unsub_refresh = async_call_later(self.hass, 1, self._async_pull_messages)
 
+    async def _async_pull_messages_or_try_to_restart(self) -> None:
+        """Pull messages from device or try to restart the subscription."""
+        try:
+            response = await self.device.create_pullpoint_service().PullMessages(
+                {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
+            )
+        except RemoteProtocolError:
+            # Likely a shutdown event, nothing to see here
+            return
+        except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
+            # Device may not support subscriptions so log at debug level
+            # when we get an XMLParseError
+            LOGGER.log(
+                DEBUG if isinstance(err, XMLParseError) else WARNING,
+                (
+                    "Failed to fetch ONVIF PullPoint subscription messages for"
+                    " '%s': %s"
+                ),
+                self.unique_id,
+                _stringify_onvif_error(err),
+            )
+            # Treat errors as if the camera restarted. Assume that the pullpoint
+            # subscription is no longer valid.
+            self._async_cancel_pullpoint_renew()
+            await self._async_renew_or_restart_pullpoint()
+            return
+
+        # Parse response
+        await self.async_parse_messages(response.NotificationMessage)
+        self._async_callback_listeners()
+
     async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
         self._unsub_refresh = None
         if self.hass.state == CoreState.running:
-            try:
-                response = await self.device.create_pullpoint_service().PullMessages(
-                    {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
-                )
-            except RemoteProtocolError:
-                # Likely a shutdown event, nothing to see here
-                return
-            except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
-                # Device may not support subscriptions so log at debug level
-                # when we get an XMLParseError
-                LOGGER.log(
-                    DEBUG if isinstance(err, XMLParseError) else WARNING,
-                    (
-                        "Failed to fetch ONVIF PullPoint subscription messages for"
-                        " '%s': %s"
-                    ),
-                    self.unique_id,
-                    _stringify_onvif_error(err),
-                )
-                # Treat errors as if the camera restarted. Assume that the pullpoint
-                # subscription is no longer valid.
-                self._async_cancel_pullpoint_renew()
-                await self._async_renew_or_restart_pullpoint()
-                return
-
-            # Parse response
-            await self.async_parse_messages(response.NotificationMessage)
-            self._async_callback_listeners()
-
-        # Reschedule another pull
-        if self._listeners:
+            await self._async_pull_messages_or_try_to_restart()
+        if self._listeners and not self._webhook_is_reachable:
             self._async_schedule_pull()
 
     @callback
