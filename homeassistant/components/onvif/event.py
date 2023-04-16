@@ -7,15 +7,18 @@ from contextlib import suppress
 import datetime as dt
 from logging import DEBUG, WARNING
 
+from aiohttp.web import Request
 from httpx import RemoteProtocolError, TransportError
 from onvif import ONVIFCamera, ONVIFService
 from zeep.exceptions import Fault, XMLParseError
 
+from homeassistant.components import webhook
 from homeassistant.core import CALLBACK_TYPE, CoreState, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.util import dt as dt_util
 
-from .const import LOGGER
+from .const import DOMAIN, LOGGER
 from .models import Event
 from .parsers import PARSERS
 
@@ -58,6 +61,10 @@ class EventManager:
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsub_refresh: CALLBACK_TYPE | None = None
 
+        self.webhook_id: str | None = None
+        self._base_url: str | None = None
+        self._webhook_url: str | None = None
+
         super().__init__()
 
     @property
@@ -93,6 +100,12 @@ class EventManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
+        if self.webhook_id is None:
+            self.async_register_webhook()
+
+        if self._webhook_url:
+            self.device.create_events_service(self._webhook_url)
+
         if not await self.device.create_pullpoint_subscription(
             {"InitialTerminationTime": _get_next_termination_time()}
         ):
@@ -120,10 +133,50 @@ class EventManager:
         self.started = True
         return True
 
+    @callback
+    def async_register_webhook(self) -> None:
+        """Register the webhook for motion events."""
+        webhook_id = f"{DOMAIN}_{self.unique_id}_events"
+        self.webhook_id = webhook_id
+        try:
+            self._base_url = get_url(self.hass, prefer_external=False)
+        except NoURLAvailableError:
+            try:
+                self._base_url = get_url(self.hass, prefer_external=True)
+            except NoURLAvailableError:
+                self.async_unregister_webhook()
+
+        webhook.async_register(
+            self.hass, DOMAIN, webhook_id, webhook_id, self._handle_webhook
+        )
+        webhook_path = webhook.async_generate_path(webhook_id)
+        self._webhook_url = f"{self._base_url}{webhook_path}"
+
+        LOGGER.debug("Registered webhook: %s", webhook_id)
+
+    @callback
+    def async_unregister_webhook(self):
+        """Unregister the webhook for motion events."""
+        LOGGER.debug("Unregistering webhook %s", self.webhook_id)
+        webhook.async_unregister(self.hass, self.webhook_id)
+        self.webhook_id = None
+
+    async def _handle_webhook(
+        self, hass: HomeAssistant, webhook_id: str, request: Request
+    ) -> None:
+        """Handle incoming webhook from Reolink for inbound messages and calls."""
+        try:
+            data = await request.text()
+        except ConnectionResetError:
+            return
+
+        LOGGER.warning("Received webhook %s: %s", webhook_id, data)
+
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
         self._listeners = []
         self.started = False
+        self.async_unregister_webhook()
 
         if not self._subscription:
             return
