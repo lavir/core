@@ -193,7 +193,7 @@ class PullPointManager:
             return await self._async_create_pullpoint_subscription()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
-                "%s: Device does not support PullPoint service: %s",
+                "%s: Device does not support PullPoint service or has too many subscriptions: %s",
                 self._unique_id,
                 _stringify_onvif_error(err),
             )
