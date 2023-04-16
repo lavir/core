@@ -185,10 +185,8 @@ class PullPointManager:
         """Start pullpoint subscription."""
         assert self.started is False, "PullPoint manager already started"
         LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
-        if not await self._async_start_pullpoint():
-            return False
-        self.started = True
-        return True
+        self.started = await self._async_start_pullpoint()
+        return self.started
 
     async def _async_start_pullpoint(self) -> bool:
         """Start pullpoint subscription."""
@@ -422,10 +420,8 @@ class WebHookManager:
         assert self.started is False, "Webhook manager already started"
         assert self._webhook_id is None, "Webhook already registered"
         self._async_register_webhook()
-        if not await self._async_start_webhook():
-            return False
-        self.started = True
-        return True
+        self.started = await self._async_start_webhook()
+        return self.started
 
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
