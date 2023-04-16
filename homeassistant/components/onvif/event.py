@@ -103,6 +103,35 @@ class EventManager:
             self._unsub_refresh()
             self._unsub_refresh = None
 
+    async def _async_start_webhook(self) -> bool:
+        try:
+            self._notify_service = self.device.create_notification_service()
+            notify_subscribe = await self._notify_service.Subscribe(
+                {
+                    "InitialTerminationTime": _get_next_termination_time(),
+                    "ConsumerReference": {"Address": self._webhook_url},
+                }
+            )
+            # pylint: disable=protected-access
+            self.device.xaddrs[
+                "http://www.onvif.org/ver10/events/wsdl/WebhookSubscription"
+            ] = notify_subscribe.SubscriptionReference.Address._value_1
+
+            # Create subscription manager
+            self._webhook_subscription = self.device.create_subscription_service(
+                "WebhookSubscription"
+            )
+            return True
+        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+            # Do not unregister the webhook because if its still
+            # subscribed to events, it will still receive them.
+            LOGGER.debug(
+                "%s: Device does not support notification service or too many subscriptions: %s",
+                self.unique_id,
+                err,
+            )
+        return False
+
     async def async_start(self) -> bool:
         """Start polling events."""
         LOGGER.debug("%s: Starting event manager", self.unique_id)
@@ -110,65 +139,63 @@ class EventManager:
             self.async_register_webhook()
         LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
         events_via_webhook = False
-
+        has_pull_point_support = False
+        try:
+            event_service = self.device.create_events_service()
+            capabilities = await event_service.GetServiceCapabilities()
+            has_pull_point_support = capabilities.WSPullPointSupport
+        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+            LOGGER.debug(
+                "%s: Device does not support events service: %s",
+                self.unique_id,
+                err,
+            )
         if self._webhook_url:
-            self._notify_service = self.device.create_notification_service()
-            try:
-                notify_subscribe = await self._notify_service.Subscribe(
-                    {
-                        "InitialTerminationTime": _get_next_termination_time(),
-                        "ConsumerReference": {"Address": self._webhook_url},
-                    }
-                )
-                # pylint: disable=protected-access
-                self.device.xaddrs[
-                    "http://www.onvif.org/ver10/events/wsdl/WebhookSubscription"
-                ] = notify_subscribe.SubscriptionReference.Address._value_1
+            events_via_webhook = await self._async_start_webhook()
+        await self._async_start_pull_point()
+        # If we have a working webhook or the device supports pullpoint
+        # we return true event if we failed to start one of them since
+        # it may be able to start later.
+        if events_via_webhook or has_pull_point_support:
+            return True
+        return False
 
-                # Create subscription manager
-                self._webhook_subscription = self.device.create_subscription_service(
-                    "WebhookSubscription"
-                )
-                events_via_webhook = True
-            except (ONVIFError, Fault, RequestError, XMLParseError) as err:
-                # Do not unregister the webhook because if its still
-                # subscribed to events, it will still receive them.
-                LOGGER.debug(
-                    "%s: Device does not support notification service or too many subscriptions: %s",
-                    self.unique_id,
-                    err,
-                )
+    async def _async_start_pull_point(self) -> None:
+        LOGGER.debug("%s: Creating pullpoint subscription", self.unique_id)
+        try:
+            if not await self.device.create_pullpoint_subscription(
+                {"InitialTerminationTime": _get_next_termination_time()}
+            ):
+                return
 
-        LOGGER.debug("Creating pullpoint subscription")
-        pull_point_created = await self.device.create_pullpoint_subscription(
-            {"InitialTerminationTime": _get_next_termination_time()}
-        )
+            self._pullpoint_service = self.device.create_onvif_service("pullpoint")
 
-        self._pullpoint_service = self.device.create_onvif_service("pullpoint")
-        if pull_point_created:
-            return events_via_webhook
+            # Create subscription manager
+            self._subscription = self.device.create_subscription_service(
+                "PullPointSubscription"
+            )
 
-        # Create subscription manager
-        self._subscription = self.device.create_subscription_service(
-            "PullPointSubscription"
-        )
+            # Renew immediately
+            await self.async_renew()
 
-        # Renew immediately
-        await self.async_renew()
+            pullpoint = self.device.create_pullpoint_service()
+            # Initialize events
+            with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
+                await pullpoint.SetSynchronizationPoint()
+            response = await pullpoint.PullMessages(
+                {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
+            )
 
-        pullpoint = self.device.create_pullpoint_service()
-        # Initialize events
-        with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-            await pullpoint.SetSynchronizationPoint()
-        response = await pullpoint.PullMessages(
-            {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=5)}
-        )
+            # Parse event initialization
+            await self.async_parse_messages(response.NotificationMessage)
 
-        # Parse event initialization
-        await self.async_parse_messages(response.NotificationMessage)
-
-        self.started = True
-        return True
+            self.started = True
+        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+            LOGGER.debug(
+                "%s: Device does not support pullpoint service: %s",
+                self.unique_id,
+                err,
+            )
 
     @callback
     def async_register_webhook(self) -> None:
