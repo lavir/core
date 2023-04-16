@@ -121,7 +121,7 @@ class EventManager:
                 )
                 # pylint: disable=protected-access
                 self.device.xaddrs[
-                    "http://www.onvif.org/ver10/events/wsdl/PullPointSubscription"
+                    "http://www.onvif.org/ver10/events/wsdl/WebhookSubscription"
                 ] = notify_subscribe.SubscriptionReference.Address._value_1
 
                 # Create subscription manager
