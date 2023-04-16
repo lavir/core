@@ -101,9 +101,7 @@ class ONVIFDevice:
 
         # Create event manager
         assert self.config_entry.unique_id
-        self.events = EventManager(
-            self.hass, self.device, self.config_entry.unique_id, self.name
-        )
+        self.events = EventManager(self.hass, self.device, self.config_entry, self.name)
 
         # Fetch basic device info and capabilities
         self.info = await self.async_get_device_info()
