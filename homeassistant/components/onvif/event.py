@@ -398,12 +398,11 @@ class PullPointManager:
     async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
         self._cancel_pull_messages = None
-        if self._hass.state == CoreState.running:
-            if not self._pull_lock.locked():
-                # Pull messages if the lock is not already locked
-                # any pull will do, so we don't need to wait for the lock
-                async with self._pull_lock:
-                    await self._async_pull_messages_or_try_to_restart()
+        if self._hass.state == CoreState.running and not self._pull_lock.locked():
+            # Pull messages if the lock is not already locked
+            # any pull will do, so we don't need to wait for the lock
+            async with self._pull_lock:
+                await self._async_pull_messages_or_try_to_restart()
         if (
             self._event_manager.has_listeners
             and not self._event_manager.webhook_is_reachable
