@@ -359,6 +359,7 @@ class PullPointManager:
     async def _async_pull_messages_or_try_to_restart(self) -> None:
         """Pull messages from device or try to restart the subscription."""
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
+        LOGGER.debug("%s: Pulling ONVIF PullPoint messages", self._name)
         try:
             response = await self._pullpoint_service.PullMessages(
                 {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
@@ -380,6 +381,7 @@ class PullPointManager:
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
             # subscription is no longer valid.
+            self._event_manager.webhook_is_reachable = False
             self._async_cancel_pullpoint_renew()
             await self._async_renew_or_restart_pullpoint()
             return
