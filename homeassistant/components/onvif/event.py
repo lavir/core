@@ -182,6 +182,7 @@ class PullPointManager:
 
         self._pullpoint_subscription: ONVIFService = None
         self._pullpoint_service: ONVIFService = None
+        self._pull_lock: asyncio.Lock = asyncio.Lock()
 
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
         self._cancel_pullpoint_renew: CALLBACK_TYPE | None = None
@@ -394,7 +395,11 @@ class PullPointManager:
         """Pull messages from device."""
         self._cancel_pull_messages = None
         if self._hass.state == CoreState.running:
-            await self._async_pull_messages_or_try_to_restart()
+            if not self._pull_lock.locked():
+                # Pull messages if the lock is not already locked
+                # any pull will do, so we don't need to wait for the lock
+                async with self._pull_lock:
+                    await self._async_pull_messages_or_try_to_restart()
         if (
             self._event_manager.has_listeners
             and not self._event_manager.webhook_is_reachable
