@@ -32,6 +32,10 @@ SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
 UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 
 
+SUBSCRIPTION_TIME = dt.timedelta(minutes=5)
+SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
+
+
 def _stringify_onvif_error(error: Exception) -> str:
     """Stringify ONVIF error."""
     if isinstance(error, Fault):
@@ -42,7 +46,7 @@ def _stringify_onvif_error(error: Exception) -> str:
 def _get_next_termination_time() -> str:
     """Get next termination time."""
     return (
-        (dt_util.utcnow() + dt.timedelta(days=1))
+        (dt_util.utcnow() + SUBSCRIPTION_TIME)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
     )
@@ -381,7 +385,7 @@ class EventManager:
                 # Renew subscription if less than two hours is left
                 if (
                     dt_util.as_utc(response.TerminationTime) - dt_util.utcnow()
-                ).total_seconds() < 7200:
+                ).total_seconds() < SUBSCRIPTION_RENEW_INTERVAL:
                     await self.async_renew()
             except RemoteProtocolError:
                 # Likely a shutdown event, nothing to see here
