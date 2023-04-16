@@ -106,9 +106,11 @@ class EventManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
-        LOGGER.debug("%s: Starting event manager", self.unique_id)
-        events_via_webhook = await self.webhook_manager.async_start()
+        if self.webhook_manager.started or self.pullpoint_manager.started:
+            raise RuntimeError("Event manager already started")
+        # Always start pull point first, since it will populate the event list
         event_via_pull_point = await self.pullpoint_manager.async_start()
+        events_via_webhook = await self.webhook_manager.async_start()
         return events_via_webhook or event_via_pull_point
 
     async def async_stop(self) -> None:
@@ -181,12 +183,13 @@ class PullPointManager:
 
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
-        LOGGER.debug("%s: Creating pullpoint subscription", self._unique_id)
+        assert self.started is False, "PullPoint manager already started"
+        LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
         try:
             return await self._async_create_pullpoint_subscription()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
-                "%s: Device does not support pullpoint service: %s",
+                "%s: Device does not support PullPoint service: %s",
                 self._unique_id,
                 _stringify_onvif_error(err),
             )
@@ -194,7 +197,7 @@ class PullPointManager:
 
     @callback
     def async_cancel_pull_messages(self) -> None:
-        """Cancel the pullpoint task."""
+        """Cancel the PullPoint task."""
         if self._cancel_pull_messages:
             self._cancel_pull_messages()
             self._cancel_pull_messages = None
@@ -208,7 +211,7 @@ class PullPointManager:
         )
 
     async def async_stop(self) -> None:
-        """Unsubscribe from pullpoint and cancel callbacks."""
+        """Unsubscribe from PullPoint and cancel callbacks."""
         self.started = False
         self._async_cancel_pullpoint_renew()
         self.async_cancel_pull_messages()
@@ -218,13 +221,13 @@ class PullPointManager:
         self, now: dt.datetime | None = None
     ) -> None:
         """Renew or start pullpoint subscription."""
-        if self._hass.is_stopping:
+        if self._hass.is_stopping or not self.started:
             return
         next_attempt = SUBSCRIPTION_RENEW_INTERVAL
         try:
             if (
                 not await self._async_renew_pullpoint()
-                or not await self._async_restart_pullpoint()
+                and not await self._async_restart_pullpoint()
             ):
                 next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
         finally:
@@ -287,8 +290,6 @@ class PullPointManager:
 
     async def _async_restart_pullpoint(self) -> bool:
         """Restart the subscription assuming the camera rebooted."""
-        if not self.started:
-            raise RuntimeError("PullPoint subscription not started")
         await self._async_unsubscribe_pullpoint()
         try:
             restarted = await self.async_start()
@@ -331,14 +332,17 @@ class PullPointManager:
         self._pullpoint_subscription = None
 
     async def _async_renew_pullpoint(self) -> bool:
-        """Renew the pullpoint subscription."""
+        """Renew the PullPoint subscription."""
         if not self._pullpoint_subscription:
-            raise RuntimeError("PullPoint subscription not started")
+            return False
         try:
             # The first time we renew, we may get a Fault error so we
             # suppress it. The subscription will be restarted in
             # async_restart later.
             await self._pullpoint_subscription.Renew(_get_next_termination_time())
+            LOGGER.debug(
+                "Renewed ONVIF PullPoint subscription for '%s'", self._unique_id
+            )
             return True
         except SUBSCRIPTION_ERRORS as err:
             LOGGER.debug(
@@ -415,9 +419,10 @@ class WebHookManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
-        LOGGER.debug("%s: Starting event manager", self._unique_id)
-        if self._webhook_id is None:
-            self._async_register_webhook()
+        LOGGER.debug("%s: Starting webhook manager", self._unique_id)
+        assert self.started is False, "Webhook manager already started"
+        assert self._webhook_id is None, "Webhook already registered"
+        self._async_register_webhook()
         return await self._async_start_webhook()
 
     async def async_stop(self) -> None:
@@ -453,11 +458,11 @@ class WebHookManager:
         # Call SetSynchronizationPoint to generate a notification message
         # to ensure the webhooks are working.
         try:
-            result = await self._webhook_pullpoint_service.SetSynchronizationPoint()
+            await self._webhook_pullpoint_service.SetSynchronizationPoint()
         except SET_SYNCHRONIZATION_POINT_ERRORS:
             LOGGER.debug("%s: SetSynchronizationPoint failed", self._unique_id)
 
-        LOGGER.warning("%s: Webhook subscription created: %s", self._unique_id, result)
+        LOGGER.debug("%s: Webhook subscription created", self._unique_id)
 
     async def _async_start_webhook(self) -> bool:
         """Start webhook."""
@@ -484,6 +489,7 @@ class WebHookManager:
         """Renew webhook subscription."""
         try:
             await self._webhook_subscription.Renew(_get_next_termination_time())
+            LOGGER.debug("%s: Webhook subscription renewed", self._unique_id)
             return True
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
@@ -497,13 +503,13 @@ class WebHookManager:
         self, now: dt.datetime | None = None
     ) -> None:
         """Renew or start webhook subscription."""
-        if self._hass.is_stopping:
+        if self._hass.is_stopping or not self.started:
             return
         next_attempt = SUBSCRIPTION_RENEW_INTERVAL
         try:
             if (
                 not await self._async_renew_webhook()
-                or not await self._async_restart_webhook()
+                and not await self._async_restart_webhook()
             ):
                 next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
         finally:
@@ -605,8 +611,6 @@ class WebHookManager:
 
     async def _async_restart_webhook(self) -> bool:
         """Restart the webhook subscription assuming the camera rebooted."""
-        if not self.started:
-            raise RuntimeError("Webhook subscription not started")
         await self._async_unsubscribe_webhook()
         try:
             return await self._async_start_webhook()
