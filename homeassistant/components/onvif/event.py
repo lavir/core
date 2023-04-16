@@ -33,7 +33,15 @@ UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 
 
 SUBSCRIPTION_TIME = dt.timedelta(minutes=5)
+SUBSCRIPTION_RELATIVE_TIME = (
+    "PT5M"  # use relative time since the time on the camera is not reliable
+)
 SUBSCRIPTION_RENEW_INTERVAL = SUBSCRIPTION_TIME.total_seconds() / 2
+
+
+def _get_next_termination_time() -> str:
+    """Get next termination time."""
+    return SUBSCRIPTION_RELATIVE_TIME
 
 
 def _stringify_onvif_error(error: Exception) -> str:
@@ -41,15 +49,6 @@ def _stringify_onvif_error(error: Exception) -> str:
     if isinstance(error, Fault):
         return error.message or str(error) or "Device sent empty error"
     return str(error)
-
-
-def _get_next_termination_time() -> str:
-    """Get next termination time."""
-    return (
-        (dt_util.utcnow() + SUBSCRIPTION_TIME)
-        .isoformat(timespec="seconds")
-        .replace("+00:00", "Z")
-    )
 
 
 class EventManager:
