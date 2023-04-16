@@ -109,7 +109,6 @@ class EventManager:
         if self.webhook_id is None:
             self.async_register_webhook()
         LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
-        self._pullpoint_service = self.device.create_onvif_service("pullpoint")
         events_via_webhook = False
 
         if self._webhook_url:
@@ -141,9 +140,12 @@ class EventManager:
                 )
 
         LOGGER.debug("Creating pullpoint subscription")
-        if not await self.device.create_pullpoint_subscription(
+        pull_point_created = await self.device.create_pullpoint_subscription(
             {"InitialTerminationTime": _get_next_termination_time()}
-        ):
+        )
+
+        self._pullpoint_service = self.device.create_onvif_service("pullpoint")
+        if pull_point_created:
             return events_via_webhook
 
         # Create subscription manager
@@ -201,7 +203,6 @@ class EventManager:
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
         """Handle incoming webhook."""
-        LOGGER.warning("Received webhook %s: %s", webhook_id, request)
         try:
             content = await request.read()
         except ConnectionResetError as ex:
