@@ -69,7 +69,10 @@ class EventManager:
 
         self.webhook_manager = WebHookManager(self)
         self.pullpoint_manager = PullPointManager(self)
-        self.webhook_is_reachable: bool = False
+
+        # We define working as reachable by the camera, having a working
+        # subscription, and the last message being received was valid.
+        self.webhook_is_working: bool = False
 
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
@@ -88,7 +91,7 @@ class EventManager:
     def async_add_listener(self, update_callback: CALLBACK_TYPE) -> Callable[[], None]:
         """Listen for data updates."""
         # This is the first listener, set up polling.
-        if not self._listeners and not self.webhook_is_reachable:
+        if not self._listeners and not self.webhook_is_working:
             self.pullpoint_manager.async_schedule_pull()
 
         self._listeners.append(update_callback)
@@ -239,9 +242,9 @@ class PullPointManager:
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run.
 
-        Used as fallback when webhook is not reachable.
+        Used as fallback when webhook is not working.
 
-        Must not check if the webhook is reachable.
+        Must not check if the webhook is working.
         """
         self.async_cancel_pull_messages()
         if self._pullpoint_service:
@@ -310,7 +313,7 @@ class PullPointManager:
 
         if (
             self._event_manager.has_listeners
-            and not self._event_manager.webhook_is_reachable
+            and not self._event_manager.webhook_is_working
         ):
             self.async_schedule_pull()
 
@@ -401,9 +404,14 @@ class PullPointManager:
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
             # subscription is no longer valid.
-            self._event_manager.webhook_is_reachable = False
+            self._event_manager.webhook_is_working = False
             self._async_cancel_pullpoint_renew()
             await self._async_renew_or_restart_pullpoint()
+            return
+
+        if self._event_manager.webhook_is_working:
+            # If the webhook became started working, our data is stale and we need to
+            # restart the subscription.
             return
 
         # Parse response
@@ -420,7 +428,7 @@ class PullPointManager:
                 await self._async_pull_messages_or_try_to_restart()
         if (
             self._event_manager.has_listeners
-            and not self._event_manager.webhook_is_reachable
+            and not self._event_manager.webhook_is_working
         ):
             self.async_schedule_pull()
 
@@ -599,7 +607,7 @@ class WebHookManager:
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
         """Handle incoming webhook."""
-        self._event_manager.webhook_is_reachable = True
+
         content: bytes | None = None
         try:
             content = await request.read()
@@ -620,9 +628,14 @@ class WebHookManager:
     ) -> None:
         """Process incoming webhook data in the background."""
         if content is None:
+            # webhook is marked as not working as something
+            # went wrong. We will mark it as working again
+            # when we receive a valid notification.
+            self._event_manager.webhook_is_working = False
             self._event_manager.pullpoint_manager.async_schedule_pull()
             return
 
+        self._event_manager.webhook_is_working = True
         assert self._webhook_pullpoint_service is not None
         assert self._webhook_pullpoint_service.transport is not None
         try:
@@ -659,7 +672,6 @@ class WebHookManager:
         """Unsubscribe from the webhook."""
         if not self._webhook_subscription:
             return
-        # Suppressed. The subscription may no longer exist.
         try:
             await self._webhook_subscription.Unsubscribe()
         except UNSUBSCRIBE_ERRORS as err:
