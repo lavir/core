@@ -127,7 +127,7 @@ class EventManager:
                 ] = notify_subscribe.SubscriptionReference.Address._value_1
 
                 # Create subscription manager
-                self._subscription = self.device.create_subscription_service(
+                self._webhook_subscription = self.device.create_subscription_service(
                     "WebhookSubscription"
                 )
                 events_via_webhook = True
@@ -203,7 +203,7 @@ class EventManager:
         """Handle incoming webhook."""
         LOGGER.warning("Received webhook %s: %s", webhook_id, request)
         try:
-            content = await request.text()
+            content = await request.read()
         except ConnectionResetError as ex:
             LOGGER.error("Error reading webhook: %s", ex)
             return
@@ -212,7 +212,9 @@ class EventManager:
         assert self._pullpoint_service.transport is not None
         try:
             doc = parse_xml(
-                content, self._pullpoint_service.transport, settings=_DEFAULT_SETTINGS
+                content,  # type: ignore[arg-type]
+                self._pullpoint_service.transport,
+                settings=_DEFAULT_SETTINGS,
             )
         except XMLSyntaxError as exc:
             LOGGER.error("Received invalid XML: %s", exc)
@@ -239,12 +241,14 @@ class EventManager:
         self.started = False
         self.async_unregister_webhook()
 
-        if not self._subscription:
-            return
-
-        with suppress(*UNSUBSCRIBE_ERRORS):
-            await self._subscription.Unsubscribe()
-        self._subscription = None
+        if self._subscription:
+            with suppress(*UNSUBSCRIBE_ERRORS):
+                await self._subscription.Unsubscribe()
+            self._subscription = None
+        if self._webhook_subscription:
+            with suppress(*UNSUBSCRIBE_ERRORS):
+                await self._webhook_subscription.Unsubscribe()
+            self._webhook_subscription = None
 
     async def async_restart(self, _now: dt.datetime | None = None) -> None:
         """Restart the subscription assuming the camera rebooted."""
@@ -265,6 +269,21 @@ class EventManager:
                     err,
                 )
             self._subscription = None
+
+        if self._webhook_subscription:
+            # Suppressed. The subscription may no longer exist.
+            try:
+                await self._webhook_subscription.Unsubscribe()
+            except UNSUBSCRIBE_ERRORS as err:
+                LOGGER.debug(
+                    (
+                        "Failed to unsubscribe ONVIF webhook subscription for '%s';"
+                        " This is normal if the device restarted: %s"
+                    ),
+                    self.unique_id,
+                    err,
+                )
+            self._webhook_subscription = None
 
         try:
             restarted = await self.async_start()
