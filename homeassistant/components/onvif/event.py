@@ -172,7 +172,12 @@ class EventManager:
 
 
 class PullPointManager:
-    """ONVIF PullPoint Manager."""
+    """ONVIF PullPoint Manager.
+
+    If the camera supports webhooks and the webhook is reachable, the pullpoint
+    manager will keep the pull point subscription alive, but will not poll for
+    messages unless the webhook fails.
+    """
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize pullpoint manager."""
@@ -421,7 +426,12 @@ class PullPointManager:
 
 
 class WebHookManager:
-    """Manage ONVIF webhook subscriptions."""
+    """Manage ONVIF webhook subscriptions.
+
+    If the camera supports webhooks, we will use that instead of
+    pullpoint subscriptions as soon as we detect that the camera
+    can reach our webhook.
+    """
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize webhook manager."""
