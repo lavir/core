@@ -16,6 +16,7 @@ from zeep.exceptions import Fault, XMLParseError, XMLSyntaxError
 from zeep.loader import parse_xml
 
 from homeassistant.components import webhook
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import (
     CALLBACK_TYPE,
     CoreState,
@@ -47,6 +48,7 @@ SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR = 60.0
 PULLPOINT_POLL_TIME = dt.timedelta(seconds=60)
 PULLPOINT_INIT_POLL_TIME = dt.timedelta(seconds=5)
 PULLPOINT_MESSAGE_LIMIT = 100
+PULLPOINT_COOLDOWN_TIME = 0.2
 
 
 def _get_next_termination_time() -> str:
@@ -65,12 +67,17 @@ class EventManager:
     """ONVIF Event Manager."""
 
     def __init__(
-        self, hass: HomeAssistant, device: ONVIFCamera, unique_id: str, name: str
+        self,
+        hass: HomeAssistant,
+        device: ONVIFCamera,
+        config_entry: ConfigEntry,
+        name: str,
     ) -> None:
         """Initialize event manager."""
         self.hass = hass
         self.device = device
-        self.unique_id = unique_id
+        self.config_entry = config_entry
+        self.unique_id = config_entry.unique_id
         self.name = name
 
         self.webhook_manager = WebHookManager(self)
@@ -147,6 +154,8 @@ class EventManager:
     # pylint: disable=protected-access
     async def async_parse_messages(self, messages) -> None:
         """Parse notification message."""
+        unique_id = self.unique_id
+        assert unique_id is not None
         for msg in messages:
             # Guard against empty message
             if not msg.Topic:
@@ -156,17 +165,20 @@ class EventManager:
             if not (parser := PARSERS.get(topic)):
                 if topic not in UNHANDLED_TOPICS:
                     LOGGER.info(
-                        "No registered handler for event from %s: %s",
-                        self.unique_id,
+                        "%s: No registered handler for event from %s: %s",
+                        self.name,
+                        unique_id,
                         msg,
                     )
                     UNHANDLED_TOPICS.add(topic)
                 continue
 
-            event = await parser(self.unique_id, msg)
+            event = await parser(unique_id, msg)
 
             if not event:
-                LOGGER.info("Unable to parse event from %s: %s", self.unique_id, msg)
+                LOGGER.info(
+                    "%s: Unable to parse event from %s: %s", self.name, unique_id, msg
+                )
                 return
 
             self._events[event.uid] = event
@@ -265,7 +277,7 @@ class PullPointManager:
         self.async_cancel_pull_messages()
         if self._pullpoint_service:
             self._cancel_pull_messages = async_call_later(
-                self._hass, 1, self._pull_messages_job
+                self._hass, PULLPOINT_COOLDOWN_TIME, self._pull_messages_job
             )
 
     async def async_stop(self) -> None:
@@ -312,13 +324,19 @@ class PullPointManager:
             sync_result = await self._pullpoint_service.SetSynchronizationPoint()
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
+        LOGGER.debug(
+            "%s: Pulling ONVIF PullPoint messages timeout=%s limit=%s",
+            self._name,
+            PULLPOINT_INIT_POLL_TIME,
+            PULLPOINT_MESSAGE_LIMIT,
+        )
         if response := await self._pullpoint_service.PullMessages(
             {
                 "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
                 "Timeout": PULLPOINT_INIT_POLL_TIME,
             }
         ):
-            LOGGER.debug("%s: PullMessages: %s", self._name, response)
+            LOGGER.debug("%s: Initial PullMessages: %s", self._name, response)
             # Parse event initialization
             await self._event_manager.async_parse_messages(response.NotificationMessage)
             self._event_manager.async_callback_listeners()
@@ -392,7 +410,12 @@ class PullPointManager:
         """
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
-        LOGGER.debug("%s: Pulling ONVIF PullPoint messages", self._name)
+        LOGGER.debug(
+            "%s: Pulling ONVIF PullPoint messages timeout=%s limit=%s",
+            self._name,
+            PULLPOINT_POLL_TIME,
+            PULLPOINT_MESSAGE_LIMIT,
+        )
         try:
             response = await self._pullpoint_service.PullMessages(
                 {
@@ -464,15 +487,12 @@ class WebHookManager:
         self._event_manager = event_manager
         self._device = event_manager.device
         self._hass = event_manager.hass
-        self._webhook_unique_id = (
-            event_manager.unique_id.replace("-", ":").replace(" ", ":").lower()
-        )
+        self._webhook_unique_id = f"{DOMAIN}_{event_manager.config_entry.entry_id}"
         self._name = event_manager.name
 
         self._webhook_subscription: ONVIFService = None
         self._webhook_pullpoint_service: ONVIFService = None
 
-        self._webhook_id: str | None = None
         self._base_url: str | None = None
         self._webhook_url: str | None = None
         self._notify_service: ONVIFService | None = None
@@ -489,7 +509,7 @@ class WebHookManager:
         """Start polling events."""
         LOGGER.debug("%s: Starting webhook manager", self._name)
         assert self.started is False, "Webhook manager already started"
-        assert self._webhook_id is None, "Webhook already registered"
+        assert self._webhook_url is None, "Webhook already registered"
         self._async_register_webhook()
         self.started = await self._async_start_webhook()
         return self.started
@@ -595,31 +615,30 @@ class WebHookManager:
     @callback
     def _async_register_webhook(self) -> None:
         """Register the webhook for motion events."""
-        webhook_id = f"{DOMAIN}_{self._webhook_unique_id}_events"
-        LOGGER.debug("%s: Registering webhook: %s", self._name, webhook_id)
-        self._webhook_id = webhook_id
+        LOGGER.debug("%s: Registering webhook: %s", self._name, self._webhook_unique_id)
+
         try:
             self._base_url = get_url(self._hass, prefer_external=False)
         except NoURLAvailableError:
             try:
                 self._base_url = get_url(self._hass, prefer_external=True)
             except NoURLAvailableError:
-                self._async_unregister_webhook()
+                return
 
+        webhook_id = self._webhook_unique_id
         webhook.async_register(
             self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
         )
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
-
         LOGGER.debug("%s: Registered webhook: %s", self._name, webhook_id)
 
     @callback
     def _async_unregister_webhook(self):
         """Unregister the webhook for motion events."""
-        LOGGER.debug("Unregistering webhook %s", self._webhook_id)
-        webhook.async_unregister(self._hass, self._webhook_id)
-        self._webhook_id = None
+        LOGGER.debug("Unregistering webhook %s", self._webhook_unique_id)
+        webhook.async_unregister(self._hass, self._webhook_unique_id)
+        self._webhook_url = None
 
     async def _async_handle_webhook(
         self, hass: HomeAssistant, webhook_id: str, request: Request
