@@ -179,6 +179,34 @@ class PullPointManager:
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
         self._cancel_pullpoint_renew: CALLBACK_TYPE | None = None
 
+    async def async_start(self) -> bool:
+        """Start pullpoint subscription."""
+        LOGGER.debug("%s: Creating pullpoint subscription", self.unique_id)
+        try:
+            return await self._async_create_pullpoint_subscription()
+        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+            LOGGER.debug(
+                "%s: Device does not support pullpoint service: %s",
+                self.unique_id,
+                _stringify_onvif_error(err),
+            )
+        return False
+
+    @callback
+    def async_cancel_pull_messages(self) -> None:
+        """Cancel the pullpoint task."""
+        if self._cancel_pull_messages:
+            self._cancel_pull_messages()
+            self._cancel_pull_messages = None
+
+    @callback
+    def async_schedule_pull(self) -> None:
+        """Schedule async_pull_messages to run."""
+        self.async_cancel_pull_messages()
+        self._cancel_pull_messages = async_call_later(
+            self.hass, 1, self._async_pull_messages
+        )
+
     async def async_stop(self) -> None:
         """Unsubscribe from pullpoint and cancel callbacks."""
         self.started = False
@@ -247,19 +275,6 @@ class PullPointManager:
             self.async_schedule_pull()
 
         return True
-
-    async def async_start(self) -> bool:
-        """Start pullpoint subscription."""
-        LOGGER.debug("%s: Creating pullpoint subscription", self.unique_id)
-        try:
-            return await self._async_create_pullpoint_subscription()
-        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
-            LOGGER.debug(
-                "%s: Device does not support pullpoint service: %s",
-                self.unique_id,
-                _stringify_onvif_error(err),
-            )
-        return False
 
     @callback
     def _async_cancel_pullpoint_renew(self) -> None:
@@ -331,19 +346,6 @@ class PullPointManager:
             )
         return False
 
-    def async_cancel_pull_messages(self) -> None:
-        """Cancel the pullpoint task."""
-        if self._cancel_pull_messages:
-            self._cancel_pull_messages()
-            self._cancel_pull_messages = None
-
-    def async_schedule_pull(self) -> None:
-        """Schedule async_pull_messages to run."""
-        self.async_cancel_pull_messages()
-        self._cancel_pull_messages = async_call_later(
-            self.hass, 1, self._async_pull_messages
-        )
-
     async def _async_pull_messages_or_try_to_restart(self) -> None:
         """Pull messages from device or try to restart the subscription."""
         try:
@@ -401,14 +403,26 @@ class WebHookManager:
         self._webhook_subscription: ONVIFService = None
         self._webhook_pullpoint_service: ONVIFService = None
 
-        self.webhook_id: str | None = None
+        self._webhook_id: str | None = None
         self._base_url: str | None = None
         self._webhook_url: str | None = None
         self._notify_service: ONVIFService | None = None
 
         self._cancel_webhook_renew: CALLBACK_TYPE | None = None
 
-        self._webhook_is_reachable: bool = False
+    async def async_start(self) -> bool:
+        """Start polling events."""
+        LOGGER.debug("%s: Starting event manager", self.unique_id)
+        if self._webhook_id is None:
+            self._async_register_webhook()
+        return await self._async_start_webhook()
+
+    async def async_stop(self) -> None:
+        """Unsubscribe from events."""
+        self.started = False
+        self._async_cancel_webhook_renew()
+        await self._async_unsubscribe_webhook()
+        self._async_unregister_webhook()
 
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
@@ -461,13 +475,6 @@ class WebHookManager:
         )
         return True
 
-    async def async_start(self) -> bool:
-        """Start polling events."""
-        LOGGER.debug("%s: Starting event manager", self.unique_id)
-        if self.webhook_id is None:
-            self._async_register_webhook()
-        return await self._async_start_webhook()
-
     async def _async_renew_webhook(self) -> bool:
         """Renew webhook subscription."""
         try:
@@ -505,7 +512,7 @@ class WebHookManager:
     def _async_register_webhook(self) -> None:
         """Register the webhook for motion events."""
         webhook_id = f"{DOMAIN}_{self.unique_id}_events"
-        self.webhook_id = webhook_id
+        self._webhook_id = webhook_id
         try:
             self._base_url = get_url(self.hass, prefer_external=False)
         except NoURLAvailableError:
@@ -526,15 +533,15 @@ class WebHookManager:
     @callback
     def _async_unregister_webhook(self):
         """Unregister the webhook for motion events."""
-        LOGGER.debug("Unregistering webhook %s", self.webhook_id)
-        webhook.async_unregister(self.hass, self.webhook_id)
-        self.webhook_id = None
+        LOGGER.debug("Unregistering webhook %s", self._webhook_id)
+        webhook.async_unregister(self.hass, self._webhook_id)
+        self._webhook_id = None
 
     async def _handle_webhook(
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
         """Handle incoming webhook."""
-        self._webhook_is_reachable = True
+        self._event_manager.webhook_is_reachable = True
         try:
             content = await request.read()
         except ConnectionResetError as ex:
@@ -565,13 +572,6 @@ class WebHookManager:
         )
         await self._event_manager.async_parse_messages(result.NotificationMessage)
         self._event_manager.async_callback_listeners()
-
-    async def async_stop(self) -> None:
-        """Unsubscribe from events."""
-        self.started = False
-        self._async_cancel_webhook_renew()
-        await self._async_unsubscribe_webhook()
-        self._async_unregister_webhook()
 
     @callback
     def _async_cancel_webhook_renew(self) -> None:
