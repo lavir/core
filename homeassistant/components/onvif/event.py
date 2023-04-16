@@ -8,9 +8,10 @@ import datetime as dt
 from logging import DEBUG, WARNING
 
 from aiohttp.web import Request
-from httpx import RemoteProtocolError, TransportError
+from httpx import RemoteProtocolError, RequestError, TransportError
 from onvif import ONVIFCamera, ONVIFService
 from onvif.client import _DEFAULT_SETTINGS
+from onvif.exceptions import ONVIFError
 from zeep.exceptions import Fault, XMLParseError, XMLSyntaxError
 from zeep.loader import parse_xml
 
@@ -28,6 +29,7 @@ UNHANDLED_TOPICS: set[str] = set()
 
 SUBSCRIPTION_ERRORS = (Fault, asyncio.TimeoutError, TransportError)
 SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
+UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 
 
 def _stringify_onvif_error(error: Exception) -> str:
@@ -58,7 +60,8 @@ class EventManager:
         self.unique_id: str = unique_id
         self.started: bool = False
 
-        self._subscription: ONVIFService = None
+        self._pullpoint_subscription: ONVIFService = None
+        self._webhook_subscription: ONVIFService = None
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
         self._unsub_refresh: CALLBACK_TYPE | None = None
@@ -101,24 +104,39 @@ class EventManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
-        LOGGER.debug("Starting event manager for %s", self.unique_id)
+        LOGGER.debug("%s: Starting event manager", self.unique_id)
         if self.webhook_id is None:
             self.async_register_webhook()
-        LOGGER.debug("Webhook registered: %s", self.webhook_id)
+        LOGGER.debug("%s: Webhook registered: %s", self.unique_id, self.webhook_id)
         events_via_webhook = False
 
         if self._webhook_url:
             self._notify_service = self.device.create_notification_service()
             try:
-                await self._notify_service.Subscribe(
+                notify_subscribe = await self._notify_service.Subscribe(
                     {
                         "InitialTerminationTime": _get_next_termination_time(),
                         "ConsumerReference": {"Address": self._webhook_url},
                     }
                 )
+                # pylint: disable=protected-access
+                self.device.xaddrs[
+                    "http://www.onvif.org/ver10/events/wsdl/PullPointSubscription"
+                ] = notify_subscribe.SubscriptionReference.Address._value_1
+
+                # Create subscription manager
+                self._pullpoint_subscription = self.device.create_subscription_service(
+                    "WebhookSubscription"
+                )
                 events_via_webhook = True
-            except Fault as err:
-                LOGGER.debug("Device does not support notification service: %s", err)
+            except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+                # Do not unregister the webhook because if its still
+                # subscribed to events, it will still receive them.
+                LOGGER.debug(
+                    "%s: Device does not support notification service or too many subscriptions: %s",
+                    self.unique_id,
+                    err,
+                )
 
         LOGGER.debug("Creating pullpoint subscription")
         if not await self.device.create_pullpoint_subscription(
@@ -127,7 +145,7 @@ class EventManager:
             return events_via_webhook
 
         # Create subscription manager
-        self._subscription = self.device.create_subscription_service(
+        self._pullpoint_subscription = self.device.create_subscription_service(
             "PullPointSubscription"
         )
 
@@ -161,9 +179,10 @@ class EventManager:
             except NoURLAvailableError:
                 self.async_unregister_webhook()
 
-        webhook.async_register(
-            self.hass, DOMAIN, webhook_id, webhook_id, self._handle_webhook
-        )
+        with suppress(ValueError):
+            webhook.async_register(
+                self.hass, DOMAIN, webhook_id, webhook_id, self._handle_webhook
+            )
         webhook_path = webhook.async_generate_path(webhook_id)
         self._webhook_url = f"{self._base_url}{webhook_path}"
 
@@ -204,23 +223,23 @@ class EventManager:
         self.started = False
         self.async_unregister_webhook()
 
-        if not self._subscription:
+        if not self._pullpoint_subscription:
             return
 
-        with suppress(*SUBSCRIPTION_ERRORS):
-            await self._subscription.Unsubscribe()
-        self._subscription = None
+        with suppress(*UNSUBSCRIBE_ERRORS):
+            await self._pullpoint_subscription.Unsubscribe()
+        self._pullpoint_subscription = None
 
     async def async_restart(self, _now: dt.datetime | None = None) -> None:
         """Restart the subscription assuming the camera rebooted."""
         if not self.started:
             return
 
-        if self._subscription:
+        if self._pullpoint_subscription:
             # Suppressed. The subscription may no longer exist.
             try:
-                await self._subscription.Unsubscribe()
-            except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
+                await self._pullpoint_subscription.Unsubscribe()
+            except UNSUBSCRIBE_ERRORS as err:
                 LOGGER.debug(
                     (
                         "Failed to unsubscribe ONVIF PullPoint subscription for '%s';"
@@ -229,7 +248,7 @@ class EventManager:
                     self.unique_id,
                     err,
                 )
-            self._subscription = None
+            self._pullpoint_subscription = None
 
         try:
             restarted = await self.async_start()
@@ -258,14 +277,14 @@ class EventManager:
 
     async def async_renew(self) -> None:
         """Renew subscription."""
-        if not self._subscription:
+        if not self._pullpoint_subscription:
             return
 
         with suppress(*SUBSCRIPTION_ERRORS):
             # The first time we renew, we may get a Fault error so we
             # suppress it. The subscription will be restarted in
             # async_restart later.
-            await self._subscription.Renew(_get_next_termination_time())
+            await self._pullpoint_subscription.Renew(_get_next_termination_time())
 
     def async_schedule_pull(self) -> None:
         """Schedule async_pull_messages to run."""
