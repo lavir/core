@@ -185,15 +185,32 @@ class PullPointManager:
         """Start pullpoint subscription."""
         assert self.started is False, "PullPoint manager already started"
         LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
+        self.started = await self._async_start_pullpoint()
+        return self.started
+
+    async def _async_start_pullpoint(self) -> bool:
+        """Start pullpoint subscription."""
         try:
-            return await self._async_create_pullpoint_subscription()
+            await self._async_create_pullpoint_subscription()
         except (ONVIFError, Fault, RequestError, XMLParseError) as err:
             LOGGER.debug(
-                "%s: Device does not support PullPoint service: %s",
+                "%s: Device does not support PullPoint service or has too many subscriptions: %s",
                 self._unique_id,
                 _stringify_onvif_error(err),
             )
-        return False
+            return False
+        self._async_schedule_pullpoint_renew()
+        return True
+
+    @callback
+    def _async_schedule_pullpoint_renew(self) -> None:
+        """Schedule PullPoint subscription renewal."""
+        self._async_cancel_pullpoint_renew()
+        self._cancel_pullpoint_renew = async_call_later(
+            self._hass,
+            SUBSCRIPTION_RENEW_INTERVAL,
+            self._async_renew_or_restart_pullpoint,
+        )
 
     @callback
     def async_cancel_pull_messages(self) -> None:
@@ -266,13 +283,6 @@ class PullPointManager:
         # Parse event initialization
         await self._event_manager.async_parse_messages(response.NotificationMessage)
 
-        self.started = True
-        self._cancel_pullpoint_renew = async_call_later(
-            self._hass,
-            SUBSCRIPTION_RENEW_INTERVAL,
-            self._async_renew_or_restart_pullpoint,
-        )
-
         if (
             self._event_manager.has_listeners
             and not self._event_manager.webhook_is_reachable
@@ -291,21 +301,7 @@ class PullPointManager:
     async def _async_restart_pullpoint(self) -> bool:
         """Restart the subscription assuming the camera rebooted."""
         await self._async_unsubscribe_pullpoint()
-        try:
-            restarted = await self.async_start()
-        except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
-            restarted = False
-            # Device may not support subscriptions so log at debug level
-            # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to restart ONVIF PullPoint subscription for '%s'; "
-                    "Retrying later: %s"
-                ),
-                self._unique_id,
-                _stringify_onvif_error(err),
-            )
+        restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
             LOGGER.debug(
                 "Restarted ONVIF PullPoint subscription for '%s'", self._unique_id
@@ -355,7 +351,8 @@ class PullPointManager:
     async def _async_pull_messages_or_try_to_restart(self) -> None:
         """Pull messages from device or try to restart the subscription."""
         try:
-            response = await self._event_manager.device.create_pullpoint_service().PullMessages(
+            pullpoint_service = self._event_manager.device.create_pullpoint_service()
+            response = await pullpoint_service.PullMessages(
                 {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
             )
         except RemoteProtocolError:
@@ -423,7 +420,8 @@ class WebHookManager:
         assert self.started is False, "Webhook manager already started"
         assert self._webhook_id is None, "Webhook already registered"
         self._async_register_webhook()
-        return await self._async_start_webhook()
+        self.started = await self._async_start_webhook()
+        return self.started
 
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
@@ -431,6 +429,16 @@ class WebHookManager:
         self._async_cancel_webhook_renew()
         await self._async_unsubscribe_webhook()
         self._async_unregister_webhook()
+
+    @callback
+    def _async_schedule_webhook_renew(self) -> None:
+        """Schedule webhook subscription renewal."""
+        self._async_cancel_webhook_renew()
+        self._cancel_webhook_renew = async_call_later(
+            self._hass,
+            SUBSCRIPTION_RENEW_INTERVAL,
+            self._async_renew_or_restart_webhook,
+        )
 
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
@@ -478,12 +486,13 @@ class WebHookManager:
             )
             return False
 
-        self._cancel_webhook_renew = async_call_later(
-            self._hass,
-            SUBSCRIPTION_RENEW_INTERVAL,
-            self._async_renew_or_restart_webhook,
-        )
+        self._async_schedule_webhook_renew()
         return True
+
+    async def _async_restart_webhook(self) -> bool:
+        """Restart the webhook subscription assuming the camera rebooted."""
+        await self._async_unsubscribe_webhook()
+        return await self._async_start_webhook()
 
     async def _async_renew_webhook(self) -> bool:
         """Renew webhook subscription."""
@@ -608,22 +617,3 @@ class WebHookManager:
                 _stringify_onvif_error(err),
             )
         self._webhook_subscription = None
-
-    async def _async_restart_webhook(self) -> bool:
-        """Restart the webhook subscription assuming the camera rebooted."""
-        await self._async_unsubscribe_webhook()
-        try:
-            return await self._async_start_webhook()
-        except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
-            # Device may not support subscriptions so log at debug level
-            # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to restart ONVIF webhook subscription for '%s'; "
-                    "Retrying later: %s"
-                ),
-                self._unique_id,
-                _stringify_onvif_error(err),
-            )
-            return False
