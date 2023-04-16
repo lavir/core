@@ -79,9 +79,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     device: ONVIFDevice = hass.data[DOMAIN][entry.unique_id]
 
-    if device.capabilities.events and (
-        device.events.webhook_started or device.events.pullpoint_started
-    ):
+    if device.capabilities.events and device.events.started:
         await device.events.async_stop()
 
     return await hass.config_entries.async_unload_platforms(entry, device.platforms)
