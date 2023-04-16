@@ -183,7 +183,8 @@ class EventManager:
         LOGGER.warning("Received webhook %s: %s", webhook_id, request)
         try:
             content = await request.text()
-        except ConnectionResetError:
+        except ConnectionResetError as ex:
+            LOGGER.error("Error reading webhook: %s", ex)
             return
 
         assert self._notify_service is not None
