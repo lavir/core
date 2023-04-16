@@ -184,6 +184,10 @@ class PullPointManager:
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
         assert self.started is False, "PullPoint manager already started"
+        return await self._async_start_pullpoint()
+
+    async def _async_start_pullpoint(self) -> bool:
+        """Start pullpoint subscription."""
         LOGGER.debug("%s: Starting PullPoint manager", self._unique_id)
         try:
             return await self._async_create_pullpoint_subscription()
@@ -291,21 +295,7 @@ class PullPointManager:
     async def _async_restart_pullpoint(self) -> bool:
         """Restart the subscription assuming the camera rebooted."""
         await self._async_unsubscribe_pullpoint()
-        try:
-            restarted = await self.async_start()
-        except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
-            restarted = False
-            # Device may not support subscriptions so log at debug level
-            # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to restart ONVIF PullPoint subscription for '%s'; "
-                    "Retrying later: %s"
-                ),
-                self._unique_id,
-                _stringify_onvif_error(err),
-            )
+        restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
             LOGGER.debug(
                 "Restarted ONVIF PullPoint subscription for '%s'", self._unique_id
@@ -355,7 +345,8 @@ class PullPointManager:
     async def _async_pull_messages_or_try_to_restart(self) -> None:
         """Pull messages from device or try to restart the subscription."""
         try:
-            response = await self._event_manager.device.create_pullpoint_service().PullMessages(
+            pullpoint_service = self._event_manager.device.create_pullpoint_service()
+            response = await pullpoint_service.PullMessages(
                 {"MessageLimit": 100, "Timeout": dt.timedelta(seconds=60)}
             )
         except RemoteProtocolError:
@@ -485,6 +476,11 @@ class WebHookManager:
         )
         return True
 
+    async def _async_restart_webhook(self) -> bool:
+        """Restart the webhook subscription assuming the camera rebooted."""
+        await self._async_unsubscribe_webhook()
+        return await self._async_start_webhook()
+
     async def _async_renew_webhook(self) -> bool:
         """Renew webhook subscription."""
         try:
@@ -608,22 +604,3 @@ class WebHookManager:
                 _stringify_onvif_error(err),
             )
         self._webhook_subscription = None
-
-    async def _async_restart_webhook(self) -> bool:
-        """Restart the webhook subscription assuming the camera rebooted."""
-        await self._async_unsubscribe_webhook()
-        try:
-            return await self._async_start_webhook()
-        except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
-            # Device may not support subscriptions so log at debug level
-            # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to restart ONVIF webhook subscription for '%s'; "
-                    "Retrying later: %s"
-                ),
-                self._unique_id,
-                _stringify_onvif_error(err),
-            )
-            return False
