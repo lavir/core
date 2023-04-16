@@ -195,7 +195,6 @@ class PullPointManager:
         self._event_manager = event_manager
         self._device = event_manager.device
         self._hass = event_manager.hass
-        self._unique_id = event_manager.unique_id
         self._name = event_manager.name
 
         self._pullpoint_subscription: ONVIFService = None
@@ -465,7 +464,9 @@ class WebHookManager:
         self._event_manager = event_manager
         self._device = event_manager.device
         self._hass = event_manager.hass
-        self._unique_id = event_manager.unique_id
+        self._webhook_unique_id = (
+            event_manager.unique_id.replace("-", ":").replace(" ", ":").lower()
+        )
         self._name = event_manager.name
 
         self._webhook_subscription: ONVIFService = None
@@ -594,7 +595,8 @@ class WebHookManager:
     @callback
     def _async_register_webhook(self) -> None:
         """Register the webhook for motion events."""
-        webhook_id = f"{DOMAIN}_{self._unique_id}_events"
+        webhook_id = f"{DOMAIN}_{self._webhook_unique_id}_events"
+        LOGGER.debug("%s: Registering webhook: %s", self._name, webhook_id)
         self._webhook_id = webhook_id
         try:
             self._base_url = get_url(self._hass, prefer_external=False)
