@@ -110,33 +110,23 @@ class OnvifFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         mac = discovery_info.macaddress
         registry = dr.async_get(self.hass)
         if not (
-            device := registry.async_get_device({(dr.CONNECTION_NETWORK_MAC, mac)})
-        ):
-            return self.async_abort(reason="no_devices_found")
-        possible_entries = [
-            hass.config_entries.async_get_entry(entry)
-            for entry in device.config_entries
-        ]
-        onvif_entries = [
-            config_entry
-            for config_entry in possible_entries
-            if config_entry and config_entry.domain == DOMAIN
-        ]
-        if len(onvif_entries) > 1:
-            # If two onvif entries have the same mac address, we can't know which one
-            # is the correct one. So we abort. This should never happen in practice.
-            return self.async_abort(reason="no_devices_found")
-        entry = onvif_entries[0]
-        if entry.state is config_entries.ConfigEntryState.LOADED:
-            return self.async_abort(reason="already_configured")
-        if hass.config_entries.async_update_entry(
-            entry, data=entry.data | {CONF_HOST: discovery_info.ip}
-        ):
-            hass.async_create_task(
-                self.hass.config_entries.async_reload(entry.entry_id)
+            device := registry.async_get_device(
+                identifiers=set(), connections={(dr.CONNECTION_NETWORK_MAC, mac)}
             )
-            return self.async_abort(reason="already_configured")
-        return self.async_abort(reason="no_devices_found")
+        ):
+            return self.async_abort(reason="no_devices_found")
+        for entry_id in device.config_entries:
+            if (
+                not (entry := hass.config_entries.async_get_entry(entry_id))
+                or entry.domain != DOMAIN
+                or entry.state is config_entries.ConfigEntryState.LOADED
+            ):
+                continue
+            if hass.config_entries.async_update_entry(
+                entry, data=entry.data | {CONF_HOST: discovery_info.ip}
+            ):
+                hass.async_create_task(self.hass.config_entries.async_reload(entry_id))
+        return self.async_abort(reason="already_configured")
 
     async def async_step_device(self, user_input=None):
         """Handle WS-Discovery.
