@@ -405,7 +405,6 @@ class PullPointManager:
         """Unsubscribe the pullpoint subscription."""
         if not self._pullpoint_subscription:
             return
-        # Suppressed. The subscription may no longer exist.
         LOGGER.debug("%s: Unsubscribing from PullPoint", self._name)
         try:
             await self._pullpoint_subscription.Unsubscribe()
@@ -564,14 +563,12 @@ class WebHookManager:
         self._webhook_unique_id = f"{DOMAIN}_{event_manager.config_entry.entry_id}"
         self._name = event_manager.name
 
+        self._webhook_url: str | None = None
+
         self._webhook_subscription: ONVIFService | None = None
         self._notification_manager: NotificationManager | None = None
 
-        self._base_url: str | None = None
-        self._webhook_url: str | None = None
-
         self._cancel_webhook_renew: CALLBACK_TYPE | None = None
-
         self._renew_lock = asyncio.Lock()
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_webhook,
@@ -687,10 +684,10 @@ class WebHookManager:
         LOGGER.debug("%s: Registering webhook: %s", self._name, self._webhook_unique_id)
 
         try:
-            self._base_url = get_url(self._hass, prefer_external=False)
+            base_url = get_url(self._hass, prefer_external=False)
         except NoURLAvailableError:
             try:
-                self._base_url = get_url(self._hass, prefer_external=True)
+                base_url = get_url(self._hass, prefer_external=True)
             except NoURLAvailableError:
                 return
 
@@ -699,7 +696,7 @@ class WebHookManager:
             self._hass, DOMAIN, webhook_id, webhook_id, self._async_handle_webhook
         )
         webhook_path = webhook.async_generate_path(webhook_id)
-        self._webhook_url = f"{self._base_url}{webhook_path}"
+        self._webhook_url = f"{base_url}{webhook_path}"
         LOGGER.debug("%s: Registered webhook: %s", self._name, webhook_id)
 
     @callback
