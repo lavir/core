@@ -358,7 +358,6 @@ class PullPointManager:
 
     async def _async_create_pullpoint_subscription(self) -> bool:
         """Create pullpoint subscription."""
-        event_manager = self._event_manager
 
         if not await self._device.create_pullpoint_subscription(
             {"InitialTerminationTime": _get_next_termination_time()}
@@ -379,29 +378,8 @@ class PullPointManager:
             sync_result = await self._pullpoint_service.SetSynchronizationPoint()
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
-        LOGGER.debug(
-            "%s: Pulling PullPoint messages timeout=%s limit=%s",
-            self._name,
-            PULLPOINT_INIT_POLL_TIME,
-            PULLPOINT_MESSAGE_LIMIT,
-        )
-        if response := await self._pullpoint_service.PullMessages(
-            {
-                "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
-                "Timeout": PULLPOINT_INIT_POLL_TIME,
-            }
-        ):
-            LOGGER.debug(
-                "%s: Initial PullMessages: %s event(s)",
-                self._name,
-                len(response.NotificationMessage),
-            )
-            # Parse event initialization
-            await event_manager.async_parse_messages(response.NotificationMessage)
-            event_manager.async_callback_listeners()
-
-        if event_manager.has_listeners:
-            self.async_schedule_pull_messages()
+        # Always schedule an initial pull messages
+        self.async_schedule_pull_messages()
 
         return True
 
