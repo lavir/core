@@ -211,7 +211,7 @@ class EventManager:
         if not self.pullpoint_manager.state != PullPointManagerState.STARTED:
             return
         LOGGER.debug("%s: Switching to webhook for events", self.name)
-        self.hass.async_create_task(self.pullpoint_manager.async_pause())
+        self.pullpoint_manager.async_pause()
 
 
 class PullPointManager:
@@ -320,10 +320,11 @@ class PullPointManager:
         self.state = PullPointManagerState.STOPPED
         await self._async_cancel_and_unsubscribe()
 
-    async def async_pause(self) -> None:
+    @callback
+    def async_pause(self) -> None:
         """Pause pullpoint subscription."""
         self.state = PullPointManagerState.PAUSED
-        await self._async_cancel_and_unsubscribe()
+        self._hass.async_create_task(self._async_cancel_and_unsubscribe())
 
     async def _async_cancel_and_unsubscribe(self) -> None:
         """Cancel and unsubscribe from PullPoint."""
