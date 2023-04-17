@@ -5,7 +5,6 @@ import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 import datetime as dt
-from logging import DEBUG, WARNING
 
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
@@ -448,8 +447,7 @@ class PullPointManager:
         except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
+            LOGGER.debug(
                 "%s: Failed to fetch ONVIF PullPoint subscription messages: %s",
                 self._name,
                 _stringify_onvif_error(err),
@@ -463,7 +461,7 @@ class PullPointManager:
             # If the webhook became started working during the long poll,
             # our data is stale and we should not process it.
             LOGGER.debug(
-                "%s: Webhook is working, not processing PullPoint messages", self._name
+                "%s: Webhook is working, skipping PullPoint messages", self._name
             )
             return True
 
