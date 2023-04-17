@@ -283,11 +283,11 @@ class PullPointManager:
 
         Must not check if the webhook is working.
         """
-        if self._pull_lock.locked():
+        self.async_cancel_pull_messages()
+        if not self.started or self._pull_lock.locked():
             # Pull is already running, another one will be
             # scheduled when the current one is done if needed.
             return
-        self.async_cancel_pull_messages()
         if self._pullpoint_service:
             self._cancel_pull_messages = async_call_later(
                 self._hass, PULLPOINT_COOLDOWN_TIME, self._pull_messages_job
