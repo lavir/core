@@ -616,15 +616,21 @@ class WebHookManager:
 
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
-        subscription = await self._device.create_notification_subscription(
+        LOGGER.debug("%s: Creating webhook subscription", self._name)
+        subscription = self._device.create_notification_subscription(
             {
                 "InitialTerminationTime": _get_next_termination_time(),
                 "ConsumerReference": {"Address": self._webhook_url},
             }
         )
-        self._webhook_subscription = subscription.service
+        # Set the processor right away because the webhook can start
+        # receiving events before before the the the start method is
+        # finished and we need to be able to process events right away.
         self._webhook_processor = subscription.processor
         await subscription.processor.start()
+        # Only set the subscription after the processor has started
+        # so we do not try to renew a subscription that is not started
+        self._webhook_subscription = subscription.service
         LOGGER.debug("%s: Webhook subscription created", self._name)
 
     async def _async_start_webhook(self) -> bool:
