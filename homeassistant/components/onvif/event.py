@@ -211,7 +211,7 @@ class EventManager:
         if not self.pullpoint_manager.state != PullPointManagerState.STARTED:
             return
         LOGGER.debug("%s: Switching to webhook for events", self.name)
-        self.hass.async_create_task(self.pullpoint_manager.async_pause())
+        self.pullpoint_manager.async_pause()
 
 
 class PullPointManager:
@@ -260,27 +260,16 @@ class PullPointManager:
         return True
 
     @callback
+    def async_pause(self) -> None:
+        """Pause pullpoint subscription."""
+        self.state = PullPointManagerState.PAUSED
+        self._hass.async_create_task(self._async_cancel_and_unsubscribe())
+
+    @callback
     def async_resume(self) -> None:
         """Resume pullpoint subscription."""
         self.state = PullPointManagerState.STARTED
         self.async_schedule_pullpoint_renew(0.0)
-
-    async def _async_start_pullpoint(self) -> bool:
-        """Start pullpoint subscription."""
-        try:
-            started = await self._async_create_pullpoint_subscription()
-        except CREATE_ERRORS as err:
-            LOGGER.debug(
-                "%s: Device does not support PullPoint service or has too many subscriptions: %s",
-                self._name,
-                _stringify_onvif_error(err),
-            )
-            return False
-
-        if started:
-            self.async_schedule_pullpoint_renew(SUBSCRIPTION_RENEW_INTERVAL)
-
-        return started
 
     @callback
     def async_schedule_pullpoint_renew(self, delay: float) -> None:
@@ -320,10 +309,22 @@ class PullPointManager:
         self.state = PullPointManagerState.STOPPED
         await self._async_cancel_and_unsubscribe()
 
-    async def async_pause(self) -> None:
-        """Pause pullpoint subscription."""
-        self.state = PullPointManagerState.PAUSED
-        await self._async_cancel_and_unsubscribe()
+    async def _async_start_pullpoint(self) -> bool:
+        """Start pullpoint subscription."""
+        try:
+            started = await self._async_create_pullpoint_subscription()
+        except CREATE_ERRORS as err:
+            LOGGER.debug(
+                "%s: Device does not support PullPoint service or has too many subscriptions: %s",
+                self._name,
+                _stringify_onvif_error(err),
+            )
+            return False
+
+        if started:
+            self.async_schedule_pullpoint_renew(SUBSCRIPTION_RENEW_INTERVAL)
+
+        return started
 
     async def _async_cancel_and_unsubscribe(self) -> None:
         """Cancel and unsubscribe from PullPoint."""
