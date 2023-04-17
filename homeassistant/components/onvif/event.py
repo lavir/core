@@ -539,6 +539,9 @@ class PullPointManager:
             async with self._pull_lock:
                 subscription_working = await self._async_pull_messages_with_lock()
 
+        if event_manager.webhook_is_working:
+            return
+
         if not subscription_working:
             self.async_schedule_pullpoint_renew(0.0)
 
