@@ -426,6 +426,7 @@ class PullPointManager:
 
         Returns False if the subscription is not working and should be restarted.
         """
+        assert self._pull_lock.locked(), "Pull lock must be held"
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
         LOGGER.debug(
