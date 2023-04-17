@@ -445,8 +445,13 @@ class PullPointManager:
                     "Timeout": PULLPOINT_POLL_TIME,
                 }
             )
-        except RemoteProtocolError:
+        except RemoteProtocolError as err:
             # Likely a shutdown event, nothing to see here
+            LOGGER.debug(
+                "%s: PullPoint subscription encountered a remote protocol error: %s",
+                self._name,
+                _stringify_onvif_error(err),
+            )
             return False
         except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
             # Device may not support subscriptions so log at debug level
