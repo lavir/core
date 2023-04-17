@@ -224,9 +224,9 @@ class EventManager:
 class PullPointManagerState(Enum):
     """States for the pullpoint manager."""
 
-    STOPPED = 0
-    STARTED = 1
-    PAUSED = 2
+    STOPPED = 0  # Not running or not supported
+    STARTED = 1  # Running and renewing
+    PAUSED = 2  # Switched to webhook, but can resume
 
 
 class PullPointManager:
@@ -271,7 +271,7 @@ class PullPointManager:
             self.state == PullPointManagerState.STOPPED
         ), "PullPoint manager already started"
         LOGGER.debug("%s: Starting PullPoint manager", self._name)
-        if not self._async_start_pullpoint():
+        if not await self._async_start_pullpoint():
             return False
         self.state = PullPointManagerState.STARTED
         return True
