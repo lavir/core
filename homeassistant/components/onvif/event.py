@@ -251,7 +251,7 @@ class PullPointManager:
             cancel_on_shutdown=True,
         )
         self._pull_messages_job = HassJob(
-            self._async_pull_messages,
+            self._async_background_pull_messages,
             f"{self._name}: pull messages",
             cancel_on_shutdown=True,
         )
@@ -539,7 +539,15 @@ class PullPointManager:
 
         return True
 
-    async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
+    @callback
+    def _async_background_pull_messages(self, _now: dt.datetime | None = None) -> None:
+        """Pull messages from device in the background."""
+        self._hass.async_create_background_task(
+            self._async_pull_messages(),
+            f"{self._name} background pull messages",
+        )
+
+    async def _async_pull_messages(self) -> None:
         """Pull messages from device."""
         self._cancel_pull_messages = None
         event_manager = self._event_manager
@@ -550,7 +558,7 @@ class PullPointManager:
                 if not await self._async_pull_messages_with_lock():
                     self.async_schedule_pullpoint_renew(0.0)
 
-        elif event_manager.has_listeners:
+        if event_manager.has_listeners:
             self.async_schedule_pull_messages()
 
 
