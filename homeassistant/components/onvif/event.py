@@ -463,8 +463,8 @@ class PullPointManager:
             return False
 
         if event_manager.webhook_is_working:
-            # If the webhook became started working, our data is stale and
-            # we should not process it.
+            # If the webhook became started working during the long poll,
+            # our data is stale and we should not process it.
             LOGGER.debug(
                 "%s: Webhook is working, not processing PullPoint messages", self._name
             )
