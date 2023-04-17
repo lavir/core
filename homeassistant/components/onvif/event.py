@@ -537,6 +537,7 @@ class PullPointManager:
     @callback
     def _async_background_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device in the background."""
+        self._cancel_pull_messages = None
         self._hass.async_create_background_task(
             self._async_pull_messages(),
             f"{self._name} background pull messages",
@@ -544,7 +545,6 @@ class PullPointManager:
 
     async def _async_pull_messages(self) -> None:
         """Pull messages from device."""
-        self._cancel_pull_messages = None
         event_manager = self._event_manager
 
         if self._pull_lock.locked():
