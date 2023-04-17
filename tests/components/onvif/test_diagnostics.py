@@ -73,8 +73,14 @@ async def test_diagnostics(
             ],
         },
         "events": {
-            "pullpoint_manager_started": True,
-            "webhook_manager_started": True,
+            "pullpoint_manager_state": {
+                "__type": "<enum " "'PullPointManagerState'>",
+                "repr": "<PullPointManagerState.PAUSED: " "2>",
+            },
             "webhook_is_working": True,
+            "webhook_manager_state": {
+                "__type": "<enum 'WebHookManagerState'>",
+                "repr": "<WebHookManagerState.STARTED: " "1>",
+            },
         },
     }

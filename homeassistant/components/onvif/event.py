@@ -5,7 +5,6 @@ import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 import datetime as dt
-from enum import Enum
 
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
@@ -28,7 +27,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
 from .const import DOMAIN, LOGGER
-from .models import Event
+from .models import Event, PullPointManagerState, WebHookManagerState
 from .parsers import PARSERS
 
 UNHANDLED_TOPICS: set[str] = set()
@@ -219,14 +218,6 @@ class EventManager:
         self.webhook_is_working = True
         LOGGER.debug("%s: Switching to webhook for events", self.name)
         self.hass.async_create_task(self.pullpoint_manager.async_pause())
-
-
-class PullPointManagerState(Enum):
-    """States for the pullpoint manager."""
-
-    STOPPED = 0  # Not running or not supported
-    STARTED = 1  # Running and renewing
-    PAUSED = 2  # Switched to webhook, but can resume
 
 
 class PullPointManager:
@@ -565,13 +556,6 @@ class PullPointManager:
 
         elif event_manager.has_listeners:
             self.async_schedule_pull_messages()
-
-
-class WebHookManagerState(Enum):
-    """States for the webhook manager."""
-
-    STOPPED = 0
-    STARTED = 1
 
 
 class WebHookManager:
