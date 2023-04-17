@@ -557,13 +557,14 @@ class PullPointManager:
             # Before we pop out of the lock we always need to schedule the next pull
             # or call async_schedule_pullpoint_renew if the pull fails so the pull
             # loop continues.
-            if self._hass.state == CoreState.running:
-                if not await self._async_pull_messages_with_lock():
-                    self.async_schedule_pullpoint_renew(0.0)
-                    return
-
-            if event_manager.has_listeners:
-                self.async_schedule_pull_messages()
+            try:
+                if self._hass.state == CoreState.running:
+                    if not await self._async_pull_messages_with_lock():
+                        self.async_schedule_pullpoint_renew(0.0)
+                        return
+            finally:
+                if event_manager.has_listeners:
+                    self.async_schedule_pull_messages()
 
 
 class WebHookManager:
