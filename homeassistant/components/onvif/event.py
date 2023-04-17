@@ -599,8 +599,12 @@ class WebHookManager:
     @callback
     def _async_mark_webhook_as_failed(self) -> None:
         """Mark webhook as failed."""
-        self._event_manager.webhook_is_working = False
-        self._event_manager.pullpoint_manager.async_schedule_pull()
+        event_manager = self._event_manager
+        if event_manager.webhook_is_working:
+            # If the webhook was working, we need to schedule a pull
+            # to make sure we don't miss any events since it stopped working.
+            event_manager.pullpoint_manager.async_schedule_pull()
+        event_manager.webhook_is_working = False
 
     async def _async_restart_webhook(self) -> bool:
         """Restart the webhook subscription assuming the camera rebooted."""
