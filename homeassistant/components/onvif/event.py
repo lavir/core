@@ -282,8 +282,10 @@ class PullPointManager:
                 _stringify_onvif_error(err),
             )
             return False
+
         if started:
             self.async_schedule_pullpoint_renew(SUBSCRIPTION_RENEW_INTERVAL)
+
         return started
 
     @callback
@@ -312,7 +314,7 @@ class PullPointManager:
         Must not check if the webhook is working.
         """
         self.async_cancel_pull_messages()
-        if self.state != PullPointManagerState.STARTED or self._pull_lock.locked():
+        if self.state != PullPointManagerState.STARTED:
             # Pull is already running, another one will be
             # scheduled when the current one is done if needed.
             return
@@ -564,6 +566,7 @@ class PullPointManager:
                 if not await self._async_pull_messages_with_lock():
                     self.async_schedule_pullpoint_renew(0.0)
                     return
+
             if event_manager.has_listeners:
                 self.async_schedule_pull_messages()
 
