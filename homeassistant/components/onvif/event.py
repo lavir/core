@@ -92,6 +92,7 @@ class EventManager:
         self.webhook_manager = WebHookManager(self)
         self.pullpoint_manager = PullPointManager(self)
 
+        self._uid_by_platform: dict[str, set[str]] = {}
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
 
@@ -102,11 +103,6 @@ class EventManager:
             self.webhook_manager.state == WebHookManagerState.STARTED
             or self.pullpoint_manager.state == PullPointManagerState.STARTED
         )
-
-    @property
-    def platforms(self) -> set[str]:
-        """Return platforms to setup."""
-        return {event.platform for event in self._events.values()}
 
     @property
     def has_listeners(self) -> bool:
@@ -187,15 +183,24 @@ class EventManager:
                 )
                 return
 
+            self.get_uids_by_platform(event.platform).add(event.uid)
             self._events[event.uid] = event
 
-    def get_uid(self, uid) -> Event | None:
+    def get_uid(self, uid: str) -> Event | None:
         """Retrieve event for given id."""
         return self._events.get(uid)
 
     def get_platform(self, platform) -> list[Event]:
         """Retrieve events for given platform."""
         return [event for event in self._events.values() if event.platform == platform]
+
+    def get_uids_by_platform(self, platform: str) -> set[str]:
+        """Retrieve uids for a given platform."""
+        if (possible_uids := self._uid_by_platform.get(platform)) is None:
+            uids: set[str] = set()
+            self._uid_by_platform[platform] = uids
+            return uids
+        return possible_uids
 
     @callback
     def async_webhook_failed(self) -> None:
