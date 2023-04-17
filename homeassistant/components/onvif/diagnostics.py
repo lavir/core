@@ -32,7 +32,6 @@ async def async_get_config_entry_diagnostics(
         "pullpoint_manager_started": device.events.pullpoint_manager.started,
     }
     data["events"] = {
-        "webhook_is_working": device.events.webhook_is_working,
         "webhook_manager_state": device.events.webhook_manager.state,
         "pullpoint_manager_state": device.events.pullpoint_manager.state,
     }

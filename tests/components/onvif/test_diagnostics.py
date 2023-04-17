@@ -77,7 +77,6 @@ async def test_diagnostics(
                 "__type": "<enum " "'PullPointManagerState'>",
                 "repr": "<PullPointManagerState.PAUSED: " "2>",
             },
-            "webhook_is_working": True,
             "webhook_manager_state": {
                 "__type": "<enum 'WebHookManagerState'>",
                 "repr": "<WebHookManagerState.STARTED: " "1>",

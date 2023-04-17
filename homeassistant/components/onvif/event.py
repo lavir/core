@@ -92,10 +92,6 @@ class EventManager:
         self.webhook_manager = WebHookManager(self)
         self.pullpoint_manager = PullPointManager(self)
 
-        # We define working as reachable by the camera, having a working
-        # subscription, and the last message being received was valid.
-        self.webhook_is_working: bool = False
-
         self._events: dict[str, Event] = {}
         self._listeners: list[CALLBACK_TYPE] = []
 
@@ -121,7 +117,7 @@ class EventManager:
     def async_add_listener(self, update_callback: CALLBACK_TYPE) -> Callable[[], None]:
         """Listen for data updates."""
         # This is the first listener, set up polling.
-        if not self._listeners and not self.webhook_is_working:
+        if not self._listeners:
             self.pullpoint_manager.async_schedule_pull_messages()
 
         self._listeners.append(update_callback)
@@ -204,18 +200,16 @@ class EventManager:
     @callback
     def async_webhook_failed(self) -> None:
         """Mark webhook as failed."""
-        if not self.webhook_is_working:
+        if not self.pullpoint_manager.state != PullPointManagerState.PAUSED:
             return
-        self.webhook_is_working = False
         LOGGER.debug("%s: Switching to PullPoint for events", self.name)
         self.pullpoint_manager.async_resume()
 
     @callback
     def async_webhook_working(self) -> None:
         """Mark webhook as working."""
-        if self.webhook_is_working:
+        if not self.pullpoint_manager.state != PullPointManagerState.STARTED:
             return
-        self.webhook_is_working = True
         LOGGER.debug("%s: Switching to webhook for events", self.name)
         self.hass.async_create_task(self.pullpoint_manager.async_pause())
 
@@ -268,7 +262,7 @@ class PullPointManager:
     @callback
     def async_resume(self) -> None:
         """Resume pullpoint subscription."""
-        self.state = PullPointManagerState.PAUSED
+        self.state = PullPointManagerState.STARTED
         self.async_schedule_pullpoint_renew(0.0)
 
     async def _async_start_pullpoint(self) -> bool:
@@ -315,8 +309,6 @@ class PullPointManager:
         """
         self.async_cancel_pull_messages()
         if self.state != PullPointManagerState.STARTED:
-            # Pull is already running, another one will be
-            # scheduled when the current one is done if needed.
             return
         if self._pullpoint_service:
             self._cancel_pull_messages = async_call_later(
