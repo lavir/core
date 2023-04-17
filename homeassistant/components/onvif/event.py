@@ -5,7 +5,6 @@ import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 import datetime as dt
-from logging import DEBUG, WARNING
 
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
@@ -426,6 +425,7 @@ class PullPointManager:
 
         Returns False if the subscription is not working and should be restarted.
         """
+        assert self._pull_lock.locked(), "Pull lock must be held"
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
         LOGGER.debug(
@@ -447,13 +447,9 @@ class PullPointManager:
         except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
-            LOGGER.log(
-                DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to fetch ONVIF PullPoint subscription messages for"
-                    " '%s': %s"
-                ),
-                self._event_manager.unique_id,
+            LOGGER.debug(
+                "%s: Failed to fetch ONVIF PullPoint subscription messages: %s",
+                self._name,
                 _stringify_onvif_error(err),
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
@@ -462,10 +458,10 @@ class PullPointManager:
             return False
 
         if event_manager.webhook_is_working:
-            # If the webhook became started working, our data is stale and we need to
-            # restart the subscription.
+            # If the webhook became started working during the long poll,
+            # our data is stale and we should not process it.
             LOGGER.debug(
-                "%s: Webhook is working, not processing PullPoint messages", self._name
+                "%s: Webhook is working, skipping PullPoint messages", self._name
             )
             return True
 
