@@ -40,8 +40,8 @@ UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 RENEW_ERRORS = (ONVIFError, RequestError, XMLParseError, *SUBSCRIPTION_ERRORS)
 #
 # We only keep the subscription alive for 3 minutes, and will keep
-# renewing it every 1.5 minutes. This is to avoid the camera to
-# accumulate subscriptions which will be impossible to clean up
+# renewing it every 1.5 minutes. This is to avoid the camera
+# accumulating subscriptions which will be impossible to clean up
 # since ONVIF does not provide a way to list existing subscriptions.
 #
 # If we max out the number of subscriptions, the camera will stop
