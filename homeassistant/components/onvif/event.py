@@ -109,6 +109,11 @@ class EventManager:
         """Return platforms to setup."""
         return {event.platform for event in self._events.values()}
 
+    @property
+    def has_listeners(self) -> bool:
+        """Return if there are listeners."""
+        return bool(self._listeners)
+
     @callback
     def async_add_listener(self, update_callback: CALLBACK_TYPE) -> Callable[[], None]:
         """Listen for data updates."""
@@ -154,11 +159,6 @@ class EventManager:
         """Update listeners."""
         for update_callback in self._listeners:
             update_callback()
-
-    @property
-    def has_listeners(self) -> bool:
-        """Return if there are listeners."""
-        return bool(self._listeners)
 
     # pylint: disable=protected-access
     async def async_parse_messages(self, messages) -> None:
