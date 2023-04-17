@@ -248,12 +248,10 @@ class PullPointManager:
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_pullpoint,
             f"{self._name}: renew or restart pullpoint",
-            cancel_on_shutdown=True,
         )
         self._pull_messages_job = HassJob(
-            self._async_pull_messages,
+            self._async_background_pull_messages,
             f"{self._name}: pull messages",
-            cancel_on_shutdown=True,
         )
 
     async def async_start(self) -> bool:
@@ -406,9 +404,6 @@ class PullPointManager:
             event_manager.async_callback_listeners()
 
         if event_manager.has_listeners:
-            # There must not be any awaits after this point to
-            # ensure that that the next pull is scheduled if
-            # we did not pull because of a lock.
             self.async_schedule_pull_messages()
 
         return True
@@ -539,23 +534,35 @@ class PullPointManager:
 
         return True
 
-    async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
+    @callback
+    def _async_background_pull_messages(self, _now: dt.datetime | None = None) -> None:
+        """Pull messages from device in the background."""
+        self._hass.async_create_background_task(
+            self._async_pull_messages(),
+            f"{self._name} background pull messages",
+        )
+
+    async def _async_pull_messages(self) -> None:
         """Pull messages from device."""
         self._cancel_pull_messages = None
-        subscription_working = True
         event_manager = self._event_manager
 
-        if self._hass.state == CoreState.running and not self._pull_lock.locked():
+        if self._pull_lock.locked():
             # Pull messages if the lock is not already locked
             # any pull will do, so we don't need to wait for the lock
-            async with self._pull_lock:
-                subscription_working = await self._async_pull_messages_with_lock()
+            LOGGER.debug(
+                "%s: PullPoint subscription is already locked, skipping pull",
+                self._name,
+            )
+            return
 
-        if not subscription_working:
-            self.async_schedule_pullpoint_renew(0.0)
-
-        elif event_manager.has_listeners:
-            self.async_schedule_pull_messages()
+        async with self._pull_lock:
+            if self._hass.state == CoreState.running:
+                if not await self._async_pull_messages_with_lock():
+                    self.async_schedule_pullpoint_renew(0.0)
+                    return
+            if event_manager.has_listeners:
+                self.async_schedule_pull_messages()
 
 
 class WebHookManager:
@@ -589,7 +596,6 @@ class WebHookManager:
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_webhook,
             f"{self._name}: renew or restart webhook",
-            cancel_on_shutdown=True,
         )
 
     async def async_start(self) -> bool:
