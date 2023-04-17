@@ -112,7 +112,7 @@ def setup_mock_device(mock_device):
     )
     mock_device.profiles = [profile1]
     mock_device.events = MagicMock(
-        webhook_is_reachable=True,
+        webhook_is_working=True,
         webhook_manager=MagicMock(started=True),
         pullpoint_manager=MagicMock(started=True),
     )
