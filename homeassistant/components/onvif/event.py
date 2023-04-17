@@ -243,6 +243,7 @@ class PullPointManager:
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
         self._cancel_pullpoint_renew: CALLBACK_TYPE | None = None
 
+        self._renew_lock: asyncio.Lock = asyncio.Lock()
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_pullpoint,
             f"{self._name}: renew or restart pullpoint",
@@ -264,7 +265,7 @@ class PullPointManager:
     @callback
     def async_resume(self) -> None:
         """Resume pullpoint subscription."""
-        self.async_schedule_pullpoint_renew(SUBSCRIPTION_RENEW_INTERVAL)
+        self.async_schedule_pullpoint_renew(0.0)
 
     async def _async_start_pullpoint(self) -> bool:
         """Start pullpoint subscription."""
@@ -333,15 +334,21 @@ class PullPointManager:
         """Renew or start pullpoint subscription."""
         if self._hass.is_stopping or not self.started:
             return
-        next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
-        try:
-            if (
-                await self._async_renew_pullpoint()
-                or await self._async_restart_pullpoint()
-            ):
-                next_attempt = SUBSCRIPTION_RENEW_INTERVAL
-        finally:
-            self.async_schedule_pullpoint_renew(next_attempt)
+        if self._renew_lock.locked():
+            LOGGER.debug("%s: PullPoint renew already in progress", self._name)
+            # Renew is already running, another one will be
+            # scheduled when the current one is done if needed.
+            return
+        async with self._renew_lock:
+            next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
+            try:
+                if (
+                    await self._async_renew_pullpoint()
+                    or await self._async_restart_pullpoint()
+                ):
+                    next_attempt = SUBSCRIPTION_RENEW_INTERVAL
+            finally:
+                self.async_schedule_pullpoint_renew(next_attempt)
 
     async def _async_create_pullpoint_subscription(self) -> bool:
         """Create pullpoint subscription."""
@@ -562,6 +569,7 @@ class WebHookManager:
 
         self._cancel_webhook_renew: CALLBACK_TYPE | None = None
 
+        self._renew_lock = asyncio.Lock()
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_webhook,
             f"{self._name}: renew or restart webhook",
@@ -669,12 +677,21 @@ class WebHookManager:
         """Renew or start webhook subscription."""
         if self._hass.is_stopping or not self.started:
             return
-        next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
-        try:
-            if await self._async_renew_webhook() or await self._async_restart_webhook():
-                next_attempt = SUBSCRIPTION_RENEW_INTERVAL
-        finally:
-            self._async_schedule_webhook_renew(next_attempt)
+        if self._renew_lock.locked():
+            LOGGER.debug("%s: Webhook renew already in progress", self._name)
+            # Renew is already running, another one will be
+            # scheduled when the current one is done if needed.
+            return
+        async with self._renew_lock:
+            next_attempt = SUBSCRIPTION_RENEW_INTERVAL_ON_ERROR
+            try:
+                if (
+                    await self._async_renew_webhook()
+                    or await self._async_restart_webhook()
+                ):
+                    next_attempt = SUBSCRIPTION_RENEW_INTERVAL
+            finally:
+                self._async_schedule_webhook_renew(next_attempt)
 
     @callback
     def _async_register_webhook(self) -> None:
