@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import mimetypes
-from pathlib import Path
-import tempfile
 
 from aiohttp import web
 from synology_dsm.api.photos import SynoPhotosAlbum, SynoPhotosItem
@@ -192,12 +190,12 @@ class SynologyPhotosMediaSource(MediaSource):
 
     async def async_get_thumbnail(
         self, item: SynoPhotosItem, diskstation: SynologyDSMData
-    ) -> str:
+    ) -> str | None:
         """Get thumbnail."""
         try:
             thumbnail = await diskstation.api.photos.get_item_thumbnail_url(item)
         except SynologyDSMException:
-            return ""
+            return None
         return str(thumbnail)
 
 
@@ -213,14 +211,13 @@ class SynologyDsmMediaView(http.HomeAssistantView):
 
     async def get(
         self, request: web.Request, source_dir_id: str, location: str
-    ) -> web.FileResponse:
+    ) -> web.Response:
         """Start a GET request."""
         if not self.hass.data.get(DOMAIN):
             raise web.HTTPNotFound()
         # location: {cache_key}/{filename}
         cache_key, file_name = location.split("/")
         image_id = cache_key.split("_")[0]
-        file_extension = file_name.split(".")[-1]
         mime_type, _ = mimetypes.guess_type(file_name)
         if not isinstance(mime_type, str):
             raise web.HTTPNotFound()
@@ -231,8 +228,4 @@ class SynologyDsmMediaView(http.HomeAssistantView):
             image = await diskstation.api.photos.download_item(item)
         except SynologyDSMException as exc:
             raise web.HTTPNotFound() from exc
-        with tempfile.NamedTemporaryFile(
-            mode="wb", suffix=f".{file_extension}", delete=False
-        ) as temp:
-            temp.write(image)
-        return web.FileResponse(Path(temp.name))
+        return web.Response(body=image, content_type=mime_type)
