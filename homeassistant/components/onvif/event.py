@@ -450,11 +450,8 @@ class PullPointManager:
             # when we get an XMLParseError
             LOGGER.log(
                 DEBUG if isinstance(err, XMLParseError) else WARNING,
-                (
-                    "Failed to fetch ONVIF PullPoint subscription messages for"
-                    " '%s': %s"
-                ),
-                self._event_manager.unique_id,
+                "%s: Failed to fetch ONVIF PullPoint subscription messages: %s",
+                self._name,
                 _stringify_onvif_error(err),
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
