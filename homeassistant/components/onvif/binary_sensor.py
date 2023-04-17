@@ -51,6 +51,7 @@ async def async_setup_entry(
             uid: ONVIFBinarySensor(uid, device) for uid in missing
         }
         if new_entities:
+            entities.update(new_entities)
             async_add_entities(new_entities.values())
 
     device.events.async_add_listener(async_check_entities)
