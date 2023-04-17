@@ -326,7 +326,7 @@ class PullPointManager:
         """Pause pullpoint subscription."""
         self._async_cancel_pullpoint_renew()
         self.async_cancel_pull_messages()
-        await self.async_unsubscribe_pullpoint()
+        await self._async_unsubscribe_pullpoint()
 
     async def _async_renew_or_restart_pullpoint(
         self, now: dt.datetime | None = None
@@ -395,6 +395,9 @@ class PullPointManager:
             event_manager.async_callback_listeners()
 
         if event_manager.has_listeners:
+            # There must not be any awaits after this point to
+            # ensure that that the next pull is scheduled if
+            # we did not pull because of a lock.
             self.async_schedule_pull_messages()
 
         return True
@@ -409,18 +412,19 @@ class PullPointManager:
     async def _async_restart_pullpoint(self) -> bool:
         """Restart the subscription assuming the camera rebooted."""
         self.async_cancel_pull_messages()
-        await self.async_unsubscribe_pullpoint()
+        await self._async_unsubscribe_pullpoint()
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
             LOGGER.debug("%s: Restarted ONVIF PullPoint subscription", self._name)
             self.async_schedule_pull_messages()
         return restarted
 
-    async def async_unsubscribe_pullpoint(self) -> None:
+    async def _async_unsubscribe_pullpoint(self) -> None:
         """Unsubscribe the pullpoint subscription."""
         if not self._pullpoint_subscription:
             return
         # Suppressed. The subscription may no longer exist.
+        LOGGER.debug("%s: Unsubscribing from ONVIF PullPoint", self._name)
         try:
             await self._pullpoint_subscription.Unsubscribe()
         except UNSUBSCRIBE_ERRORS as err:
@@ -795,6 +799,7 @@ class WebHookManager:
         """Unsubscribe from the webhook."""
         if not self._webhook_subscription:
             return
+        LOGGER.debug("%s: Unsubscribing from webhook", self._name)
         try:
             await self._webhook_subscription.Unsubscribe()
         except UNSUBSCRIBE_ERRORS as err:
