@@ -5,6 +5,7 @@ import asyncio
 from collections.abc import Callable
 from contextlib import suppress
 import datetime as dt
+from enum import Enum
 
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
@@ -102,7 +103,10 @@ class EventManager:
     @property
     def started(self) -> bool:
         """Return True if event manager is started."""
-        return self.webhook_manager.started or self.pullpoint_manager.started
+        return (
+            self.webhook_manager.state == WebHookManagerState.STARTED
+            or self.pullpoint_manager.state == PullPointManagerState.STARTED
+        )
 
     @property
     def platforms(self) -> set[str]:
@@ -141,8 +145,6 @@ class EventManager:
 
     async def async_start(self) -> bool:
         """Start polling events."""
-        if self.webhook_manager.started or self.pullpoint_manager.started:
-            raise RuntimeError("Event manager already started")
         # Always start pull point first, since it will populate the event list
         event_via_pull_point = await self.pullpoint_manager.async_start()
         events_via_webhook = await self.webhook_manager.async_start()
@@ -219,6 +221,14 @@ class EventManager:
         self.hass.async_create_task(self.pullpoint_manager.async_pause())
 
 
+class PullPointManagerState(Enum):
+    """States for the pullpoint manager."""
+
+    STOPPED = 0
+    STARTED = 1
+    PAUSED = 2
+
+
 class PullPointManager:
     """ONVIF PullPoint Manager.
 
@@ -229,7 +239,7 @@ class PullPointManager:
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize pullpoint manager."""
-        self.started: bool = False
+        self.state = PullPointManagerState.STOPPED
 
         self._event_manager = event_manager
         self._device = event_manager.device
@@ -257,14 +267,19 @@ class PullPointManager:
 
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
-        assert self.started is False, "PullPoint manager already started"
+        assert (
+            self.state == PullPointManagerState.STOPPED
+        ), "PullPoint manager already started"
         LOGGER.debug("%s: Starting PullPoint manager", self._name)
-        self.started = await self._async_start_pullpoint()
-        return self.started
+        if not self._async_start_pullpoint():
+            return False
+        self.state = PullPointManagerState.STARTED
+        return True
 
     @callback
     def async_resume(self) -> None:
         """Resume pullpoint subscription."""
+        self.state = PullPointManagerState.PAUSED
         self.async_schedule_pullpoint_renew(0.0)
 
     async def _async_start_pullpoint(self) -> bool:
@@ -308,7 +323,7 @@ class PullPointManager:
         Must not check if the webhook is working.
         """
         self.async_cancel_pull_messages()
-        if not self.started or self._pull_lock.locked():
+        if self.state != PullPointManagerState.STARTED or self._pull_lock.locked():
             # Pull is already running, another one will be
             # scheduled when the current one is done if needed.
             return
@@ -319,11 +334,16 @@ class PullPointManager:
 
     async def async_stop(self) -> None:
         """Unsubscribe from PullPoint and cancel callbacks."""
-        self.started = False
-        await self.async_pause()
+        self.state = PullPointManagerState.STOPPED
+        await self._async_cancel_and_unsubscribe()
 
     async def async_pause(self) -> None:
         """Pause pullpoint subscription."""
+        self.state = PullPointManagerState.PAUSED
+        await self._async_cancel_and_unsubscribe()
+
+    async def _async_cancel_and_unsubscribe(self) -> None:
+        """Cancel and unsubscribe from PullPoint."""
         self._async_cancel_pullpoint_renew()
         self.async_cancel_pull_messages()
         await self._async_unsubscribe_pullpoint()
@@ -332,7 +352,7 @@ class PullPointManager:
         self, now: dt.datetime | None = None
     ) -> None:
         """Renew or start pullpoint subscription."""
-        if self._hass.is_stopping or not self.started:
+        if self._hass.is_stopping or self.state != PullPointManagerState.STARTED:
             return
         if self._renew_lock.locked():
             LOGGER.debug("%s: PullPoint renew already in progress", self._name)
@@ -539,14 +559,18 @@ class PullPointManager:
             async with self._pull_lock:
                 subscription_working = await self._async_pull_messages_with_lock()
 
-        if event_manager.webhook_is_working:
-            return
-
         if not subscription_working:
             self.async_schedule_pullpoint_renew(0.0)
 
         elif event_manager.has_listeners:
             self.async_schedule_pull_messages()
+
+
+class WebHookManagerState(Enum):
+    """States for the webhook manager."""
+
+    STOPPED = 0
+    STARTED = 1
 
 
 class WebHookManager:
@@ -559,7 +583,7 @@ class WebHookManager:
 
     def __init__(self, event_manager: EventManager) -> None:
         """Initialize webhook manager."""
-        self.started: bool = False
+        self.state = WebHookManagerState.STOPPED
 
         self._event_manager = event_manager
         self._device = event_manager.device
@@ -586,15 +610,19 @@ class WebHookManager:
     async def async_start(self) -> bool:
         """Start polling events."""
         LOGGER.debug("%s: Starting webhook manager", self._name)
-        assert self.started is False, "Webhook manager already started"
+        assert (
+            self.state == WebHookManagerState.STOPPED
+        ), "Webhook manager already started"
         assert self._webhook_url is None, "Webhook already registered"
         self._async_register_webhook()
-        self.started = await self._async_start_webhook()
-        return self.started
+        if not await self._async_start_webhook():
+            return False
+        self.state = WebHookManagerState.STARTED
+        return True
 
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
-        self.started = False
+        self.state = WebHookManagerState.STOPPED
         self._async_cancel_webhook_renew()
         await self._async_unsubscribe_webhook()
         self._async_unregister_webhook()
@@ -682,7 +710,7 @@ class WebHookManager:
         self, now: dt.datetime | None = None
     ) -> None:
         """Renew or start webhook subscription."""
-        if self._hass.is_stopping or not self.started:
+        if self._hass.is_stopping or self.state != WebHookManagerState.STARTED:
             return
         if self._renew_lock.locked():
             LOGGER.debug("%s: Webhook renew already in progress", self._name)
