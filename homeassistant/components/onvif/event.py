@@ -383,7 +383,7 @@ class PullPointManager:
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
         LOGGER.debug(
-            "%s: Pulling ONVIF PullPoint messages timeout=%s limit=%s",
+            "%s: Pulling PullPoint messages timeout=%s limit=%s",
             self._name,
             PULLPOINT_INIT_POLL_TIME,
             PULLPOINT_MESSAGE_LIMIT,
@@ -421,7 +421,7 @@ class PullPointManager:
         await self._async_unsubscribe_pullpoint()
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
-            LOGGER.debug("%s: Restarted ONVIF PullPoint subscription", self._name)
+            LOGGER.debug("%s: Restarted PullPoint subscription", self._name)
             self.async_schedule_pull_messages()
         return restarted
 
@@ -430,13 +430,13 @@ class PullPointManager:
         if not self._pullpoint_subscription:
             return
         # Suppressed. The subscription may no longer exist.
-        LOGGER.debug("%s: Unsubscribing from ONVIF PullPoint", self._name)
+        LOGGER.debug("%s: Unsubscribing from PullPoint", self._name)
         try:
             await self._pullpoint_subscription.Unsubscribe()
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
-                    "%s: Failed to unsubscribe ONVIF PullPoint subscription;"
+                    "%s: Failed to unsubscribe PullPoint subscription;"
                     " This is normal if the device restarted: %s"
                 ),
                 self._name,
@@ -453,11 +453,11 @@ class PullPointManager:
             # suppress it. The subscription will be restarted in
             # async_restart later.
             await self._pullpoint_subscription.Renew(_get_next_termination_time())
-            LOGGER.debug("%s: Renewed ONVIF PullPoint subscription", self._name)
+            LOGGER.debug("%s: Renewed PullPoint subscription", self._name)
             return True
         except RENEW_ERRORS as err:
             LOGGER.debug(
-                "%s: Failed to renew ONVIF PullPoint subscription; %s",
+                "%s: Failed to renew PullPoint subscription; %s",
                 self._name,
                 _stringify_onvif_error(err),
             )
@@ -477,7 +477,7 @@ class PullPointManager:
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
         LOGGER.debug(
-            "%s: Pulling ONVIF PullPoint messages timeout=%s limit=%s",
+            "%s: Pulling PullPoint messages timeout=%s limit=%s",
             self._name,
             PULLPOINT_POLL_TIME,
             PULLPOINT_MESSAGE_LIMIT,
@@ -501,7 +501,7 @@ class PullPointManager:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
             LOGGER.debug(
-                "%s: Failed to fetch ONVIF PullPoint subscription messages: %s",
+                "%s: Failed to fetch PullPoint subscription messages: %s",
                 self._name,
                 _stringify_onvif_error(err),
             )
@@ -830,7 +830,7 @@ class WebHookManager:
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
-                    "%s: Failed to unsubscribe ONVIF webhook subscription;"
+                    "%s: Failed to unsubscribe webhook subscription;"
                     " This is normal if the device restarted: %s"
                 ),
                 self._name,
