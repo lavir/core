@@ -624,6 +624,7 @@ class WebHookManager:
         )
         self._webhook_subscription = subscription.service
         self._webhook_processor = subscription.processor
+        await subscription.processor.start()
         LOGGER.debug("%s: Webhook subscription created", self._name)
 
     async def _async_start_webhook(self) -> bool:
@@ -745,7 +746,9 @@ class WebHookManager:
             # when we receive a valid notification.
             event_manager.async_webhook_failed()
             return
-        assert self._webhook_processor is not None, "Webhook is not setup"
+        if not self._webhook_processor:
+            LOGGER.debug("%s: Received webhook before processor setup", self._name)
+            return
         if not (result := self._webhook_processor.process(content)):
             LOGGER.debug("%s: Failed to process webhook %s", self._name, webhook_id)
             return
