@@ -475,13 +475,15 @@ class PullPointManager:
             return True
 
         # Parse response
-        if number_of_events := len(response.NotificationMessage):
+        if (notification_message := response.NotificationMessage) and (
+            number_of_events := len(notification_message)
+        ):
             LOGGER.debug(
                 "%s: continuous PullMessages: %s event(s)",
                 self._name,
                 number_of_events,
             )
-            await event_manager.async_parse_messages(response.NotificationMessage)
+            await event_manager.async_parse_messages(notification_message)
             event_manager.async_callback_listeners()
         else:
             LOGGER.debug("%s: continuous PullMessages: no events", self._name)
