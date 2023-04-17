@@ -563,15 +563,15 @@ class WebHookManager:
         )
         # pylint: disable=protected-access
         self._device.xaddrs[
-            "http://www.onvif.org/ver10/events/wsdl/WebhookSubscription"
+            "http://www.onvif.org/ver10/events/wsdl/NotificationConsumer"
         ] = notify_subscribe.SubscriptionReference.Address._value_1
 
         # Create subscription manager
         self._webhook_subscription = self._device.create_subscription_service(
-            "WebhookSubscription"
+            "NotificationConsumer"
         )
         self._webhook_pullpoint_service = self._device.create_onvif_service(
-            "pullpoint", port_type="WebhookSubscription"
+            "pullpoint", port_type="NotificationConsumer"
         )
 
         # 5.2.3 BASIC NOTIFICATION INTERFACE - NOTIFY
