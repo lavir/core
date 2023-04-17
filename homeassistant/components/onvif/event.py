@@ -668,7 +668,7 @@ class WebHookManager:
             return False
         try:
             await self._webhook_subscription.Renew(_get_next_termination_time())
-            LOGGER.debug("%s: Webhook subscription renewed", self._name)
+            LOGGER.debug("%s: Renewed Webhook subscription", self._name)
             return True
         except RENEW_ERRORS as err:
             LOGGER.debug(
