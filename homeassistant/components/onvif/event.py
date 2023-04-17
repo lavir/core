@@ -314,7 +314,14 @@ class PullPointManager:
     async def _async_start_pullpoint(self) -> bool:
         """Start pullpoint subscription."""
         try:
-            started = await self._async_create_pullpoint_subscription()
+            try:
+                started = await self._async_create_pullpoint_subscription()
+            except RemoteProtocolError:
+                # http://datatracker.ietf.org/doc/html/rfc2616#section-8.1.4 allows the server
+                # to close the connection at any time, we treat this as a normal and try again
+                # once since we do not want to declare the camera as not supporting PullPoint
+                # if it just happened to close the connection at the wrong time.
+                started = await self._async_create_pullpoint_subscription()
         except CREATE_ERRORS as err:
             LOGGER.debug(
                 "%s: Device does not support PullPoint service or has too many subscriptions: %s",
@@ -464,13 +471,17 @@ class PullPointManager:
                 }
             )
         except RemoteProtocolError as err:
-            # Likely a shutdown event, nothing to see here
+            # Either a shutdown event or the camera closed the connection. Because
+            # http://datatracker.ietf.org/doc/html/rfc2616#section-8.1.4 allows the server
+            # to close the connection at any time, we treat this as a normal. Some
+            # cameras may close the connection if there are no messages to pull.
             LOGGER.debug(
-                "%s: PullPoint subscription encountered a remote protocol error: %s",
+                "%s: PullPoint subscription encountered a remote protocol error "
+                "(this is normal for some cameras): %s",
                 self._name,
                 _stringify_onvif_error(err),
             )
-            return False
+            return True
         except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
@@ -621,7 +632,14 @@ class WebHookManager:
     async def _async_start_webhook(self) -> bool:
         """Start webhook."""
         try:
-            await self._async_create_webhook_subscription()
+            try:
+                await self._async_create_webhook_subscription()
+            except RemoteProtocolError:
+                # http://datatracker.ietf.org/doc/html/rfc2616#section-8.1.4 allows the server
+                # to close the connection at any time, we treat this as a normal and try again
+                # once since we do not want to declare the camera as not supporting webhooks
+                # if it just happened to close the connection at the wrong time.
+                await self._async_create_webhook_subscription()
         except CREATE_ERRORS as err:
             self._event_manager.async_webhook_failed()
             LOGGER.debug(
