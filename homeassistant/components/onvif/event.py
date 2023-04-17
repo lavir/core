@@ -557,6 +557,7 @@ class PullPointManager:
             async with self._pull_lock:
                 if not await self._async_pull_messages_with_lock():
                     self.async_schedule_pullpoint_renew(0.0)
+                    return
 
         if event_manager.has_listeners:
             self.async_schedule_pull_messages()
