@@ -37,7 +37,16 @@ SUBSCRIPTION_ERRORS = (Fault, asyncio.TimeoutError, TransportError)
 SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
 UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
 
-
+#
+# We only keep the subscription alive for 3 minutes, and will keep
+# renewing it every 1.5 minutes. This is to avoid the camera to
+# accumulate subscriptions which will be impossible to clean up
+# since ONVIF does not provide a way to list existing subscriptions.
+#
+# If we max out the number of subscriptions, the camera will stop
+# sending events to us, and we will not be able to recover until
+# the subscriptions expire or the camera is rebooted.
+#
 SUBSCRIPTION_TIME = dt.timedelta(minutes=3)
 SUBSCRIPTION_RELATIVE_TIME = (
     "PT3M"  # use relative time since the time on the camera is not reliable
