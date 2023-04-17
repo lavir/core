@@ -375,6 +375,7 @@ class PullPointManager:
 
     async def _async_restart_pullpoint(self) -> bool:
         """Restart the subscription assuming the camera rebooted."""
+        self.async_cancel_pull_messages()
         await self._async_unsubscribe_pullpoint()
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
