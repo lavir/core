@@ -474,6 +474,8 @@ class PullPointManager:
         """Pull messages from device."""
         self._cancel_pull_messages = None
         subscription_working = True
+        event_manager = self._event_manager
+
         if self._hass.state == CoreState.running and not self._pull_lock.locked():
             # Pull messages if the lock is not already locked
             # any pull will do, so we don't need to wait for the lock
@@ -482,10 +484,8 @@ class PullPointManager:
 
         if not subscription_working:
             self._async_schedule_pullpoint_renew(0.0)
-        elif (
-            self._event_manager.has_listeners
-            and not self._event_manager.webhook_is_working
-        ):
+
+        elif event_manager.has_listeners and not event_manager.webhook_is_working:
             self.async_schedule_pull()
 
 
@@ -585,7 +585,7 @@ class WebHookManager:
         try:
             await self._async_create_webhook_subscription()
         except CREATE_ERRORS as err:
-            self._event_manager.webhook_is_working = False
+            self._async_mark_webhook_as_failed()
             LOGGER.debug(
                 "%s: Device does not support notification service or too many subscriptions: %s",
                 self._name,
@@ -595,6 +595,12 @@ class WebHookManager:
 
         self._async_schedule_webhook_renew(SUBSCRIPTION_RENEW_INTERVAL)
         return True
+
+    @callback
+    def _async_mark_webhook_as_failed(self) -> None:
+        """Mark webhook as failed."""
+        self._event_manager.webhook_is_working = False
+        self._event_manager.pullpoint_manager.async_schedule_pull()
 
     async def _async_restart_webhook(self) -> bool:
         """Restart the webhook subscription assuming the camera rebooted."""
@@ -687,8 +693,7 @@ class WebHookManager:
             # webhook is marked as not working as something
             # went wrong. We will mark it as working again
             # when we receive a valid notification.
-            event_manager.webhook_is_working = False
-            event_manager.pullpoint_manager.async_schedule_pull()
+            self._async_mark_webhook_as_failed()
             return
 
         if not event_manager.webhook_is_working:
