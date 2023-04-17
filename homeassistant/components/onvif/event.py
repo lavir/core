@@ -59,11 +59,6 @@ PULLPOINT_MESSAGE_LIMIT = 100
 PULLPOINT_COOLDOWN_TIME = 0.75
 
 
-def _get_next_termination_time() -> str:
-    """Get next termination time."""
-    return SUBSCRIPTION_RELATIVE_TIME
-
-
 def _stringify_onvif_error(error: Exception) -> str:
     """Stringify ONVIF error."""
     if isinstance(error, Fault):
@@ -366,7 +361,7 @@ class PullPointManager:
         """Create pullpoint subscription."""
 
         if not await self._device.create_pullpoint_subscription(
-            {"InitialTerminationTime": _get_next_termination_time()}
+            {"InitialTerminationTime": SUBSCRIPTION_RELATIVE_TIME}
         ):
             LOGGER.debug("%s: Failed to create PullPoint subscription", self._name)
             return False
@@ -433,7 +428,7 @@ class PullPointManager:
             # The first time we renew, we may get a Fault error so we
             # suppress it. The subscription will be restarted in
             # async_restart later.
-            await self._pullpoint_subscription.Renew(_get_next_termination_time())
+            await self._pullpoint_subscription.Renew(SUBSCRIPTION_RELATIVE_TIME)
             LOGGER.debug("%s: Renewed PullPoint subscription", self._name)
             return True
         except RENEW_ERRORS as err:
@@ -619,7 +614,7 @@ class WebHookManager:
         LOGGER.debug("%s: Creating webhook subscription", self._name)
         self._notification_manager = self._device.create_notification_manager(
             {
-                "InitialTerminationTime": _get_next_termination_time(),
+                "InitialTerminationTime": SUBSCRIPTION_RELATIVE_TIME,
                 "ConsumerReference": {"Address": self._webhook_url},
             }
         )
@@ -653,7 +648,7 @@ class WebHookManager:
         if not self._webhook_subscription:
             return False
         try:
-            await self._webhook_subscription.Renew(_get_next_termination_time())
+            await self._webhook_subscription.Renew(SUBSCRIPTION_RELATIVE_TIME)
             LOGGER.debug("%s: Renewed Webhook subscription", self._name)
             return True
         except RENEW_ERRORS as err:
