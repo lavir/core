@@ -336,7 +336,11 @@ class PullPointManager:
                 "Timeout": PULLPOINT_INIT_POLL_TIME,
             }
         ):
-            LOGGER.debug("%s: Initial PullMessages: %s", self._name, response)
+            LOGGER.debug(
+                "%s: Initial PullMessages: %s event(s)",
+                self._name,
+                len(response.NotificationMessage),
+            )
             # Parse event initialization
             await self._event_manager.async_parse_messages(response.NotificationMessage)
             self._event_manager.async_callback_listeners()
