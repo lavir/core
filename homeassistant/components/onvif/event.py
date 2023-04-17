@@ -9,7 +9,7 @@ import datetime as dt
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
 from onvif import ONVIFCamera, ONVIFService
-from onvif.client import NotificationProcessor
+from onvif.client import NotificationManager
 from onvif.exceptions import ONVIFError
 from zeep.exceptions import Fault, XMLParseError
 
@@ -570,7 +570,7 @@ class WebHookManager:
         self._name = event_manager.name
 
         self._webhook_subscription: ONVIFService | None = None
-        self._webhook_processor: NotificationProcessor | None = None
+        self._notification_manager: NotificationManager | None = None
 
         self._base_url: str | None = None
         self._webhook_url: str | None = None
@@ -617,20 +617,14 @@ class WebHookManager:
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
         LOGGER.debug("%s: Creating webhook subscription", self._name)
-        subscription = self._device.create_notification_subscription(
+        self._notification_manager = self._device.create_notification_manager(
             {
                 "InitialTerminationTime": _get_next_termination_time(),
                 "ConsumerReference": {"Address": self._webhook_url},
             }
         )
-        # Set the processor right away because the webhook can start
-        # receiving events before before the the the start method is
-        # finished and we need to be able to process events right away.
-        self._webhook_processor = subscription.processor
-        await self._webhook_processor.start()
-        # Only set the subscription after the processor has started
-        # so we do not try to renew a subscription that is not started
-        self._webhook_subscription = subscription.service
+        self._webhook_subscription = await self._notification_manager.setup()
+        await self._notification_manager.start()
         LOGGER.debug("%s: Webhook subscription created", self._name)
 
     async def _async_start_webhook(self) -> bool:
@@ -752,10 +746,12 @@ class WebHookManager:
             # when we receive a valid notification.
             event_manager.async_webhook_failed()
             return
-        if not self._webhook_processor:
-            LOGGER.debug("%s: Received webhook before processor setup", self._name)
+        if not self._notification_manager:
+            LOGGER.debug(
+                "%s: Received webhook before notification manager is setup", self._name
+            )
             return
-        if not (result := self._webhook_processor.process(content)):
+        if not (result := self._notification_manager.process(content)):
             LOGGER.debug("%s: Failed to process webhook %s", self._name, webhook_id)
             return
         LOGGER.debug(
