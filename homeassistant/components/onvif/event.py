@@ -756,7 +756,6 @@ class WebHookManager:
         self, hass: HomeAssistant, webhook_id: str, request: Request
     ) -> None:
         """Handle incoming webhook."""
-
         content: bytes | None = None
         try:
             content = await request.read()
