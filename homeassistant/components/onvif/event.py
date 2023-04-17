@@ -557,6 +557,9 @@ class PullPointManager:
             return
 
         async with self._pull_lock:
+            # Before we pop out of the lock we always need to schedule the next pull
+            # or call async_schedule_pullpoint_renew if the pull fails so the pull
+            # loop continues.
             if self._hass.state == CoreState.running:
                 if not await self._async_pull_messages_with_lock():
                     self.async_schedule_pullpoint_renew(0.0)
