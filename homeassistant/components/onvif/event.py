@@ -759,7 +759,6 @@ class WebHookManager:
             event_manager.async_webhook_failed()
             return
 
-        event_manager.async_webhook_working()
         assert self._webhook_pullpoint_service is not None
         assert self._webhook_pullpoint_service.transport is not None
         try:
@@ -785,6 +784,7 @@ class WebHookManager:
             webhook_id,
             len(result.NotificationMessage),
         )
+        event_manager.async_webhook_working()
         await event_manager.async_parse_messages(result.NotificationMessage)
         event_manager.async_callback_listeners()
 
