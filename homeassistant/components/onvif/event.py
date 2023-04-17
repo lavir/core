@@ -633,6 +633,9 @@ class WebHookManager:
 
     async def _async_renew_webhook(self) -> bool:
         """Renew webhook subscription."""
+        if not self._webhook_subscription:
+            # Subscription may have already been unsubscribed
+            return False
         try:
             await self._webhook_subscription.Renew(_get_next_termination_time())
             LOGGER.debug("%s: Webhook subscription renewed", self._name)
