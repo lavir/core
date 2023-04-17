@@ -34,9 +34,10 @@ from .parsers import PARSERS
 UNHANDLED_TOPICS: set[str] = set()
 
 SUBSCRIPTION_ERRORS = (Fault, asyncio.TimeoutError, TransportError)
+CREATE_ERRORS = (ONVIFError, Fault, RequestError, XMLParseError)
 SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
 UNSUBSCRIBE_ERRORS = (XMLParseError, *SUBSCRIPTION_ERRORS)
-
+RENEW_ERRORS = (ONVIFError, RequestError, XMLParseError, *SUBSCRIPTION_ERRORS)
 #
 # We only keep the subscription alive for 3 minutes, and will keep
 # renewing it every 1.5 minutes. This is to avoid the camera to
@@ -247,7 +248,7 @@ class PullPointManager:
         """Start pullpoint subscription."""
         try:
             started = await self._async_create_pullpoint_subscription()
-        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+        except CREATE_ERRORS as err:
             LOGGER.debug(
                 "%s: Device does not support PullPoint service or has too many subscriptions: %s",
                 self._name,
@@ -407,7 +408,7 @@ class PullPointManager:
             await self._pullpoint_subscription.Renew(_get_next_termination_time())
             LOGGER.debug("%s: Renewed ONVIF PullPoint subscription", self._name)
             return True
-        except SUBSCRIPTION_ERRORS as err:
+        except RENEW_ERRORS as err:
             LOGGER.debug(
                 "%s: Failed to renew ONVIF PullPoint subscription; %s",
                 self._name,
@@ -580,7 +581,7 @@ class WebHookManager:
         """Start webhook."""
         try:
             await self._async_create_webhook_subscription()
-        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+        except CREATE_ERRORS as err:
             # Do not unregister the webhook because if its still
             # subscribed to events, it will still receive them.
             LOGGER.debug(
@@ -604,7 +605,7 @@ class WebHookManager:
             await self._webhook_subscription.Renew(_get_next_termination_time())
             LOGGER.debug("%s: Webhook subscription renewed", self._name)
             return True
-        except (ONVIFError, Fault, RequestError, XMLParseError) as err:
+        except RENEW_ERRORS as err:
             LOGGER.debug(
                 "%s: Failed to renew webhook subscription %s",
                 self._name,
