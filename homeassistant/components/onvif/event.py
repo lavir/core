@@ -523,11 +523,12 @@ class PullPointManager:
             # subscription is no longer valid.
             return False
 
-        if event_manager.webhook_is_working:
+        if self.state != PullPointManagerState.STARTED:
             # If the webhook became started working during the long poll,
-            # our data is stale and we should not process it.
+            # and we got paused, our data is stale and we should not process it.
             LOGGER.debug(
-                "%s: Webhook is working, skipping PullPoint messages", self._name
+                "%s: PullPoint is paused (likely due to working webhook), skipping PullPoint messages",
+                self._name,
             )
             return True
 
