@@ -627,7 +627,7 @@ class WebHookManager:
         # receiving events before before the the the start method is
         # finished and we need to be able to process events right away.
         self._webhook_processor = subscription.processor
-        await subscription.processor.start()
+        await self._webhook_processor.start()
         # Only set the subscription after the processor has started
         # so we do not try to renew a subscription that is not started
         self._webhook_subscription = subscription.service
