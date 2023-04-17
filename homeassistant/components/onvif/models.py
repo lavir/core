@@ -87,6 +87,7 @@ class PullPointManagerState(Enum):
     STOPPED = 0  # Not running or not supported
     STARTED = 1  # Running and renewing
     PAUSED = 2  # Switched to webhook, but can resume
+    FAILED = 3  # Failed to do initial subscription
 
 
 class WebHookManagerState(Enum):
@@ -94,3 +95,4 @@ class WebHookManagerState(Enum):
 
     STOPPED = 0
     STARTED = 1
+    FAILED = 2  # Failed to do initial subscription

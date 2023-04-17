@@ -44,12 +44,11 @@ async def async_setup_entry(
         nonlocal uids_by_platform
         if not (missing := uids_by_platform.difference(entities)):
             return
-        new_entities: list[ONVIFSensor] = []
-        for uid in missing:
-            entities[uid] = ONVIFSensor(uid, device)
-            new_entities.append(entities[uid])
+        new_entities: dict[str, ONVIFSensor] = {
+            uid: ONVIFSensor(uid, device) for uid in missing
+        }
         if new_entities:
-            async_add_entities(new_entities)
+            async_add_entities(new_entities.values())
 
     device.events.async_add_listener(async_check_entities)
 

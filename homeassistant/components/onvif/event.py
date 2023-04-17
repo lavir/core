@@ -260,6 +260,7 @@ class PullPointManager:
         ), "PullPoint manager already started"
         LOGGER.debug("%s: Starting PullPoint manager", self._name)
         if not await self._async_start_pullpoint():
+            self.state = PullPointManagerState.FAILED
             return False
         self.state = PullPointManagerState.STARTED
         return True
@@ -593,6 +594,7 @@ class WebHookManager:
         assert self._webhook_url is None, "Webhook already registered"
         self._async_register_webhook()
         if not await self._async_start_webhook():
+            self.state = WebHookManagerState.FAILED
             return False
         self.state = WebHookManagerState.STARTED
         return True
