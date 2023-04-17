@@ -248,12 +248,10 @@ class PullPointManager:
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_pullpoint,
             f"{self._name}: renew or restart pullpoint",
-            cancel_on_shutdown=True,
         )
         self._pull_messages_job = HassJob(
             self._async_background_pull_messages,
             f"{self._name}: pull messages",
-            cancel_on_shutdown=True,
         )
 
     async def async_start(self) -> bool:
@@ -594,7 +592,6 @@ class WebHookManager:
         self._renew_or_restart_job = HassJob(
             self._async_renew_or_restart_webhook,
             f"{self._name}: renew or restart webhook",
-            cancel_on_shutdown=True,
         )
 
     async def async_start(self) -> bool:
