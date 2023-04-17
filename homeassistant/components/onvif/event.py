@@ -361,7 +361,7 @@ class PullPointManager:
         await self._async_unsubscribe_pullpoint()
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
-            LOGGER.debug("Restarted ONVIF PullPoint subscription for '%s'", self._name)
+            LOGGER.debug("%s: Restarted ONVIF PullPoint subscription", self._name)
             self.async_schedule_pull()
         return restarted
 
@@ -375,7 +375,7 @@ class PullPointManager:
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
-                    "Failed to unsubscribe ONVIF PullPoint subscription for '%s';"
+                    "%s: Failed to unsubscribe ONVIF PullPoint subscription;"
                     " This is normal if the device restarted: %s"
                 ),
                 self._name,
@@ -392,11 +392,11 @@ class PullPointManager:
             # suppress it. The subscription will be restarted in
             # async_restart later.
             await self._pullpoint_subscription.Renew(_get_next_termination_time())
-            LOGGER.debug("Renewed ONVIF PullPoint subscription for '%s'", self._name)
+            LOGGER.debug("%s: Renewed ONVIF PullPoint subscription", self._name)
             return True
         except SUBSCRIPTION_ERRORS as err:
             LOGGER.debug(
-                "Failed to renew ONVIF PullPoint subscription for '%s'; %s",
+                "%s: Failed to renew ONVIF PullPoint subscription; %s",
                 self._name,
                 _stringify_onvif_error(err),
             )
@@ -636,7 +636,9 @@ class WebHookManager:
     @callback
     def _async_unregister_webhook(self):
         """Unregister the webhook for motion events."""
-        LOGGER.debug("Unregistering webhook %s", self._webhook_unique_id)
+        LOGGER.debug(
+            "%s: Unregistering webhook %s", self._name, self._webhook_unique_id
+        )
         webhook.async_unregister(self._hass, self._webhook_unique_id)
         self._webhook_url = None
 
@@ -720,7 +722,7 @@ class WebHookManager:
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
-                    "Failed to unsubscribe ONVIF webhook subscription for '%s';"
+                    "%s: Failed to unsubscribe ONVIF webhook subscription;"
                     " This is normal if the device restarted: %s"
                 ),
                 self._name,
