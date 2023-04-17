@@ -585,8 +585,7 @@ class WebHookManager:
         try:
             await self._async_create_webhook_subscription()
         except CREATE_ERRORS as err:
-            # Do not unregister the webhook because if its still
-            # subscribed to events, it will still receive them.
+            self._event_manager.webhook_is_working = False
             LOGGER.debug(
                 "%s: Device does not support notification service or too many subscriptions: %s",
                 self._name,
