@@ -405,7 +405,6 @@ class PullPointManager:
         """Unsubscribe the pullpoint subscription."""
         if not self._pullpoint_subscription:
             return
-        # Suppressed. The subscription may no longer exist.
         LOGGER.debug("%s: Unsubscribing from PullPoint", self._name)
         try:
             await self._pullpoint_subscription.Unsubscribe()
