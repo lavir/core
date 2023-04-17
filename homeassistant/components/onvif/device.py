@@ -269,10 +269,6 @@ class ONVIFDevice:
             media_capabilities = await media_service.GetServiceCapabilities()
             snapshot = media_capabilities and media_capabilities.SnapshotUri
 
-        pullpoint = False
-        with suppress(ONVIFError, Fault, RequestError, XMLParseError):
-            pullpoint = await self.events.async_start()
-
         ptz = False
         with suppress(ONVIFError, Fault, RequestError):
             self.device.get_definition("ptz")
@@ -283,7 +279,11 @@ class ONVIFDevice:
             self.device.create_imaging_service()
             imaging = True
 
-        return Capabilities(snapshot, pullpoint, ptz, imaging)
+        events = False
+        with suppress(ONVIFError, Fault, RequestError, XMLParseError):
+            events = await self.events.async_start()
+
+        return Capabilities(snapshot, events, ptz, imaging)
 
     async def async_get_profiles(self) -> list[Profile]:
         """Obtain media profiles for this device."""
