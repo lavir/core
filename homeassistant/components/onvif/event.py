@@ -404,9 +404,6 @@ class PullPointManager:
             event_manager.async_callback_listeners()
 
         if event_manager.has_listeners:
-            # There must not be any awaits after this point to
-            # ensure that that the next pull is scheduled if
-            # we did not pull because of a lock.
             self.async_schedule_pull_messages()
 
         return True
@@ -549,16 +546,23 @@ class PullPointManager:
         """Pull messages from device."""
         self._cancel_pull_messages = None
         event_manager = self._event_manager
-        if self._hass.state == CoreState.running and not self._pull_lock.locked():
+
+        if self._pull_lock.locked():
             # Pull messages if the lock is not already locked
             # any pull will do, so we don't need to wait for the lock
-            async with self._pull_lock:
+            LOGGER.debug(
+                "%s: PullPoint subscription is already locked, skipping pull",
+                self._name,
+            )
+            return
+
+        async with self._pull_lock:
+            if self._hass.state == CoreState.running:
                 if not await self._async_pull_messages_with_lock():
                     self.async_schedule_pullpoint_renew(0.0)
                     return
-
-        if event_manager.has_listeners:
-            self.async_schedule_pull_messages()
+            if event_manager.has_listeners:
+                self.async_schedule_pull_messages()
 
 
 class WebHookManager:
