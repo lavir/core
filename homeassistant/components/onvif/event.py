@@ -9,10 +9,9 @@ import datetime as dt
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
 from onvif import ONVIFCamera, ONVIFService
-from onvif.client import _DEFAULT_SETTINGS
+from onvif.client import NotificationProcessor
 from onvif.exceptions import ONVIFError
-from zeep.exceptions import Fault, XMLParseError, XMLSyntaxError
-from zeep.loader import parse_xml
+from zeep.exceptions import Fault, XMLParseError
 
 from homeassistant.components import webhook
 from homeassistant.config_entries import ConfigEntry
@@ -570,12 +569,11 @@ class WebHookManager:
         self._webhook_unique_id = f"{DOMAIN}_{event_manager.config_entry.entry_id}"
         self._name = event_manager.name
 
-        self._webhook_subscription: ONVIFService = None
-        self._webhook_pullpoint_service: ONVIFService = None
+        self._webhook_subscription: ONVIFService | None = None
+        self._webhook_processor: NotificationProcessor | None = None
 
         self._base_url: str | None = None
         self._webhook_url: str | None = None
-        self._notify_service: ONVIFService | None = None
 
         self._cancel_webhook_renew: CALLBACK_TYPE | None = None
 
@@ -618,34 +616,14 @@ class WebHookManager:
 
     async def _async_create_webhook_subscription(self) -> None:
         """Create webhook subscription."""
-        self._notify_service = self._device.create_notification_service()
-        notify_subscribe = await self._notify_service.Subscribe(
+        subscription = await self._device.create_notification_subscription(
             {
                 "InitialTerminationTime": _get_next_termination_time(),
                 "ConsumerReference": {"Address": self._webhook_url},
             }
         )
-        # pylint: disable=protected-access
-        self._device.xaddrs[
-            "http://www.onvif.org/ver10/events/wsdl/NotificationConsumer"
-        ] = notify_subscribe.SubscriptionReference.Address._value_1
-
-        # Create subscription manager
-        self._webhook_subscription = self._device.create_subscription_service(
-            "NotificationConsumer"
-        )
-        self._webhook_pullpoint_service = self._device.create_onvif_service(
-            "pullpoint", port_type="NotificationConsumer"
-        )
-
-        # 5.2.3 BASIC NOTIFICATION INTERFACE - NOTIFY
-        # Call SetSynchronizationPoint to generate a notification message
-        # to ensure the webhooks are working.
-        try:
-            await self._webhook_pullpoint_service.SetSynchronizationPoint()
-        except SET_SYNCHRONIZATION_POINT_ERRORS:
-            LOGGER.debug("%s: SetSynchronizationPoint failed", self._name)
-
+        self._webhook_subscription = subscription.service
+        self._webhook_processor = subscription.processor
         LOGGER.debug("%s: Webhook subscription created", self._name)
 
     async def _async_start_webhook(self) -> bool:
@@ -767,26 +745,10 @@ class WebHookManager:
             # when we receive a valid notification.
             event_manager.async_webhook_failed()
             return
-
-        assert self._webhook_pullpoint_service is not None
-        assert self._webhook_pullpoint_service.transport is not None
-        try:
-            doc = parse_xml(
-                content,  # type: ignore[arg-type]
-                self._webhook_pullpoint_service.transport,
-                settings=_DEFAULT_SETTINGS,
-            )
-        except XMLSyntaxError as exc:
-            LOGGER.error("Received invalid XML: %s", exc)
+        assert self._webhook_processor is not None, "Webhook is not setup"
+        if not (result := self._webhook_processor.process(content)):
+            LOGGER.debug("%s: Failed to process webhook %s", self._name, webhook_id)
             return
-
-        async_operation_proxy = self._webhook_pullpoint_service.ws_client.PullMessages
-        op_name = async_operation_proxy._op_name  # pylint: disable=protected-access
-        binding = (
-            async_operation_proxy._proxy._binding  # pylint: disable=protected-access
-        )
-        operation = binding.get(op_name)
-        result = operation.process_reply(doc)
         LOGGER.debug(
             "%s: Processed webhook %s with %s event(s)",
             self._name,
