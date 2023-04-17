@@ -416,11 +416,15 @@ class PullPointManager:
             )
         return False
 
-    async def _async_pull_messages_or_try_to_restart(self) -> None:
-        """Pull messages from device or try to restart the subscription.
+    async def _async_pull_messages_with_lock(self) -> bool:
+        """Pull messages from device while holding the lock.
 
         This function must not be called directly, it should only
-        be called from _async_pull_messages
+        be called from _async_pull_messages.
+
+        Returns True if the subscription is working.
+
+        Returns False if the subscription is not working and should be restarted.
         """
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
@@ -439,7 +443,7 @@ class PullPointManager:
             )
         except RemoteProtocolError:
             # Likely a shutdown event, nothing to see here
-            return
+            return False
         except (XMLParseError, *SUBSCRIPTION_ERRORS) as err:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
@@ -455,9 +459,7 @@ class PullPointManager:
             # Treat errors as if the camera restarted. Assume that the pullpoint
             # subscription is no longer valid.
             event_manager.webhook_is_working = False
-            self._async_cancel_pullpoint_renew()
-            await self._async_renew_or_restart_pullpoint()
-            return
+            return False
 
         if event_manager.webhook_is_working:
             # If the webhook became started working, our data is stale and we need to
@@ -465,21 +467,26 @@ class PullPointManager:
             LOGGER.debug(
                 "%s: Webhook is working, not processing PullPoint messages", self._name
             )
-            return
+            return True
 
         # Parse response
         await event_manager.async_parse_messages(response.NotificationMessage)
         event_manager.async_callback_listeners()
+        return True
 
     async def _async_pull_messages(self, _now: dt.datetime | None = None) -> None:
         """Pull messages from device."""
         self._cancel_pull_messages = None
+        subscription_working = True
         if self._hass.state == CoreState.running and not self._pull_lock.locked():
             # Pull messages if the lock is not already locked
             # any pull will do, so we don't need to wait for the lock
             async with self._pull_lock:
-                await self._async_pull_messages_or_try_to_restart()
-        if (
+                subscription_working = await self._async_pull_messages_with_lock()
+
+        if not subscription_working:
+            self._async_schedule_pullpoint_renew(0.0)
+        elif (
             self._event_manager.has_listeners
             and not self._event_manager.webhook_is_working
         ):
