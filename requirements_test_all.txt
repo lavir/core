@@ -76,7 +76,7 @@ adext==0.4.2
 adguardhome==0.6.1
 
 # homeassistant.components.advantage_air
-advantage_air==0.4.2
+advantage_air==0.4.4
 
 # homeassistant.components.frontier_silicon
 afsapi==0.2.7
@@ -1593,6 +1593,9 @@ radios==0.1.1
 
 # homeassistant.components.radiotherm
 radiotherm==2.1.0
+
+# homeassistant.components.rapt_ble
+rapt-ble==0.1.0
 
 # homeassistant.components.rainmachine
 regenmaschine==2022.11.0
