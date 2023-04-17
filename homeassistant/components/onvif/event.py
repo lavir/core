@@ -291,7 +291,7 @@ class PullPointManager:
             self._cancel_pull_messages = None
 
     @callback
-    def async_schedule_pull_messages(self) -> None:
+    def async_schedule_pull_messages(self, delay: float | None = None) -> None:
         """Schedule async_pull_messages to run.
 
         Used as fallback when webhook is not working.
@@ -302,8 +302,9 @@ class PullPointManager:
         if self.state != PullPointManagerState.STARTED:
             return
         if self._pullpoint_service:
+            when = delay if delay is not None else PULLPOINT_COOLDOWN_TIME
             self._cancel_pull_messages = async_call_later(
-                self._hass, PULLPOINT_COOLDOWN_TIME, self._pull_messages_job
+                self._hass, when, self._pull_messages_job
             )
 
     async def async_stop(self) -> None:
@@ -379,7 +380,7 @@ class PullPointManager:
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
 
         # Always schedule an initial pull messages
-        self.async_schedule_pull_messages()
+        self.async_schedule_pull_messages(0.0)
 
         return True
 
@@ -397,7 +398,7 @@ class PullPointManager:
         restarted = await self._async_start_pullpoint()
         if restarted and self._event_manager.has_listeners:
             LOGGER.debug("%s: Restarted PullPoint subscription", self._name)
-            self.async_schedule_pull_messages()
+            self.async_schedule_pull_messages(0.0)
         return restarted
 
     async def _async_unsubscribe_pullpoint(self) -> None:
