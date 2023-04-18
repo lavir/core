@@ -238,7 +238,7 @@ async def _async_events_consumer(
             events.append(stream_queue.get_nowait())
 
         if logbook_events := event_processor.humanify(
-            async_event_to_row(e) for e in events
+            tuple(async_event_to_row(e) for e in events)
         ):
             connection.send_message(
                 JSON_DUMP(

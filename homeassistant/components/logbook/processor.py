@@ -5,9 +5,8 @@ from collections.abc import Callable, Generator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime as dt
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy.engine import Result
 from sqlalchemy.engine.row import Row
 
 from homeassistant.components.recorder import get_instance
@@ -19,7 +18,10 @@ from homeassistant.components.recorder.models import (
     process_datetime_to_timestamp,
     process_timestamp_to_utc_isoformat,
 )
-from homeassistant.components.recorder.util import session_scope
+from homeassistant.components.recorder.util import (
+    execute_stmt_lambda_element,
+    session_scope,
+)
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.const import (
     ATTR_DOMAIN,
@@ -134,24 +136,6 @@ class EventProcessor:
     ) -> list[dict[str, Any]]:
         """Get events for a period of time."""
 
-        def yield_rows(result: Result) -> Sequence[Row] | Result:
-            """Yield rows from the database."""
-            # end_day - start_day intentionally checks .days and not .total_seconds()
-            # since we don't want to switch over to buffered if they go
-            # over one day by a few hours since the UI makes it so easy to do that.
-            if self.limited_select or (end_day - start_day).days <= 1:
-                return result.all()
-            # Only buffer rows to reduce memory pressure
-            # if we expect the result set is going to be very large.
-            # What is considered very large is going to differ
-            # based on the hardware Home Assistant is running on.
-            #
-            # sqlalchemy suggests that is at least 10k, but for
-            # even and RPi3 that number seems higher in testing
-            # so we don't switch over until we request > 1 day+ of data.
-            #
-            return result.yield_per(1024)
-
         with session_scope(hass=self.hass, read_only=True) as session:
             metadata_ids: list[int] | None = None
             instance = get_instance(self.hass)
@@ -176,10 +160,11 @@ class EventProcessor:
                 self.filters,
                 self.context_id,
             )
-            return self.humanify(yield_rows(session.execute(stmt)))
+            rows = cast(Sequence[Row], execute_stmt_lambda_element(session, stmt))
+            return self.humanify(rows)
 
     def humanify(
-        self, rows: Generator[EventAsRow, None, None] | Sequence[Row] | Result
+        self, rows: Sequence[EventAsRow] | Sequence[Row]
     ) -> list[dict[str, str]]:
         """Humanify rows."""
         return list(
@@ -193,7 +178,7 @@ class EventProcessor:
 
 
 def _humanify(
-    rows: Generator[EventAsRow, None, None] | Sequence[Row] | Result,
+    rows: Sequence[EventAsRow] | Sequence[Row],
     ent_reg: er.EntityRegistry,
     logbook_run: LogbookRun,
     context_augmenter: ContextAugmenter,
