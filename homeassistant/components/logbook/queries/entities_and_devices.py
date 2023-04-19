@@ -65,7 +65,7 @@ def _apply_entities_devices_context_union(
     json_quoted_entity_ids: list[str],
     json_quoted_device_ids: list[str],
 ) -> CompoundSelect:
-    devices_entities_cte = _select_entities_device_id_context_ids_sub_query(
+    devices_entities_subquery = _select_entities_device_id_context_ids_sub_query(
         start_day,
         end_day,
         event_type_ids,
@@ -84,12 +84,12 @@ def _apply_entities_devices_context_union(
             select_events_context_only()
             .outerjoin(EventTypes, (Events.event_type_id == EventTypes.event_type_id))
             .outerjoin(EventData, (Events.data_id == EventData.data_id))
-            .where(Events.context_id_bin.in_(devices_entities_cte))
+            .where(Events.context_id_bin.in_(devices_entities_subquery))
         ),
         apply_states_context_hints(
             select_states_context_only()
             .outerjoin(StatesMeta, (States.metadata_id == StatesMeta.metadata_id))
-            .where(States.context_id_bin.in_(devices_entities_cte))
+            .where(States.context_id_bin.in_(devices_entities_subquery))
         ),
     )
 
