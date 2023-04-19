@@ -50,24 +50,28 @@ def _apply_devices_context_union(
     event_type_ids: tuple[int, ...],
     json_quotable_device_ids: list[str],
 ) -> CompoundSelect:
-    """Generate a query to find the device context ids and a query to find linked row."""
-    devices_subquery = _select_device_id_context_ids_sub_query(
-        start_day,
-        end_day,
-        event_type_ids,
-        json_quotable_device_ids,
+    """Generate a CTE to find the device context ids and a query to find linked row."""
+    devices_cte = (
+        _select_device_id_context_ids_sub_query(
+            start_day,
+            end_day,
+            event_type_ids,
+            json_quotable_device_ids,
+        )
+        .cte()
+        .select()
     )
     return sel.union_all(
         apply_events_context_hints(
             select_events_context_only()
             .outerjoin(EventTypes, (Events.event_type_id == EventTypes.event_type_id))
             .outerjoin(EventData, (Events.data_id == EventData.data_id))
-            .where(Events.context_id_bin.in_(devices_subquery))
+            .where(Events.context_id_bin.in_(devices_cte))
         ),
         apply_states_context_hints(
             select_states_context_only()
             .outerjoin(StatesMeta, (States.metadata_id == StatesMeta.metadata_id))
-            .where(States.context_id_bin.in_(devices_subquery))
+            .where(States.context_id_bin.in_(devices_cte))
         ),
     )
 
