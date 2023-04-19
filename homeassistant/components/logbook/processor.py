@@ -5,7 +5,6 @@ from collections.abc import Callable, Generator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime as dt
-import logging
 from typing import Any
 
 from sqlalchemy.engine import Result
@@ -34,8 +33,6 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, split_entity_id
 from homeassistant.helpers import entity_registry as er
 import homeassistant.util.dt as dt_util
-
-_LOGGER = logging.getLogger(__name__)
 
 from .const import (
     ATTR_MESSAGE,
@@ -178,13 +175,6 @@ class EventProcessor:
                 self.device_ids,
                 self.filters,
                 self.context_id,
-            )
-            _LOGGER.warning(
-                "Actual statement: %s",
-                stmt.compile(
-                    dialect=instance.engine.dialect,
-                    compile_kwargs={"literal_binds": True},
-                ),
             )
             return self.humanify(yield_rows(session.execute(stmt)))
 
