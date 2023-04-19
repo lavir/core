@@ -7,7 +7,7 @@ import sqlalchemy
 from sqlalchemy import lambda_stmt, select, union_all
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.lambdas import StatementLambdaElement
-from sqlalchemy.sql.selectable import CompoundSelect, Select
+from sqlalchemy.sql.selectable import CTE, CompoundSelect, Select
 
 from homeassistant.components.recorder.db_schema import (
     ENTITY_ID_IN_EVENT,
@@ -62,17 +62,13 @@ def _apply_entities_context_union(
     json_quoted_entity_ids: list[str],
 ) -> CompoundSelect:
     """Generate a CTE to find the entity and device context ids and a query to find linked row."""
-    entities_cte = (
-        _select_entities_context_ids_sub_query(
-            start_day,
-            end_day,
-            event_type_ids,
-            states_metadata_ids,
-            json_quoted_entity_ids,
-        )
-        .cte()
-        .select()
-    )
+    entities_cte: CTE = _select_entities_context_ids_sub_query(
+        start_day,
+        end_day,
+        event_type_ids,
+        states_metadata_ids,
+        json_quoted_entity_ids,
+    ).cte()
     # We used to optimize this to exclude rows we already in the union with
     # a StatesMeta.metadata_ids.not_in(states_metadata_ids) but that made the
     # query much slower on MySQL, and since we already filter them away
@@ -82,14 +78,16 @@ def _apply_entities_context_union(
         states_select_for_entity_ids(start_day, end_day, states_metadata_ids),
         apply_events_context_hints(
             select_events_context_only()
+            .select_from(entities_cte)
+            .outerjoin(Events, entities_cte.c.context_id_bin == Events.context_id_bin)
             .outerjoin(EventTypes, (Events.event_type_id == EventTypes.event_type_id))
             .outerjoin(EventData, (Events.data_id == EventData.data_id))
-            .where(Events.context_id_bin.in_(entities_cte))
         ),
         apply_states_context_hints(
             select_states_context_only()
+            .select_from(entities_cte)
+            .outerjoin(States, entities_cte.c.context_id_bin == States.context_id_bin)
             .outerjoin(StatesMeta, (States.metadata_id == StatesMeta.metadata_id))
-            .where(States.context_id_bin.in_(entities_cte))
         ),
     )
 
