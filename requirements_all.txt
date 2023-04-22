@@ -223,7 +223,7 @@ aionanoleaf==0.2.1
 aionotify==0.2.0
 
 # homeassistant.components.notion
-aionotion==3.0.2
+aionotion==2023.04.2
 
 # homeassistant.components.oncue
 aiooncue==0.3.4
@@ -1371,7 +1371,7 @@ plexauth==0.0.6
 plexwebsocket==0.0.13
 
 # homeassistant.components.plugwise
-plugwise==0.27.5
+plugwise==0.31.0
 
 # homeassistant.components.plum_lightpad
 plumlightpad==0.0.11
@@ -2239,7 +2239,7 @@ regenmaschine==2022.11.0
 renault-api==0.1.13
 
 # homeassistant.components.reolink
-reolink-aio==0.5.10
+reolink-aio==0.5.13
 
 # homeassistant.components.python_script
 restrictedpython==6.0
