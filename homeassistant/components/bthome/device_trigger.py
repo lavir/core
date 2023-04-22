@@ -1,7 +1,7 @@
 """Provides device triggers for BTHome BLE."""
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Any
 
 import voluptuous as vol
 
@@ -22,14 +22,13 @@ from homeassistant.helpers.typing import ConfigType
 from .const import (
     BTHOME_BLE_EVENT,
     CONF_DISCOVERED_EVENT_CLASSES,
+    CONF_SUBTYPE,
     DOMAIN,
     EVENT_CLASS,
     EVENT_CLASS_BUTTON,
     EVENT_CLASS_DIMMER,
     EVENT_TYPE,
 )
-
-CONF_SUBTYPE: Final = "subtype"
 
 TRIGGERS_BY_EVENT_CLASS = {
     EVENT_CLASS_BUTTON: {
@@ -77,18 +76,17 @@ async def async_get_triggers(
 ) -> list[dict[str, Any]]:
     """Return a list of triggers for BTHome BLE devices."""
     device_registry = dr.async_get(hass)
-    if not (device := device_registry.async_get(device_id)):
-        return []
+    device = device_registry.async_get(device_id)
+    assert device is not None
     config_entries = [
         hass.config_entries.async_get_entry(entry_id)
         for entry_id in device.config_entries
     ]
-    if not (
-        bthome_config_entries := [
-            entry for entry in config_entries if entry and entry.domain == DOMAIN
-        ]
-    ):
-        return []
+    bthome_config_entry = next(
+        iter(entry for entry in config_entries if entry and entry.domain == DOMAIN),
+        None,
+    )
+    assert bthome_config_entry is not None
     return [
         {
             # Required fields of TRIGGER_BASE_SCHEMA
@@ -99,7 +97,7 @@ async def async_get_triggers(
             CONF_TYPE: event_class,
             CONF_SUBTYPE: event_type,
         }
-        for event_class in bthome_config_entries[0].data.get(
+        for event_class in bthome_config_entry.data.get(
             CONF_DISCOVERED_EVENT_CLASSES, []
         )
         for event_type in TRIGGERS_BY_EVENT_CLASS.get(event_class, [])
