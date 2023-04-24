@@ -506,7 +506,7 @@ elgato==4.0.1
 elkm1-lib==2.2.1
 
 # homeassistant.components.elmax
-elmax_api==0.0.2
+elmax_api==0.0.4
 
 # homeassistant.components.emulated_roku
 emulated_roku==0.2.1
@@ -567,7 +567,7 @@ fnv-hash-fast==0.3.1
 foobot_async==1.0.0
 
 # homeassistant.components.forecast_solar
-forecast_solar==2.2.0
+forecast_solar==3.0.0
 
 # homeassistant.components.freebox
 freebox-api==1.1.0
