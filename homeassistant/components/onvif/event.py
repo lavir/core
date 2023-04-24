@@ -34,7 +34,6 @@ from .util import stringify_onvif_error
 # entities for them.
 UNHANDLED_TOPICS: set[str] = {"tns1:MediaControl/VideoEncoderConfiguration"}
 
-
 SUBSCRIPTION_ERRORS = (Fault, asyncio.TimeoutError, TransportError)
 CREATE_ERRORS = (ONVIFError, Fault, RequestError, XMLParseError)
 SET_SYNCHRONIZATION_POINT_ERRORS = (*SUBSCRIPTION_ERRORS, TypeError)
@@ -161,7 +160,7 @@ class EventManager:
             #
             # Our parser expects the topic to be
             # tns1:RuleEngine/CellMotionDetector/Motion
-            topic = msg.Topic._value_1.rstrip(".").rstrip("/")
+            topic = msg.Topic._value_1.rstrip("/.")
 
             if not (parser := PARSERS.get(topic)):
                 if topic not in UNHANDLED_TOPICS:
