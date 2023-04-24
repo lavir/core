@@ -176,7 +176,24 @@ class ActivityStream(AugustSubscriberMixin):
                 lastest_activity
                 and lastest_activity.activity_start_time >= activity.activity_start_time
             ):
+                _LOGGER.warning(
+                    "%s: Rejecting: %s because it is older than %s (%s >= %s)",
+                    device_id,
+                    activity,
+                    lastest_activity,
+                    lastest_activity.activity_start_time,
+                    activity.activity_start_time,
+                )
                 continue
+
+            _LOGGER.warning(
+                "%s: Accepting: %s because it is newer than %s (%s < %s)",
+                device_id,
+                activity,
+                lastest_activity,
+                lastest_activity.activity_start_time,
+                activity.activity_start_time,
+            )
 
             device_activities[activity_type] = activity
 
