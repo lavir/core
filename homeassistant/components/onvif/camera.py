@@ -133,10 +133,7 @@ class ONVIFCameraEntity(ONVIFBaseEntity, Camera):
 
     async def stream_source(self):
         """Return the stream source."""
-        uri = await self._async_get_stream_uri()
-        if extra_args := self.device.config_entry.options.get(CONF_EXTRA_ARGUMENTS):
-            return f"{extra_args} {uri}"
-        return uri
+        return await self._async_get_stream_uri()
 
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
