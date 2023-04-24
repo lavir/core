@@ -181,7 +181,7 @@ class ActivityStream(AugustSubscriberMixin):
                     device_id,
                     activity,
                     lastest_activity,
-                    lastest_activity.activity_start_time,
+                    lastest_activity and lastest_activity.activity_start_time,
                     activity.activity_start_time,
                 )
                 continue
@@ -191,7 +191,7 @@ class ActivityStream(AugustSubscriberMixin):
                 device_id,
                 activity,
                 lastest_activity,
-                lastest_activity.activity_start_time,
+                lastest_activity and lastest_activity.activity_start_time,
                 activity.activity_start_time,
             )
 
