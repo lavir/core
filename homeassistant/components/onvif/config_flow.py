@@ -85,6 +85,7 @@ class OnvifFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a ONVIF config flow."""
 
     VERSION = 1
+    _reauth_entry: config_entries.ConfigEntry
 
     @staticmethod
     @callback
@@ -99,7 +100,6 @@ class OnvifFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         self.device_id = None
         self.devices = []
         self.onvif_config = {}
-        self._reauth_entry: config_entries.ConfigEntry | None = None
 
     async def async_step_user(self, user_input=None):
         """Handle user flow."""
@@ -115,16 +115,17 @@ class OnvifFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
         """Handle re-authentication of an existing config entry."""
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
+        reauth_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
         )
+        assert reauth_entry is not None
+        self._reauth_entry = reauth_entry
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Confirm reauth."""
-        assert self._reauth_entry is not None
         entry = self._reauth_entry
         errors: dict[str, str] | None = {}
         description_placeholders: dict[str, str] | None = None
