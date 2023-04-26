@@ -1555,9 +1555,7 @@ def _statistics_during_period_with_session(
     stmt = _generate_statistics_during_period_stmt(
         start_time, end_time, metadata_ids, table, types
     )
-    stats = cast(
-        Sequence[Row], execute_stmt_lambda_element(session, stmt, orm_rows=False)
-    )
+    stats = cast(Sequence[Row], execute_stmt_lambda_element(session, stmt))
 
     if not stats:
         return {}
@@ -1666,9 +1664,7 @@ def _get_last_statistics(
             stmt = _get_last_statistics_stmt(metadata_id, number_of_stats)
         else:
             stmt = _get_last_statistics_short_term_stmt(metadata_id, number_of_stats)
-        stats = cast(
-            Sequence[Row], execute_stmt_lambda_element(session, stmt, orm_rows=False)
-        )
+        stats = cast(Sequence[Row], execute_stmt_lambda_element(session, stmt))
 
         if not stats:
             return {}
@@ -1759,9 +1755,7 @@ def get_latest_short_term_statistics(
             if statistic_id in metadata
         ]
         stmt = _latest_short_term_statistics_stmt(metadata_ids)
-        stats = cast(
-            Sequence[Row], execute_stmt_lambda_element(session, stmt, orm_rows=False)
-        )
+        stats = cast(Sequence[Row], execute_stmt_lambda_element(session, stmt))
         if not stats:
             return {}
 
