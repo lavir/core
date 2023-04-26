@@ -857,13 +857,13 @@ def _reduce_statistics(
                 }
                 if _want_mean:
                     row["mean"] = mean(mean_values) if mean_values else None
-                    mean_values.clear()
+                    mean_values = []
                 if _want_min:
                     row["min"] = min(min_values) if min_values else None
-                    min_values.clear()
+                    min_values = []
                 if _want_max:
                     row["max"] = max(max_values) if max_values else None
-                    max_values.clear()
+                    max_values = []
                 if _want_last_reset:
                     row["last_reset"] = prev_stat.get("last_reset")
                 if _want_state:
