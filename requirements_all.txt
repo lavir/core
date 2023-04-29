@@ -431,7 +431,7 @@ beautifulsoup4==4.11.1
 bellows==0.35.2
 
 # homeassistant.components.bmw_connected_drive
-bimmer_connected==0.13.0
+bimmer_connected==0.13.2
 
 # homeassistant.components.bizkaibus
 bizkaibus==0.1.1
@@ -2149,7 +2149,7 @@ pytrafikverket==0.2.3
 pyudev==0.23.2
 
 # homeassistant.components.unifiprotect
-pyunifiprotect==4.8.2
+pyunifiprotect==4.8.3
 
 # homeassistant.components.uptimerobot
 pyuptimerobot==22.2.0
