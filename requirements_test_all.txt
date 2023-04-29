@@ -781,7 +781,7 @@ konnected==1.2.0
 krakenex==2.1.0
 
 # homeassistant.components.lacrosse_view
-lacrosse-view==0.0.9
+lacrosse-view==1.0.1
 
 # homeassistant.components.laundrify
 laundrify_aio==1.1.2
@@ -1013,7 +1013,7 @@ plexauth==0.0.6
 plexwebsocket==0.0.13
 
 # homeassistant.components.plugwise
-plugwise==0.31.0
+plugwise==0.31.1
 
 # homeassistant.components.plum_lightpad
 plumlightpad==0.0.11
