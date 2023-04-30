@@ -113,14 +113,13 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
             self._detail.set_online(True)
 
         if lock_activity and lock_activity_without_operator:
-            transient_states = (LockStatus.UNLOCKING, LockStatus.LOCKING)
             if (
                 lock_activity.activity_start_time
-                >= lock_activity_without_operator.activity_start_time
+                > lock_activity_without_operator.activity_start_time
                 or lock_activity.activity_start_time
                 == lock_activity_without_operator.activity_start_time
                 and ACTIVITY_ACTION_STATES.get(lock_activity.action)
-                not in transient_states
+                not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
             ):
                 update_lock_detail_from_activity(self._detail, lock_activity)
             else:
