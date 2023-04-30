@@ -110,22 +110,9 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
             {ActivityType.LOCK_OPERATION_WITHOUT_OPERATOR},
         )
 
-        latest_activity = lock_activity_without_operator
-        if (
-            not lock_activity_without_operator
-            or (lock_activity and lock_activity_without_operator)
-            and (
-                lock_activity.activity_start_time
-                > lock_activity_without_operator.activity_start_time
-                or lock_activity.activity_start_time
-                == lock_activity_without_operator.activity_start_time
-                and ACTIVITY_ACTION_STATES.get(lock_activity.action)
-                not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
-            )
+        if latest_activity := _get_latest_activity(
+            lock_activity_without_operator, lock_activity
         ):
-            latest_activity = lock_activity
-
-        if latest_activity:
             if latest_activity.source == SOURCE_PUBNUB:
                 # If the source is pubnub the lock must be online since its a live update
                 self._detail.set_online(True)
@@ -167,6 +154,25 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
             self._attr_changed_by = last_state.attributes[ATTR_CHANGED_BY]
 
 
+# If we get a lock operation activity with the same time stamp as a moving
+# activity we want to use the non-moving activity since its the completed state.
+MOVING_STATES = (LockStatus.UNLOCKING, LockStatus.LOCKING)
+
+
+def _get_latest_activity(activity1, activity2):
+    if (
+        not activity1
+        or (activity1 and activity2)
+        and (
+            activity2.activity_start_time > activity1.activity_start_time
+            or activity1.activity_start_time == activity2.activity_start_time
+            and ACTIVITY_ACTION_STATES.get(activity2.action) not in MOVING_STATES
+        )
+    ):
+        return activity2
+    return activity1
+
+
 def update_lock_detail_from_activity(lock_detail, activity):
     """Update the LockDetail from an activity."""
     activity_end_time_utc = as_utc_from_local(activity.activity_end_time)
@@ -176,6 +182,8 @@ def update_lock_detail_from_activity(lock_detail, activity):
         if (
             lock_detail.lock_status_datetime
             and lock_detail.lock_status_datetime > activity_end_time_utc
+            or lock_detail.lock_status_datetime == activity_end_time_utc
+            and lock_detail.lock_status not in MOVING_STATES
         ):
             return False
         lock_detail.lock_status = ACTIVITY_ACTION_STATES[activity.action]
@@ -183,7 +191,7 @@ def update_lock_detail_from_activity(lock_detail, activity):
     elif isinstance(activity, DoorOperationActivity):
         if (
             lock_detail.door_state_datetime
-            and lock_detail.door_state_datetime > activity_end_time_utc
+            and lock_detail.door_state_datetime >= activity_end_time_utc
         ):
             return False
         lock_detail.door_state = ACTIVITY_ACTION_STATES[activity.action]

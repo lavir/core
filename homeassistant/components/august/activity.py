@@ -181,12 +181,7 @@ class ActivityStream(AugustSubscriberMixin):
 
             # Ignore activities that are older than the latest one unless it is a non
             # locking or unlocking activity with the exact same start time.
-            if latest_activity and (
-                latest_activity.activity_start_time > activity.activity_start_time
-                or latest_activity.activity_start_time == activity.activity_start_time
-                and ACTIVITY_ACTION_STATES.get(latest_activity.action)
-                not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
-            ):
+            if _get_latest_activity(activity, latest_activity) != activity:
                 continue
 
             _LOGGER.warning(
@@ -199,3 +194,18 @@ class ActivityStream(AugustSubscriberMixin):
             updated_device_ids.add(device_id)
 
         return updated_device_ids
+
+
+def _get_latest_activity(activity1, activity2):
+    if (
+        not activity1
+        or (activity1 and activity2)
+        and (
+            activity2.activity_start_time > activity1.activity_start_time
+            or activity1.activity_start_time == activity2.activity_start_time
+            and ACTIVITY_ACTION_STATES.get(activity2.action)
+            not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
+        )
+    ):
+        return activity2
+    return activity1
