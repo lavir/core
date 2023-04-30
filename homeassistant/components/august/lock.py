@@ -106,8 +106,7 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
         latest_activity = lock_activity_without_operator
         if (
             not lock_activity_without_operator
-            or lock_activity
-            and lock_activity_without_operator
+            or (lock_activity and lock_activity_without_operator)
             and (
                 lock_activity.activity_start_time
                 > lock_activity_without_operator.activity_start_time
