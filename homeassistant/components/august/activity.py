@@ -171,7 +171,8 @@ class ActivityStream(AugustSubscriberMixin):
             device_activities = self._latest_activities.setdefault(device_id, {})
             latest_activity = device_activities.get(activity_type)
             _LOGGER.warning(
-                "Processing activity: %s - lastest_activity: %s",
+                "Processing device_id: %s activity: %s - lastest_activity: %s",
+                activity.device_id,
                 activity,
                 latest_activity,
             )
