@@ -181,9 +181,8 @@ class ActivityStream(AugustSubscriberMixin):
 
             # Ignore activities that are older than the latest one unless it is a non
             # locking or unlocking activity with the exact same start time.
-            if (
-                latest_activity
-                and latest_activity.activity_start_time > activity.activity_start_time
+            if latest_activity and (
+                latest_activity.activity_start_time > activity.activity_start_time
                 or latest_activity.activity_start_time == activity.activity_start_time
                 and ACTIVITY_ACTION_STATES.get(latest_activity.action)
                 not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
