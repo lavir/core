@@ -3,8 +3,7 @@ import asyncio
 import logging
 
 from aiohttp import ClientError
-from yalexs.activity import ACTIVITY_ACTION_STATES
-from yalexs.lock import LockStatus
+from yalexs.util import get_latest_activity
 
 from homeassistant.core import callback
 from homeassistant.helpers.debounce import Debouncer
@@ -171,41 +170,16 @@ class ActivityStream(AugustSubscriberMixin):
             device_id = activity.device_id
             activity_type = activity.activity_type
             device_activities = self._latest_activities.setdefault(device_id, {})
-            latest_activity = device_activities.get(activity_type)
-            _LOGGER.warning(
-                "Processing device_id: %s activity: %s - lastest_activity: %s",
-                activity.device_id,
-                activity,
-                latest_activity,
-            )
-
             # Ignore activities that are older than the latest one unless it is a non
             # locking or unlocking activity with the exact same start time.
-            if _get_latest_activity(activity, latest_activity) != activity:
+            if (
+                get_latest_activity(activity, device_activities.get(activity_type))
+                != activity
+            ):
                 continue
 
-            _LOGGER.warning(
-                "accepted new activity device_id: %s activity: %s",
-                activity.device_id,
-                activity,
-            )
             device_activities[activity_type] = activity
 
             updated_device_ids.add(device_id)
 
         return updated_device_ids
-
-
-def _get_latest_activity(activity1, activity2):
-    if (
-        not activity1
-        or (activity1 and activity2)
-        and (
-            activity2.activity_start_time > activity1.activity_start_time
-            or activity1.activity_start_time == activity2.activity_start_time
-            and ACTIVITY_ACTION_STATES.get(activity2.action)
-            not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
-        )
-    ):
-        return activity2
-    return activity1
