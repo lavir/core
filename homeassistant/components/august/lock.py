@@ -102,32 +102,28 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
         )
         if lock_activity:
             self._attr_changed_by = lock_activity.operated_by
-            # If the source is pubnub the lock must be online since its a live update
-            if lock_activity.source == SOURCE_PUBNUB:
-                self._detail.set_online(True)
-        if (
-            lock_activity_without_operator
-            and lock_activity_without_operator.source == SOURCE_PUBNUB
-        ):
-            # If the source is pubnub the lock must be online since its a live update
-            self._detail.set_online(True)
 
-        if lock_activity and lock_activity_without_operator:
-            if (
+        latest_activity = lock_activity_without_operator
+        if (
+            not lock_activity_without_operator
+            or lock_activity
+            and lock_activity_without_operator
+            and (
                 lock_activity.activity_start_time
                 > lock_activity_without_operator.activity_start_time
                 or lock_activity.activity_start_time
                 == lock_activity_without_operator.activity_start_time
                 and ACTIVITY_ACTION_STATES.get(lock_activity.action)
                 not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
-            ):
-                update_lock_detail_from_activity(self._detail, lock_activity)
-            else:
-                update_lock_detail_from_activity(
-                    self._detail, lock_activity_without_operator
-                )
-        elif activity := lock_activity or lock_activity_without_operator:
-            update_lock_detail_from_activity(self._detail, activity)
+            )
+        ):
+            latest_activity = lock_activity
+
+        if latest_activity:
+            if latest_activity.source == SOURCE_PUBNUB:
+                # If the source is pubnub the lock must be online since its a live update
+                self._detail.set_online(True)
+            update_lock_detail_from_activity(self._detail, latest_activity)
 
         bridge_activity = self._data.activity_stream.get_latest_device_activity(
             self._device_id, {ActivityType.BRIDGE_OPERATION}
