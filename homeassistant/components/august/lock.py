@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 from aiohttp import ClientResponseError
-from yalexs.activity import SOURCE_PUBNUB, ActivityType
+from yalexs.activity import ACTIVITY_ACTION_STATES, SOURCE_PUBNUB, ActivityType
 from yalexs.lock import LockStatus
 from yalexs.util import update_lock_detail_from_activity
 
@@ -90,17 +90,45 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
     @callback
     def _update_from_data(self):
         """Get the latest state of the sensor and update activity."""
-        lock_activity = self._data.activity_stream.get_latest_device_activity(
-            self._device_id,
-            {ActivityType.LOCK_OPERATION, ActivityType.LOCK_OPERATION_WITHOUT_OPERATOR},
+        activity_stream = self._data.activity_stream
+        device_id = self._device_id
+        lock_activity = activity_stream.get_latest_device_activity(
+            device_id,
+            {ActivityType.LOCK_OPERATION},
         )
-
-        if lock_activity is not None:
+        lock_activity_without_operator = activity_stream.get_latest_device_activity(
+            device_id,
+            {ActivityType.LOCK_OPERATION_WITHOUT_OPERATOR},
+        )
+        if lock_activity:
             self._attr_changed_by = lock_activity.operated_by
-            update_lock_detail_from_activity(self._detail, lock_activity)
             # If the source is pubnub the lock must be online since its a live update
             if lock_activity.source == SOURCE_PUBNUB:
                 self._detail.set_online(True)
+        if (
+            lock_activity_without_operator
+            and lock_activity_without_operator.source == SOURCE_PUBNUB
+        ):
+            # If the source is pubnub the lock must be online since its a live update
+            self._detail.set_online(True)
+
+        if lock_activity and lock_activity_without_operator:
+            transient_states = (LockStatus.UNLOCKING, LockStatus.LOCKING)
+            if (
+                lock_activity.activity_start_time
+                >= lock_activity_without_operator.activity_start_time
+                or lock_activity.activity_start_time
+                == lock_activity_without_operator.activity_start_time
+                and ACTIVITY_ACTION_STATES.get(lock_activity.action)
+                not in transient_states
+            ):
+                update_lock_detail_from_activity(self._detail, lock_activity)
+            else:
+                update_lock_detail_from_activity(
+                    self._detail, lock_activity_without_operator
+                )
+        elif activity := lock_activity or lock_activity_without_operator:
+            update_lock_detail_from_activity(self._detail, activity)
 
         bridge_activity = self._data.activity_stream.get_latest_device_activity(
             self._device_id, {ActivityType.BRIDGE_OPERATION}
