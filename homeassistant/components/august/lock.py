@@ -92,16 +92,16 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
         """Get the latest state of the sensor and update activity."""
         activity_stream = self._data.activity_stream
         device_id = self._device_id
-        lock_activity = activity_stream.get_latest_device_activity(
+        if lock_activity := activity_stream.get_latest_device_activity(
             device_id,
             {ActivityType.LOCK_OPERATION},
-        )
+        ):
+            self._attr_changed_by = lock_activity.operated_by
+
         lock_activity_without_operator = activity_stream.get_latest_device_activity(
             device_id,
             {ActivityType.LOCK_OPERATION_WITHOUT_OPERATOR},
         )
-        if lock_activity:
-            self._attr_changed_by = lock_activity.operated_by
 
         latest_activity = lock_activity_without_operator
         if (
