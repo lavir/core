@@ -186,7 +186,7 @@ class ActivityStream(AugustSubscriberMixin):
                 if (
                     lastest_activity_start_time > activity_start_time
                     or lastest_activity_start_time == activity_start_time
-                    and ACTIVITY_ACTION_STATES.get(lastest_activity_start_time.action)
+                    and ACTIVITY_ACTION_STATES.get(latest_activity.action)
                     not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
                 ):
                     continue
