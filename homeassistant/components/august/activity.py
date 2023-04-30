@@ -3,6 +3,8 @@ import asyncio
 import logging
 
 from aiohttp import ClientError
+from yalexs.activity import ACTIVITY_ACTION_STATES
+from yalexs.lock import LockStatus
 
 from homeassistant.core import callback
 from homeassistant.helpers.debounce import Debouncer
@@ -178,11 +180,16 @@ class ActivityStream(AugustSubscriberMixin):
             )
 
             # Ignore activities that are older than the latest one
-            if (
-                latest_activity
-                and latest_activity.activity_start_time > activity.activity_start_time
-            ):
-                continue
+            if latest_activity:
+                lastest_activity_start_time = latest_activity.activity_start_time
+                activity_start_time = activity.activity_start_time
+                if (
+                    lastest_activity_start_time > activity_start_time
+                    or lastest_activity_start_time == activity_start_time
+                    and ACTIVITY_ACTION_STATES.get(lastest_activity_start_time.action)
+                    not in (LockStatus.UNLOCKING, LockStatus.LOCKING)
+                ):
+                    continue
 
             _LOGGER.warning(
                 "accepted new activity device_id: %s activity: %s",
