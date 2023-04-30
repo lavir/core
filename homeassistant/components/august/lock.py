@@ -5,7 +5,14 @@ from typing import Any
 from aiohttp import ClientResponseError
 from yalexs.activity import ACTIVITY_ACTION_STATES, SOURCE_PUBNUB, ActivityType
 from yalexs.lock import LockStatus
-from yalexs.util import update_lock_detail_from_activity
+from yalexs.util import (
+    ACTION_BRIDGE_OFFLINE,
+    ACTION_BRIDGE_ONLINE,
+    BridgeOperationActivity,
+    DoorOperationActivity,
+    LockOperationActivity,
+    as_utc_from_local,
+)
 
 from homeassistant.components.lock import ATTR_CHANGED_BY, LockEntity
 from homeassistant.config_entries import ConfigEntry
@@ -158,3 +165,35 @@ class AugustLock(AugustEntityMixin, RestoreEntity, LockEntity):
 
         if ATTR_CHANGED_BY in last_state.attributes:
             self._attr_changed_by = last_state.attributes[ATTR_CHANGED_BY]
+
+
+def update_lock_detail_from_activity(lock_detail, activity):
+    """Update the LockDetail from an activity."""
+    activity_end_time_utc = as_utc_from_local(activity.activity_end_time)
+    if activity.device_id != lock_detail.device_id:
+        raise ValueError
+    if isinstance(activity, LockOperationActivity):
+        if (
+            lock_detail.lock_status_datetime
+            and lock_detail.lock_status_datetime > activity_end_time_utc
+        ):
+            return False
+        lock_detail.lock_status = ACTIVITY_ACTION_STATES[activity.action]
+        lock_detail.lock_status_datetime = activity_end_time_utc
+    elif isinstance(activity, DoorOperationActivity):
+        if (
+            lock_detail.door_state_datetime
+            and lock_detail.door_state_datetime > activity_end_time_utc
+        ):
+            return False
+        lock_detail.door_state = ACTIVITY_ACTION_STATES[activity.action]
+        lock_detail.door_state_datetime = activity_end_time_utc
+    elif isinstance(activity, BridgeOperationActivity):
+        if activity.action == ACTION_BRIDGE_ONLINE:
+            lock_detail.set_online(True)
+        elif activity.action == ACTION_BRIDGE_OFFLINE:
+            lock_detail.set_online(False)
+    else:
+        raise ValueError
+
+    return True
