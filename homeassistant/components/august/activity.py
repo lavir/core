@@ -174,7 +174,7 @@ class ActivityStream(AugustSubscriberMixin):
             # Ignore activities that are older than the latest one
             if (
                 lastest_activity
-                and lastest_activity.activity_start_time >= activity.activity_start_time
+                and lastest_activity.activity_start_time > activity.activity_start_time
             ):
                 continue
 
