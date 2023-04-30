@@ -184,6 +184,11 @@ class ActivityStream(AugustSubscriberMixin):
             ):
                 continue
 
+            _LOGGER.warning(
+                "accepted new activity device_id: %s activity: %s",
+                activity.device_id,
+                activity,
+            )
             device_activities[activity_type] = activity
 
             updated_device_ids.add(device_id)
