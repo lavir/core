@@ -416,9 +416,9 @@ async def async_parse_visitor_detector(uid: str, msg) -> Event | None:
 
         return Event(
             f"{uid}_{msg.Topic._value_1}_{video_source}",
-            "Pet Detection",
+            "Visitor Detection",
             "binary_sensor",
-            "motion",
+            None,
             None,
             msg.Message._value_1.Data.SimpleItem[0].Value == "true",
         )
