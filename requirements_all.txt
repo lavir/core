@@ -911,7 +911,7 @@ hole==0.8.0
 holidays==0.21.13
 
 # homeassistant.components.frontend
-home-assistant-frontend==20230428.0
+home-assistant-frontend==20230501.0
 
 # homeassistant.components.conversation
 home-assistant-intents==2023.4.26
@@ -2585,7 +2585,7 @@ venstarcolortouch==0.19
 vilfo-api-client==0.3.2
 
 # homeassistant.components.voip
-voip-utils==0.0.5
+voip-utils==0.0.6
 
 # homeassistant.components.volkszaehler
 volkszaehler==0.4.0
