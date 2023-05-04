@@ -75,14 +75,22 @@ class ESPHomeDashboard(DataUpdateCoordinator[dict[str, ConfiguredDevice]]):
         self.url = url
         self.api = ESPHomeDashboardAPI(url, session)
 
+    @property
+    def initialized(self) -> bool:
+        """Return whether the dashboard is initialized."""
+        return self.addon_slug is not None
+
     async def async_update_source(self, addon_slug: str, host: str, port: int) -> None:
         """Update the source."""
-        if self.addon_slug != addon_slug or self.url != self.api.url:
-            self.url = f"http://{host}:{port}"
-            self.addon_slug = addon_slug
-            self.update_interval = UPDATE_INTERVAL
-            self.api = ESPHomeDashboardAPI(self.url, self.api.session)
-            await self.async_request_refresh()
+        url = f"http://{host}:{port}"
+        if self.addon_slug == addon_slug and self.url == url:
+            # Nothing changed, don't update
+            return
+        self.url = url
+        self.addon_slug = addon_slug
+        self.update_interval = UPDATE_INTERVAL
+        self.api = ESPHomeDashboardAPI(self.url, self.api.session)
+        await self.async_request_refresh()
 
     @property
     def supports_update(self) -> bool:
