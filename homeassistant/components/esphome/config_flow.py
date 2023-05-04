@@ -367,9 +367,7 @@ class EsphomeFlowHandler(ConfigFlow, domain=DOMAIN):
         if self._device_name is None:
             return False
 
-        dashboard = async_get_dashboard(self.hass)
-
-        if not dashboard.initialized:
+        if (dashboard := async_get_dashboard(self.hass)) is None:
             return False
 
         await dashboard.async_request_refresh()
