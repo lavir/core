@@ -51,7 +51,7 @@ RENEW_ERRORS = (ONVIFError, RequestError, XMLParseError, *SUBSCRIPTION_ERRORS)
 #
 SUBSCRIPTION_TIME = dt.timedelta(minutes=10)
 SUBSCRIPTION_RELATIVE_TIME = (
-    "PT10M"  # use relative time since the time on the camera is not reliable
+    "PT600S"  # use relative time since the time on the camera is not reliable
 )
 SUBSCRIPTION_ATTEMPTS = 3
 SUBSCRIPTION_RENEW_INTERVAL = (
@@ -397,10 +397,6 @@ class PullPointManager:
         with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
             sync_result = await self._pullpoint_service.SetSynchronizationPoint()
             LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
-
-        # Immediately renew the subscription since some cameras will
-        # will ignore the InitialTerminationTime parameter.
-        await self._async_call_pullpoint_subscription_renew()
 
         # Always schedule an initial pull messages
         self.async_schedule_pull_messages(0.0)
