@@ -647,7 +647,7 @@ class WebHookManager:
             self._webhook_url,
         )
         try:
-            self._notification_manager = self._device.create_notification_manager(
+            self._notification_manager = await self._device.create_notification_manager(
                 self._webhook_url, SUBSCRIPTION_TIME
             )
         except ValidationError as err:
