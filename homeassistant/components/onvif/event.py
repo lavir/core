@@ -14,6 +14,7 @@ from onvif.client import (
     retry_connection_error,
 )
 from onvif.exceptions import ONVIFError
+from onvif.util import stringify_onvif_error
 from zeep.exceptions import Fault, ValidationError, XMLParseError
 
 from homeassistant.components import webhook
@@ -31,7 +32,6 @@ from homeassistant.helpers.network import NoURLAvailableError, get_url
 from .const import DOMAIN, LOGGER
 from .models import Event, PullPointManagerState, WebHookManagerState
 from .parsers import PARSERS
-from .util import stringify_onvif_error
 
 # Topics in this list are ignored because we do not want to create
 # entities for them.
