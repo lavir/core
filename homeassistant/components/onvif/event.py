@@ -609,13 +609,6 @@ class WebHookManager:
 
         self._notification_manager: NotificationManager | None = None
 
-        self._cancel_webhook_renew: CALLBACK_TYPE | None = None
-        self._renew_lock = asyncio.Lock()
-        self._renew_or_restart_job = HassJob(
-            self._async_renew_or_restart_webhook,
-            f"{self._name}: renew or restart webhook",
-        )
-
     async def async_start(self) -> bool:
         """Start polling events."""
         LOGGER.debug("%s: Starting webhook manager", self._name)
@@ -633,19 +626,8 @@ class WebHookManager:
     async def async_stop(self) -> None:
         """Unsubscribe from events."""
         self.state = WebHookManagerState.STOPPED
-        self._async_cancel_webhook_renew()
         await self._async_unsubscribe_webhook()
         self._async_unregister_webhook()
-
-    @callback
-    def _async_schedule_webhook_renew(self, delay: float) -> None:
-        """Schedule webhook subscription renewal."""
-        self._async_cancel_webhook_renew()
-        self._cancel_webhook_renew = async_call_later(
-            self._hass,
-            delay,
-            self._renew_or_restart_job,
-        )
 
     @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
     async def _async_create_webhook_subscription(self) -> None:
@@ -657,7 +639,9 @@ class WebHookManager:
         )
         try:
             self._notification_manager = await self._device.create_notification_manager(
-                self._webhook_url, SUBSCRIPTION_TIME
+                self._webhook_url,
+                SUBSCRIPTION_TIME,
+                self._event_manager.async_mark_events_stale,
             )
         except ValidationError as err:
             # This should only happen if there is a problem with the webhook URL
@@ -686,58 +670,7 @@ class WebHookManager:
                 stringify_onvif_error(err),
             )
             return False
-
-        self._async_schedule_webhook_renew(SUBSCRIPTION_RENEW_INTERVAL)
         return True
-
-    async def _async_restart_webhook(self) -> bool:
-        """Restart the webhook subscription assuming the camera rebooted."""
-        await self._async_unsubscribe_webhook()
-        return await self._async_start_webhook()
-
-    @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
-    async def _async_call_webhook_subscription_renew(self) -> None:
-        """Call PullPoint subscription Renew."""
-        assert self._notification_manager is not None
-        await self._notification_manager.renew()
-
-    async def _async_renew_webhook(self) -> bool:
-        """Renew webhook subscription."""
-        if not self._notification_manager or self._notification_manager.closed:
-            return False
-        try:
-            await self._async_call_webhook_subscription_renew()
-            LOGGER.debug("%s: Renewed Webhook subscription", self._name)
-            return True
-        except RENEW_ERRORS as err:
-            self._event_manager.async_mark_events_stale()
-            LOGGER.debug(
-                "%s: Failed to renew webhook subscription %s",
-                self._name,
-                stringify_onvif_error(err),
-            )
-        return False
-
-    async def _async_renew_or_restart_webhook(
-        self, now: dt.datetime | None = None
-    ) -> None:
-        """Renew or start webhook subscription."""
-        if self._hass.is_stopping or self.state != WebHookManagerState.STARTED:
-            return
-        if self._renew_lock.locked():
-            LOGGER.debug("%s: Webhook renew already in progress", self._name)
-            # Renew is already running, another one will be
-            # scheduled when the current one is done if needed.
-            return
-        async with self._renew_lock:
-            next_attempt = SUBSCRIPTION_RESTART_INTERVAL_ON_ERROR
-            try:
-                if await self._async_renew_webhook():
-                    next_attempt = SUBSCRIPTION_RENEW_INTERVAL
-                else:
-                    await self._async_restart_webhook()
-            finally:
-                self._async_schedule_webhook_renew(next_attempt)
 
     @callback
     def _async_register_webhook(self) -> None:
@@ -818,20 +751,13 @@ class WebHookManager:
         await event_manager.async_parse_messages(result.NotificationMessage)
         event_manager.async_callback_listeners()
 
-    @callback
-    def _async_cancel_webhook_renew(self) -> None:
-        """Cancel the webhook renew task."""
-        if self._cancel_webhook_renew:
-            self._cancel_webhook_renew()
-            self._cancel_webhook_renew = None
-
     async def _async_unsubscribe_webhook(self) -> None:
         """Unsubscribe from the webhook."""
         if not self._notification_manager or self._notification_manager.closed:
             return
         LOGGER.debug("%s: Unsubscribing from webhook", self._name)
         try:
-            await self._notification_manager.stop()
+            await self._notification_manager.shutdown()
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
