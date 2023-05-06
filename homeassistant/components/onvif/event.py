@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from contextlib import suppress
 import datetime as dt
 
 from aiohttp.web import Request
 from httpx import RemoteProtocolError, RequestError, TransportError
 from onvif import ONVIFCamera, ONVIFService
-from onvif.client import NotificationManager, retry_connection_error
+from onvif.client import (
+    NotificationManager,
+    PullPointManager as ONVIFPullPointManager,
+    retry_connection_error,
+)
 from onvif.exceptions import ONVIFError
 from zeep.exceptions import Fault, ValidationError, XMLParseError
 
@@ -50,11 +53,6 @@ RENEW_ERRORS = (ONVIFError, RequestError, XMLParseError, *SUBSCRIPTION_ERRORS)
 # the subscriptions expire or the camera is rebooted.
 #
 SUBSCRIPTION_TIME = dt.timedelta(minutes=10)
-
-# SUBSCRIPTION_RELATIVE_TIME uses a relative time since the time on the camera
-# is not reliable. We use 600 seconds (10 minutes) since some cameras cannot
-# parse time in the format "PT10M" (10 minutes).
-SUBSCRIPTION_RELATIVE_TIME = "PT600S"
 
 # SUBSCRIPTION_RENEW_INTERVAL Must be less than the
 # overall timeout of 90 * (SUBSCRIPTION_ATTEMPTS) 2 = 180 seconds
@@ -255,8 +253,8 @@ class PullPointManager:
         self._hass = event_manager.hass
         self._name = event_manager.name
 
-        self._pullpoint_subscription: ONVIFService = None
         self._pullpoint_service: ONVIFService = None
+        self._pullpoint_manager: ONVIFPullPointManager | None = None
         self._pull_lock: asyncio.Lock = asyncio.Lock()
 
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
@@ -390,29 +388,12 @@ class PullPointManager:
     @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
     async def _async_create_pullpoint_subscription(self) -> bool:
         """Create pullpoint subscription."""
-
-        if not await self._device.create_pullpoint_subscription(
-            {"InitialTerminationTime": SUBSCRIPTION_RELATIVE_TIME}
-        ):
-            LOGGER.debug("%s: Failed to create PullPoint subscription", self._name)
-            return False
-
-        # Create subscription manager
-        self._pullpoint_subscription = await self._device.create_subscription_service(
-            "PullPointSubscription"
+        self._pullpoint_manager = await self._device.create_pullpoint_manager(
+            SUBSCRIPTION_TIME
         )
-
-        # Create the service that will be used to pull messages from the device.
-        self._pullpoint_service = await self._device.create_pullpoint_service()
-
-        # Initialize events
-        with suppress(*SET_SYNCHRONIZATION_POINT_ERRORS):
-            sync_result = await self._pullpoint_service.SetSynchronizationPoint()
-            LOGGER.debug("%s: SetSynchronizationPoint: %s", self._name, sync_result)
-
+        self._pullpoint_service = self._pullpoint_manager.get_service()
         # Always schedule an initial pull messages
         self.async_schedule_pull_messages(0.0)
-
         return True
 
     @callback
@@ -434,14 +415,11 @@ class PullPointManager:
 
     async def _async_unsubscribe_pullpoint(self) -> None:
         """Unsubscribe the pullpoint subscription."""
-        if (
-            not self._pullpoint_subscription
-            or self._pullpoint_subscription.transport.client.is_closed
-        ):
+        if not self._pullpoint_manager or self._pullpoint_manager.closed:
             return
         LOGGER.debug("%s: Unsubscribing from PullPoint", self._name)
         try:
-            await self._pullpoint_subscription.Unsubscribe()
+            await self._pullpoint_manager.stop()
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
@@ -451,19 +429,17 @@ class PullPointManager:
                 self._name,
                 stringify_onvif_error(err),
             )
-        self._pullpoint_subscription = None
+        self._pullpoint_manager = None
 
     @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
     async def _async_call_pullpoint_subscription_renew(self) -> None:
         """Call PullPoint subscription Renew."""
-        await self._pullpoint_subscription.Renew(SUBSCRIPTION_RELATIVE_TIME)
+        assert self._pullpoint_manager is not None, "PullPoint manager does not exist"
+        await self._pullpoint_manager.renew()
 
     async def _async_renew_pullpoint(self) -> bool:
         """Renew the PullPoint subscription."""
-        if (
-            not self._pullpoint_subscription
-            or self._pullpoint_subscription.transport.client.is_closed
-        ):
+        if not self._pullpoint_manager or self._pullpoint_manager.closed:
             return False
         try:
             # The first time we renew, we may get a Fault error so we
@@ -622,7 +598,6 @@ class WebHookManager:
 
         self._webhook_url: str | None = None
 
-        self._webhook_subscription: ONVIFService | None = None
         self._notification_manager: NotificationManager | None = None
 
         self._cancel_webhook_renew: CALLBACK_TYPE | None = None
@@ -671,14 +646,10 @@ class WebHookManager:
             self._name,
             self._webhook_url,
         )
-        self._notification_manager = self._device.create_notification_manager(
-            {
-                "InitialTerminationTime": SUBSCRIPTION_RELATIVE_TIME,
-                "ConsumerReference": {"Address": self._webhook_url},
-            }
-        )
         try:
-            self._webhook_subscription = await self._notification_manager.setup()
+            self._notification_manager = self._device.create_notification_manager(
+                self._webhook_url, SUBSCRIPTION_TIME
+            )
         except ValidationError as err:
             # This should only happen if there is a problem with the webhook URL
             # that is causing it to not be well formed.
@@ -688,7 +659,6 @@ class WebHookManager:
                 err,
             )
             raise
-        await self._notification_manager.start()
         LOGGER.debug(
             "%s: Webhook subscription created with URL: %s",
             self._name,
@@ -719,15 +689,12 @@ class WebHookManager:
     @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
     async def _async_call_webhook_subscription_renew(self) -> None:
         """Call PullPoint subscription Renew."""
-        assert self._webhook_subscription is not None
-        await self._webhook_subscription.Renew(SUBSCRIPTION_RELATIVE_TIME)
+        assert self._notification_manager is not None
+        await self._notification_manager.renew()
 
     async def _async_renew_webhook(self) -> bool:
         """Renew webhook subscription."""
-        if (
-            not self._webhook_subscription
-            or self._webhook_subscription.transport.client.is_closed
-        ):
+        if not self._notification_manager or self._notification_manager.closed:
             return False
         try:
             await self._async_call_webhook_subscription_renew()
@@ -851,14 +818,11 @@ class WebHookManager:
 
     async def _async_unsubscribe_webhook(self) -> None:
         """Unsubscribe from the webhook."""
-        if (
-            not self._webhook_subscription
-            or self._webhook_subscription.transport.client.is_closed
-        ):
+        if not self._notification_manager or self._notification_manager.closed:
             return
         LOGGER.debug("%s: Unsubscribing from webhook", self._name)
         try:
-            await self._webhook_subscription.Unsubscribe()
+            await self._notification_manager.stop()
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
@@ -868,4 +832,4 @@ class WebHookManager:
                 self._name,
                 stringify_onvif_error(err),
             )
-        self._webhook_subscription = None
+        self._notification_manager = None
