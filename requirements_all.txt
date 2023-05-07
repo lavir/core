@@ -156,7 +156,7 @@ aioecowitt==2023.01.0
 aioemonitor==1.0.5
 
 # homeassistant.components.esphome
-aioesphomeapi==13.7.3
+aioesphomeapi==13.7.4
 
 # homeassistant.components.flo
 aioflo==2021.11.0
@@ -300,7 +300,7 @@ aiovlc==0.1.0
 aiowatttime==0.1.1
 
 # homeassistant.components.webostv
-aiowebostv==0.3.2
+aiowebostv==0.3.3
 
 # homeassistant.components.yandex_transport
 aioymaps==1.2.2
