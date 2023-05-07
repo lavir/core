@@ -358,31 +358,27 @@ class PullPointManager:
             )
         self._pullpoint_manager = None
 
-    async def _async_pull_messages_inner(self) -> bool:
-        """Pull messages from device while holding the lock.
-
-        This function must not be called directly, it should only
-        be called from _async_pull_messages.
-
-        Returns True if the subscription is working.
-
-        Returns False if the subscription is not working and should be restarted.
-        """
+    async def _async_pull_messages(self) -> None:
+        """Pull messages from device."""
+        if self._pullpoint_manager is None:
+            return
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
-        event_manager = self._event_manager
         LOGGER.debug(
             "%s: Pulling PullPoint messages timeout=%s limit=%s",
             self._name,
             PULLPOINT_POLL_TIME,
             PULLPOINT_MESSAGE_LIMIT,
         )
+        next_pull_delay = None
+        response = None
         try:
-            response = await self._pullpoint_service.PullMessages(
-                {
-                    "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
-                    "Timeout": PULLPOINT_POLL_TIME,
-                }
-            )
+            if self._hass.state == CoreState.running:
+                response = await self._pullpoint_service.PullMessages(
+                    {
+                        "MessageLimit": PULLPOINT_MESSAGE_LIMIT,
+                        "Timeout": PULLPOINT_POLL_TIME,
+                    }
+                )
         except RemoteProtocolError as err:
             # Either a shutdown event or the camera closed the connection. Because
             # http://datatracker.ietf.org/doc/html/rfc2616#section-8.1.4 allows the server
@@ -394,7 +390,6 @@ class PullPointManager:
                 self._name,
                 stringify_onvif_error(err),
             )
-            return True
         except Fault as err:
             # Device may not support subscriptions so log at debug level
             # when we get an XMLParseError
@@ -405,7 +400,7 @@ class PullPointManager:
             )
             # Treat errors as if the camera restarted. Assume that the pullpoint
             # subscription is no longer valid.
-            return False
+            self._pullpoint_manager.resume()
         except (XMLParseError, RequestError, TimeoutError, TransportError) as err:
             LOGGER.debug(
                 "%s: PullPoint subscription encountered an unexpected error and will be retried "
@@ -415,7 +410,9 @@ class PullPointManager:
             )
             # Avoid renewing the subscription too often since it causes problems
             # for some cameras, mainly the Tapo ones.
-            return True
+            next_pull_delay = SUBSCRIPTION_RESTART_INTERVAL_ON_ERROR
+        finally:
+            self._async_schedule_pull_if_listeners(next_pull_delay)
 
         if self.state != PullPointManagerState.STARTED:
             # If the webhook became started working during the long poll,
@@ -425,9 +422,12 @@ class PullPointManager:
                 self._name,
                 self.state,
             )
-            return True
+
+        if not response:
+            return
 
         # Parse response
+        event_manager = self._event_manager
         if (notification_message := response.NotificationMessage) and (
             number_of_events := len(notification_message)
         ):
@@ -440,8 +440,6 @@ class PullPointManager:
             event_manager.async_callback_listeners()
         else:
             LOGGER.debug("%s: continuous PullMessages: no events", self._name)
-
-        return True
 
     @callback
     def async_cancel_pull_messages(self) -> None:
@@ -468,10 +466,10 @@ class PullPointManager:
             )
 
     @callback
-    def _async_schedule_pull_if_listeners(self) -> None:
+    def _async_schedule_pull_if_listeners(self, delay: float | None = None) -> None:
         """Schedule async_pull_messages to run if there are listeners."""
         if self._event_manager.has_listeners:
-            self.async_schedule_pull_messages()
+            self.async_schedule_pull_messages(delay)
 
     @callback
     def _async_background_pull_messages_or_reschedule(
@@ -479,8 +477,6 @@ class PullPointManager:
     ) -> None:
         """Pull messages from device in the background."""
         if self._pull_messages_task and not self._pull_messages_task.done():
-            # Pull messages if the lock is not already locked
-            # any pull will do, so we don't need to wait for the lock
             LOGGER.debug(
                 "%s: PullPoint message pull is already in process, skipping pull",
                 self._name,
@@ -491,19 +487,6 @@ class PullPointManager:
             self._async_pull_messages(),
             f"{self._name} background pull messages",
         )
-
-    async def _async_pull_messages(self) -> None:
-        """Pull messages from device."""
-        # Before we pop out of the lock we always need to schedule the next pull
-        if self._pullpoint_manager is None:
-            return
-        try:
-            if self._hass.state == CoreState.running:
-                if not await self._async_pull_messages_inner():
-                    self._pullpoint_manager.resume()
-                    return
-        finally:
-            self._async_schedule_pull_if_listeners()
 
 
 class WebHookManager:
