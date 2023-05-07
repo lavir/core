@@ -264,20 +264,13 @@ class PullPointManager:
 
         self._pullpoint_service: ONVIFService = None
         self._pullpoint_manager: ONVIFPullPointManager | None = None
-        self._pull_lock: asyncio.Lock = asyncio.Lock()
 
         self._cancel_pull_messages: CALLBACK_TYPE | None = None
-        self._cancel_pullpoint_renew: CALLBACK_TYPE | None = None
-
-        self._renew_lock: asyncio.Lock = asyncio.Lock()
-        self._renew_or_restart_job = HassJob(
-            self._async_renew_or_restart_pullpoint,
-            f"{self._name}: renew or restart pullpoint",
-        )
         self._pull_messages_job = HassJob(
-            self._async_background_pull_messages,
+            self._async_background_pull_messages_or_reschedule,
             f"{self._name}: pull messages",
         )
+        self._pull_messages_task: asyncio.Task[None] | None = None
 
     async def async_start(self) -> bool:
         """Start pullpoint subscription."""
@@ -298,7 +291,8 @@ class PullPointManager:
         self.state = PullPointManagerState.PAUSED
         # Cancel the renew job so we don't renew the subscription
         # and stop pulling messages.
-        self._async_cancel_pullpoint_renew()
+        if self._pullpoint_manager:
+            self._pullpoint_manager.pause()
         self.async_cancel_pull_messages()
         # We do not unsubscribe from the pullpoint subscription and instead
         # let the subscription expire since some cameras will terminate all
@@ -309,41 +303,8 @@ class PullPointManager:
         """Resume pullpoint subscription."""
         LOGGER.debug("%s: Resuming PullPoint manager", self._name)
         self.state = PullPointManagerState.STARTED
-        self.async_schedule_pullpoint_renew(0.0)
-
-    @callback
-    def async_schedule_pullpoint_renew(self, delay: float) -> None:
-        """Schedule PullPoint subscription renewal."""
-        self._async_cancel_pullpoint_renew()
-        self._cancel_pullpoint_renew = async_call_later(
-            self._hass,
-            delay,
-            self._renew_or_restart_job,
-        )
-
-    @callback
-    def async_cancel_pull_messages(self) -> None:
-        """Cancel the PullPoint task."""
-        if self._cancel_pull_messages:
-            self._cancel_pull_messages()
-            self._cancel_pull_messages = None
-
-    @callback
-    def async_schedule_pull_messages(self, delay: float | None = None) -> None:
-        """Schedule async_pull_messages to run.
-
-        Used as fallback when webhook is not working.
-
-        Must not check if the webhook is working.
-        """
-        self.async_cancel_pull_messages()
-        if self.state != PullPointManagerState.STARTED:
-            return
-        if self._pullpoint_service:
-            when = delay if delay is not None else PULLPOINT_COOLDOWN_TIME
-            self._cancel_pull_messages = async_call_later(
-                self._hass, when, self._pull_messages_job
-            )
+        if self._pullpoint_manager:
+            self._pullpoint_manager.resume()
 
     async def async_stop(self) -> None:
         """Unsubscribe from PullPoint and cancel callbacks."""
@@ -361,66 +322,23 @@ class PullPointManager:
                 stringify_onvif_error(err),
             )
             return False
-
-        if started:
-            self.async_schedule_pullpoint_renew(SUBSCRIPTION_RENEW_INTERVAL)
-
         return started
 
     async def _async_cancel_and_unsubscribe(self) -> None:
         """Cancel and unsubscribe from PullPoint."""
-        self._async_cancel_pullpoint_renew()
         self.async_cancel_pull_messages()
+        if self._pull_messages_task:
+            self._pull_messages_task.cancel()
         await self._async_unsubscribe_pullpoint()
-
-    async def _async_renew_or_restart_pullpoint(
-        self, now: dt.datetime | None = None
-    ) -> None:
-        """Renew or start pullpoint subscription."""
-        if self._hass.is_stopping or self.state != PullPointManagerState.STARTED:
-            return
-        if self._renew_lock.locked():
-            LOGGER.debug("%s: PullPoint renew already in progress", self._name)
-            # Renew is already running, another one will be
-            # scheduled when the current one is done if needed.
-            return
-        async with self._renew_lock:
-            next_attempt = SUBSCRIPTION_RESTART_INTERVAL_ON_ERROR
-            try:
-                if await self._async_renew_pullpoint():
-                    next_attempt = SUBSCRIPTION_RENEW_INTERVAL
-                else:
-                    await self._async_restart_pullpoint()
-            finally:
-                self.async_schedule_pullpoint_renew(next_attempt)
 
     @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
     async def _async_create_pullpoint_subscription(self) -> bool:
         """Create pullpoint subscription."""
         self._pullpoint_manager = await self._device.create_pullpoint_manager(
-            SUBSCRIPTION_TIME
+            SUBSCRIPTION_TIME, self._event_manager.async_mark_events_stale
         )
         self._pullpoint_service = self._pullpoint_manager.get_service()
-        # Always schedule an initial pull messages
-        self.async_schedule_pull_messages(0.0)
         return True
-
-    @callback
-    def _async_cancel_pullpoint_renew(self) -> None:
-        """Cancel the pullpoint renew task."""
-        if self._cancel_pullpoint_renew:
-            self._cancel_pullpoint_renew()
-            self._cancel_pullpoint_renew = None
-
-    async def _async_restart_pullpoint(self) -> bool:
-        """Restart the subscription assuming the camera rebooted."""
-        self.async_cancel_pull_messages()
-        await self._async_unsubscribe_pullpoint()
-        restarted = await self._async_start_pullpoint()
-        if restarted and self._event_manager.has_listeners:
-            LOGGER.debug("%s: Restarted PullPoint subscription", self._name)
-            self.async_schedule_pull_messages(0.0)
-        return restarted
 
     async def _async_unsubscribe_pullpoint(self) -> None:
         """Unsubscribe the pullpoint subscription."""
@@ -428,7 +346,7 @@ class PullPointManager:
             return
         LOGGER.debug("%s: Unsubscribing from PullPoint", self._name)
         try:
-            await self._pullpoint_manager.stop()
+            await self._pullpoint_manager.shutdown()
         except UNSUBSCRIBE_ERRORS as err:
             LOGGER.debug(
                 (
@@ -440,33 +358,7 @@ class PullPointManager:
             )
         self._pullpoint_manager = None
 
-    @retry_connection_error(SUBSCRIPTION_ATTEMPTS)
-    async def _async_call_pullpoint_subscription_renew(self) -> None:
-        """Call PullPoint subscription Renew."""
-        assert self._pullpoint_manager is not None, "PullPoint manager does not exist"
-        await self._pullpoint_manager.renew()
-
-    async def _async_renew_pullpoint(self) -> bool:
-        """Renew the PullPoint subscription."""
-        if not self._pullpoint_manager or self._pullpoint_manager.closed:
-            return False
-        try:
-            # The first time we renew, we may get a Fault error so we
-            # suppress it. The subscription will be restarted in
-            # async_restart later.
-            await self._async_call_pullpoint_subscription_renew()
-            LOGGER.debug("%s: Renewed PullPoint subscription", self._name)
-            return True
-        except RENEW_ERRORS as err:
-            self._event_manager.async_mark_events_stale()
-            LOGGER.debug(
-                "%s: Failed to renew PullPoint subscription; %s",
-                self._name,
-                stringify_onvif_error(err),
-            )
-        return False
-
-    async def _async_pull_messages_with_lock(self) -> bool:
+    async def _async_pull_messages_inner(self) -> bool:
         """Pull messages from device while holding the lock.
 
         This function must not be called directly, it should only
@@ -476,7 +368,6 @@ class PullPointManager:
 
         Returns False if the subscription is not working and should be restarted.
         """
-        assert self._pull_lock.locked(), "Pull lock must be held"
         assert self._pullpoint_service is not None, "PullPoint service does not exist"
         event_manager = self._event_manager
         LOGGER.debug(
@@ -530,8 +421,9 @@ class PullPointManager:
             # If the webhook became started working during the long poll,
             # and we got paused, our data is stale and we should not process it.
             LOGGER.debug(
-                "%s: PullPoint is paused (likely due to working webhook), skipping PullPoint messages",
+                "%s: PullPoint state is %s (likely due to working webhook), skipping PullPoint messages",
                 self._name,
+                self.state,
             )
             return True
 
@@ -552,39 +444,66 @@ class PullPointManager:
         return True
 
     @callback
-    def _async_background_pull_messages(self, _now: dt.datetime | None = None) -> None:
+    def async_cancel_pull_messages(self) -> None:
+        """Cancel the PullPoint task."""
+        if self._cancel_pull_messages:
+            self._cancel_pull_messages()
+            self._cancel_pull_messages = None
+
+    @callback
+    def async_schedule_pull_messages(self, delay: float | None = None) -> None:
+        """Schedule async_pull_messages to run.
+
+        Used as fallback when webhook is not working.
+
+        Must not check if the webhook is working.
+        """
+        self.async_cancel_pull_messages()
+        if self.state != PullPointManagerState.STARTED:
+            return
+        if self._pullpoint_service:
+            when = delay if delay is not None else PULLPOINT_COOLDOWN_TIME
+            self._cancel_pull_messages = async_call_later(
+                self._hass, when, self._pull_messages_job
+            )
+
+    @callback
+    def _async_schedule_pull_if_listeners(self) -> None:
+        """Schedule async_pull_messages to run if there are listeners."""
+        if self._event_manager.has_listeners:
+            self.async_schedule_pull_messages()
+
+    @callback
+    def _async_background_pull_messages_or_reschedule(
+        self, _now: dt.datetime | None = None
+    ) -> None:
         """Pull messages from device in the background."""
-        self._cancel_pull_messages = None
-        self._hass.async_create_background_task(
+        if self._pull_messages_task and not self._pull_messages_task.done():
+            # Pull messages if the lock is not already locked
+            # any pull will do, so we don't need to wait for the lock
+            LOGGER.debug(
+                "%s: PullPoint message pull is already in process, skipping pull",
+                self._name,
+            )
+            self._async_schedule_pull_if_listeners()
+            return
+        self._pull_messages_task = self._hass.async_create_background_task(
             self._async_pull_messages(),
             f"{self._name} background pull messages",
         )
 
     async def _async_pull_messages(self) -> None:
         """Pull messages from device."""
-        event_manager = self._event_manager
-
-        if self._pull_lock.locked():
-            # Pull messages if the lock is not already locked
-            # any pull will do, so we don't need to wait for the lock
-            LOGGER.debug(
-                "%s: PullPoint subscription is already locked, skipping pull",
-                self._name,
-            )
+        # Before we pop out of the lock we always need to schedule the next pull
+        if self._pullpoint_manager is None:
             return
-
-        async with self._pull_lock:
-            # Before we pop out of the lock we always need to schedule the next pull
-            # or call async_schedule_pullpoint_renew if the pull fails so the pull
-            # loop continues.
-            try:
-                if self._hass.state == CoreState.running:
-                    if not await self._async_pull_messages_with_lock():
-                        self.async_schedule_pullpoint_renew(0.0)
-                        return
-            finally:
-                if event_manager.has_listeners:
-                    self.async_schedule_pull_messages()
+        try:
+            if self._hass.state == CoreState.running:
+                if not await self._async_pull_messages_inner():
+                    self._pullpoint_manager.resume()
+                    return
+        finally:
+            self._async_schedule_pull_if_listeners()
 
 
 class WebHookManager:
