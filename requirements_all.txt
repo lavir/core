@@ -625,6 +625,9 @@ dweepy==0.3.0
 # homeassistant.components.dynalite
 dynalite_devices==0.1.47
 
+# homeassistant.components.dynalite
+dynalite_panel==0.0.4
+
 # homeassistant.components.rainforest_eagle
 eagle100==0.1.1
 
@@ -1020,6 +1023,9 @@ kegtron-ble==0.4.0
 
 # homeassistant.components.kiwi
 kiwiki-client==0.1.1
+
+# homeassistant.components.knx
+knx_frontend==2023.5.2.143855
 
 # homeassistant.components.konnected
 konnected==1.2.0
@@ -2662,6 +2668,9 @@ xiaomi-ble==0.17.0
 
 # homeassistant.components.knx
 xknx==2.9.0
+
+# homeassistant.components.knx
+xknxproject==3.1.0
 
 # homeassistant.components.bluesound
 # homeassistant.components.fritz
