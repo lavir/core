@@ -465,7 +465,7 @@ bluemaestro-ble==0.2.3
 bluetooth-adapters==0.15.3
 
 # homeassistant.components.bluetooth
-bluetooth-auto-recovery==1.1.2
+bluetooth-auto-recovery==1.2.0
 
 # homeassistant.components.bluetooth
 # homeassistant.components.esphome
@@ -686,7 +686,7 @@ epsonprinter==0.0.9
 esphome-dashboard-api==1.2.3
 
 # homeassistant.components.netgear_lte
-eternalegypt==0.0.15
+eternalegypt==0.0.16
 
 # homeassistant.components.eufylife_ble
 eufylife_ble_client==0.1.7

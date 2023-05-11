@@ -1,11 +1,13 @@
 """The profiler integration."""
 import asyncio
+from asyncio.sslproto import SSLProtocol
 from contextlib import suppress
 from datetime import timedelta
 from functools import _lru_cache_wrapper
 import json
 import logging
 import reprlib
+import ssl
 import sys
 import threading
 import time
@@ -38,6 +40,7 @@ SERVICE_DUMP_LOG_OBJECTS = "dump_log_objects"
 SERVICE_LRU_STATS = "lru_stats"
 SERVICE_LOG_THREAD_FRAMES = "log_thread_frames"
 SERVICE_LOG_EVENT_LOOP_SCHEDULED = "log_event_loop_scheduled"
+SERVICE_LOG_SSL = "log_ssl"
 
 _LRU_CACHE_WRAPPER_OBJECT = _lru_cache_wrapper.__name__
 _SQLALCHEMY_LRU_OBJECT = "LRUCache"
@@ -61,6 +64,7 @@ SERVICES = (
     SERVICE_LRU_STATS,
     SERVICE_LOG_THREAD_FRAMES,
     SERVICE_LOG_EVENT_LOOP_SCHEDULED,
+    SERVICE_LOG_SSL,
 )
 
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
@@ -270,6 +274,30 @@ async def async_setup_entry(  # noqa: C901
             arepr.maxstring = original_maxstring
             arepr.maxother = original_maxother
 
+    async def _async_dump_ssl(call: ServiceCall) -> None:
+        """Log all ssl objects in memory."""
+        # Imports deferred to avoid loading modules
+        # in memory since usually only one part of this
+        # integration is used at a time
+        import objgraph  # pylint: disable=import-outside-toplevel
+
+        for obj in objgraph.by_type("SSLObject"):
+            obj = cast(ssl.SSLObject, obj)
+            _LOGGER.critical(
+                "SSLObject %s server_hostname=%s peercert=%s",
+                obj,
+                obj.server_hostname,
+                obj.getpeercert(),
+            )
+
+        for obj in objgraph.by_type("SSLProtocol"):
+            obj = cast(SSLProtocol, obj)
+            _LOGGER.critical(
+                "SSLProtocol %s socket=%s",
+                obj,  # pylint: disable-next=protected-access
+                obj._transport.get_extra_info("socket"),
+            )
+
     async_register_admin_service(
         hass,
         DOMAIN,
@@ -362,6 +390,13 @@ async def async_setup_entry(  # noqa: C901
         DOMAIN,
         SERVICE_LOG_EVENT_LOOP_SCHEDULED,
         _async_dump_scheduled,
+    )
+
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_LOG_SSL,
+        _async_dump_ssl,
     )
 
     return True
