@@ -277,10 +277,13 @@ async def async_setup_entry(  # noqa: C901
 
         for obj in objgraph.by_type("SSLProtocol"):
             obj = cast(SSLProtocol, obj)
+            transport = None
+            if transport := obj._transport:  # pylint: disable=protected-access
+                sock = transport.get_extra_info("socket")
             _LOGGER.critical(
                 "SSLProtocol %s socket=%s",
-                obj,  # pylint: disable-next=protected-access
-                obj._transport.get_extra_info("socket"),
+                obj,
+                sock,
             )
 
     async_register_admin_service(
