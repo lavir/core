@@ -283,11 +283,15 @@ async def async_setup_entry(  # noqa: C901
 
         for obj in objgraph.by_type("SSLObject"):
             obj = cast(ssl.SSLObject, obj)
+            try:
+                cert = obj.getpeercert()
+            except ValueError as ex:
+                cert = str(ex)
             _LOGGER.critical(
                 "SSLObject %s server_hostname=%s peercert=%s",
                 obj,
                 obj.server_hostname,
-                obj.getpeercert(),
+                cert,
             )
 
         for obj in objgraph.by_type("SSLProtocol"):
