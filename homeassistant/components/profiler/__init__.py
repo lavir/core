@@ -311,11 +311,17 @@ async def async_setup_entry(  # noqa: C901
                 ssl_proto = obj.get_protocol()
             except AttributeError:
                 ssl_proto = None
-            sock = obj.get_extra_info("socket")
-            ssl_object = obj.get_extra_info("ssl_object")
+            try:
+                sock = obj.get_extra_info("socket")
+            except AttributeError:
+                sock = None
+            try:
+                ssl_object = obj.get_extra_info("ssl_object")
+            except AttributeError:
+                ssl_object = None
             try:
                 peercert = obj.get_extra_info("peercert")
-            except ValueError as ex:
+            except (AttributeError, ValueError) as ex:
                 peercert = str(ex)
             _LOGGER.critical(
                 "_SSLProtocolTransport %s ssl_proto=%s ssl_object=%s peercert=%s sock=%s",
