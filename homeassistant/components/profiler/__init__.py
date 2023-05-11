@@ -1,6 +1,6 @@
 """The profiler integration."""
 import asyncio
-from asyncio.sslproto import SSLProtocol
+from asyncio.sslproto import SSLProtocol, _SSLProtocolTransport
 from contextlib import suppress
 from datetime import timedelta
 from functools import _lru_cache_wrapper
@@ -283,6 +283,24 @@ async def async_setup_entry(  # noqa: C901
             _LOGGER.critical(
                 "SSLProtocol %s socket=%s",
                 obj,
+                sock,
+            )
+
+        for obj in objgraph.by_type("_SSLProtocolTransport"):
+            obj = cast(_SSLProtocolTransport, obj)
+            ssl_proto = obj.get_protocol()
+            sock = obj.get_extra_info("socket")
+            ssl_object = obj.get_extra_info("ssl_object")
+            try:
+                peercert = obj.get_extra_info("peercert")
+            except ValueError as ex:
+                peercert = str(ex)
+            _LOGGER.critical(
+                "_SSLProtocolTransport %s ssl_proto=%s ssl_object=%s peercert=%s sock=%s",
+                obj,
+                ssl_proto,
+                ssl_object,
+                peercert,
                 sock,
             )
 
