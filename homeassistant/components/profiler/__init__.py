@@ -307,7 +307,10 @@ async def async_setup_entry(  # noqa: C901
 
         for obj in objgraph.by_type("_SSLProtocolTransport"):
             obj = cast(_SSLProtocolTransport, obj)
-            ssl_proto = obj.get_protocol()
+            try:
+                ssl_proto = obj.get_protocol()
+            except AttributeError:
+                ssl_proto = None
             sock = obj.get_extra_info("socket")
             ssl_object = obj.get_extra_info("ssl_object")
             try:
