@@ -72,7 +72,7 @@ class WebSocketHandler:
         self.request = request
         self.wsock = web.WebSocketResponse(heartbeat=55)
         self._message_queue: deque = deque()
-        self._queue_ready: asyncio.Event = asyncio.Event()
+        self._ready_future: asyncio.Future[None] | None = None
         self._handle_task: asyncio.Task | None = None
         self._writer_task: asyncio.Task | None = None
         self._closing: bool = False
@@ -91,44 +91,47 @@ class WebSocketHandler:
         """Write outgoing messages."""
         # Exceptions if Socket disconnected or cancelled by connection handler
         message_queue = self._message_queue
-        queue_ready = self._queue_ready
         logger = self._logger
-        wsock = self.wsock
+        send_str = self.wsock.send_str
+        loop = self.hass.loop
+        debug = logger.debug
         try:
             with suppress(RuntimeError, ConnectionResetError, *CANCELLATION_ERRORS):
                 while not self.wsock.closed:
-                    await queue_ready.wait()
+                    if (messages_remaining := len(message_queue)) == 0:
+                        self._ready_future = loop.create_future()
+                        await self._ready_future
+                        messages_remaining = len(message_queue)
+
                     if (process := message_queue.popleft()) is None:
                         return
 
+                    messages_remaining -= 1
                     message = process if isinstance(process, str) else process()
-                    no_remaining_messages = len(message_queue) == 0
 
                     if (
-                        no_remaining_messages
+                        not messages_remaining
                         or not self.connection
                         or not self.connection.can_coalesce
                     ):
-                        if no_remaining_messages:
-                            queue_ready.clear()
-                        logger.debug("Sending %s", message)
-                        await wsock.send_str(message)
+                        debug("Sending %s", message)
+                        await send_str(message)
                         continue
 
                     messages: list[str] = [message]
-                    while len(message_queue):
+                    while messages_remaining:
                         if (process := message_queue.popleft()) is None:
                             return
                         messages.append(
                             process if isinstance(process, str) else process()
                         )
+                        messages_remaining -= 1
 
-                    queue_ready.clear()
                     coalesced_messages = "[" + ",".join(messages) + "]"
-                    logger.debug("Sending %s", coalesced_messages)
-                    await wsock.send_str(coalesced_messages)
+                    debug("Sending %s", coalesced_messages)
+                    await send_str(coalesced_messages)
         finally:
-            # Clean up the peaker checker when we shut down the writer
+            # Clean up the peak checker when we shut down the writer
             self._cancel_peak_checker()
 
     @callback
@@ -168,9 +171,11 @@ class WebSocketHandler:
                 message,
             )
             self._cancel()
+            return
 
         message_queue.append(message)
-        self._queue_ready.set()
+        if self._ready_future and not self._ready_future.done():
+            self._ready_future.set_result(None)
 
         peak_checker_active = self._peak_checker_unsub is not None
 
@@ -208,6 +213,7 @@ class WebSocketHandler:
     def _cancel(self) -> None:
         """Cancel the connection."""
         self._closing = True
+        self._cancel_peak_checker()
         if self._handle_task is not None:
             self._handle_task.cancel()
         if self._writer_task is not None:
@@ -365,15 +371,14 @@ class WebSocketHandler:
 
             self._closing = True
 
+            self._message_queue.append(None)
+            if self._ready_future and not self._ready_future.done():
+                self._ready_future.set_result(None)
+
             try:
-                self._message_queue.append(None)
-                self._queue_ready.set()
                 # Make sure all error messages are written before closing
                 await self._writer_task
                 await wsock.close()
-            except asyncio.QueueFull:  # can be raised by put_nowait
-                self._writer_task.cancel()
-
             finally:
                 if disconnect_warn is None:
                     self._logger.debug("Disconnected")
