@@ -116,7 +116,6 @@ class AccessoryIIDStorage:
             allocated_iid = accessory_allocated_iids[-1] + 1
         else:
             allocated_iid = 2
-
         accessory_allocation[allocation_key] = allocated_iid
         accessory_allocated_iids.append(allocated_iid)
         self._async_schedule_save()
