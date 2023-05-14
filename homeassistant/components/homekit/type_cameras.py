@@ -178,6 +178,7 @@ class Camera(HomeAccessory, PyhapCamera):
             "codecs": [
                 {"type": "OPUS", "samplerate": 24},
                 {"type": "OPUS", "samplerate": 16},
+                {"type": "OPUS", "samplerate": 8},  # Required for Apple Watch
             ]
         }
 
@@ -354,7 +355,10 @@ class Camera(HomeAccessory, PyhapCamera):
             )
         audio_application = ""
         if self.config[CONF_AUDIO_CODEC] == "libopus":
-            audio_application = "-application lowdelay "
+            a_packet_time = stream_config["a_packet_time"]
+            audio_application = (
+                f"-application lowdelay -frame_duration {a_packet_time} "
+            )
         output_vars = stream_config.copy()
         output_vars.update(
             {
