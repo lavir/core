@@ -116,7 +116,7 @@ aio_georss_gdacs==0.8
 aioairq==0.2.4
 
 # homeassistant.components.airzone
-aioairzone==0.5.5
+aioairzone==0.5.6
 
 # homeassistant.components.ambient_station
 aioambient==2023.04.0
@@ -596,7 +596,7 @@ denonavr==0.11.2
 devolo-home-control-api==0.18.2
 
 # homeassistant.components.devolo_home_network
-devolo-plc-api==1.2.0
+devolo-plc-api==1.3.1
 
 # homeassistant.components.directv
 directv==0.4.0
