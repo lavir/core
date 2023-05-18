@@ -1877,7 +1877,7 @@ pyownet==0.10.0.post1
 pypca==0.0.7
 
 # homeassistant.components.lcn
-pypck==0.7.16
+pypck==0.7.17
 
 # homeassistant.components.pjlink
 pypjlink2==1.2.1
@@ -2233,7 +2233,7 @@ radiotherm==2.1.0
 raincloudy==0.0.7
 
 # homeassistant.components.rapt_ble
-rapt-ble==0.1.0
+rapt-ble==0.1.1
 
 # homeassistant.components.raspyrfm
 raspyrfm-client==1.2.8
