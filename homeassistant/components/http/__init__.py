@@ -451,7 +451,7 @@ class HomeAssistantHTTP:
             class_name = view.__class__.__name__
             raise AttributeError(f'{class_name} missing required attribute "name"')
 
-        view.register(self.app, self.app.router)
+        view.register(self.hass, self.app, self.app.router)
 
     def register_redirect(
         self,
