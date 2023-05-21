@@ -120,7 +120,8 @@ def request_handler_factory(
     hass: HomeAssistant, view: HomeAssistantView, handler: Callable
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     """Wrap the handler classes."""
-    assert asyncio.iscoroutinefunction(handler) or is_callback(
+    is_coroutinefunction = asyncio.iscoroutinefunction(handler)
+    assert is_coroutinefunction or is_callback(
         handler
     ), "Handler should be a coroutine or a callback."
 
@@ -143,9 +144,10 @@ def request_handler_factory(
             )
 
         try:
-            result = handler(request, **request.match_info)
-            if asyncio.iscoroutine(result):
-                result = await result
+            if is_coroutinefunction:
+                result = await handler(request, **request.match_info)
+            else:
+                result = handler(request, **request.match_info)
         except vol.Invalid as err:
             raise HTTPBadRequest() from err
         except exceptions.ServiceNotFound as err:
