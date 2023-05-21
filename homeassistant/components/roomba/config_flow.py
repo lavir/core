@@ -4,6 +4,9 @@ from __future__ import annotations
 import asyncio
 from functools import partial
 
+from roombapy import RoombaFactory
+from roombapy.discovery import RoombaDiscovery
+from roombapy.getpassword import RoombaPassword
 import voluptuous as vol
 
 from homeassistant import config_entries, core
@@ -11,9 +14,6 @@ from homeassistant.components import dhcp, zeroconf
 from homeassistant.const import CONF_DELAY, CONF_HOST, CONF_NAME, CONF_PASSWORD
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from roombapy import RoombaFactory
-from roombapy.discovery import RoombaDiscovery
-from roombapy.getpassword import RoombaPassword
 
 from . import CannotConnect, async_connect_or_timeout, async_disconnect_or_timeout
 from .const import (
