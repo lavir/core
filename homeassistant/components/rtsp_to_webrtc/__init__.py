@@ -19,7 +19,6 @@ Other integrations may use this integration with these steps:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Any
 
@@ -90,19 +89,19 @@ async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) 
 
 async def _async_setup_internal_server(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Set up the internal RTSPToWebRTC server."""
-
     peer_connections: set[RTCPeerConnection] = set()
 
     async def _async_offer_for_stream_source(
         stream_source: str,
         offer_sdp: str,
     ) -> str:
+        """Handle the signal path for a WebRTC stream."""
         offer = RTCSessionDescription(sdp=offer_sdp, type="offer")
         peer_connection = RTCPeerConnection()
         peer_connections.add(peer_connection)
 
         @peer_connection.on("connectionstatechange")  # type: ignore[misc]
-        async def on_connection_state_change() -> None:
+        async def _on_connection_state_change() -> None:
             _LOGGER.debug("Connection state is %s", peer_connection.connectionState)
             if peer_connection.connectionState == "failed":
                 await peer_connection.close()
@@ -115,12 +114,9 @@ async def _async_setup_internal_server(hass: HomeAssistant, entry: ConfigEntry) 
         await peer_connection.setRemoteDescription(offer)
         answer = await peer_connection.createAnswer()
         await peer_connection.setLocalDescription(answer)
-        return json.dumps(
-            {
-                "sdp": peer_connection.localDescription.sdp,
-                "type": peer_connection.localDescription.type,
-            }
-        )
+        sdp_answer: str = peer_connection.localDescription.sdp
+        _LOGGER.debug("answer=%s", sdp_answer)
+        return sdp_answer
 
     async def async_offer_for_stream_source(
         stream_source: str,
@@ -131,6 +127,7 @@ async def _async_setup_internal_server(hass: HomeAssistant, entry: ConfigEntry) 
         try:
             return await _async_offer_for_stream_source(stream_source, offer_sdp)
         except Exception as err:
+            _LOGGER.exception("Error handling offer for stream %s", stream_id)
             raise HomeAssistantError(str(err)) from err
 
     async def on_shutdown(event: Event) -> None:
