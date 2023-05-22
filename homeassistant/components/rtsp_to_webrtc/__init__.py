@@ -49,10 +49,11 @@ CONF_STUN_SERVER = "stun_server"
 async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Set up the external RTSPToWebRTC server."""
     client: WebRTCClientInterface
+    server_url: str = entry.options[DATA_SERVER_URL]
     try:
         async with async_timeout.timeout(TIMEOUT):
             client = await get_adaptive_client(
-                async_get_clientsession(hass), entry.data[DATA_SERVER_URL]
+                async_get_clientsession(hass), server_url
             )
     except ResponseError as err:
         raise ConfigEntryNotReady from err
