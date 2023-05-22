@@ -58,6 +58,10 @@ class RTSPToWebRTCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             options={DATA_SERVER_URL: None},
         )
 
+    async def async_step_import(self, user_input: dict[str, Any]) -> FlowResult:
+        """Handle import from configuration.yaml."""
+        return await self.async_step_user({})
+
     async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> FlowResult:
         """Prepare configuration for the RTSPtoWebRTC server add-on discovery."""
         if self._async_current_entries():
