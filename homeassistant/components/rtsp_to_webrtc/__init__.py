@@ -108,7 +108,7 @@ async def _async_setup_internal_server(hass: HomeAssistant, entry: ConfigEntry) 
                 peer_connections.discard(peer_connection)
 
         # open media source
-        player = MediaPlayer(stream_source)
+        player = MediaPlayer(stream_source, decode=False)
         peer_connection.addTrack(player.audio)
         peer_connection.addTrack(player.video)
         await peer_connection.setRemoteDescription(offer)
