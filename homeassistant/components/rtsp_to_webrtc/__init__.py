@@ -59,8 +59,6 @@ async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) 
     except (TimeoutError, ClientError) as err:
         raise ConfigEntryNotReady from err
 
-    hass.data[DOMAIN][CONF_STUN_SERVER] = entry.options.get(CONF_STUN_SERVER, "")
-
     async def async_offer_for_stream_source(
         stream_source: str,
         offer_sdp: str,
@@ -148,14 +146,22 @@ async def _async_setup_internal_server(hass: HomeAssistant, entry: ConfigEntry) 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up RTSPtoWebRTC from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
+    if DATA_SERVER_URL in entry.data:
+        # Server is optional now, but was required in the past
+        hass.config_entries.async_update_entry(
+            entry,
+            data={},
+            options=entry.options | {DATA_SERVER_URL: entry.data[DATA_SERVER_URL]},
+        )
 
-    server_url = entry.data[DATA_SERVER_URL]
-
-    if server_url:
+    if entry.options[DATA_SERVER_URL]:
         await _async_setup_external_server(hass, entry)
     else:
         await _async_setup_internal_server(hass, entry)
+
+    hass.data.setdefault(DOMAIN, {})[CONF_STUN_SERVER] = entry.options.get(
+        CONF_STUN_SERVER, ""
+    )
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 

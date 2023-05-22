@@ -50,10 +50,12 @@ class RTSPToWebRTCConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
 
+        self._set_confirm_only()
         await self.async_set_unique_id(DOMAIN)
         return self.async_create_entry(
             title=DOMAIN,
-            data={DATA_SERVER_URL: None},
+            data={},
+            options={DATA_SERVER_URL: None},
         )
 
     async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> FlowResult:
