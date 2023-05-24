@@ -1622,7 +1622,7 @@ class StateMachine:
             return
 
         if context is None:
-            # Its much faster to convert a timestamp to a utc datetime object
+            # It is much faster to convert a timestamp to a utc datetime object
             # than converting a utc datetime object to a timestamp since cpython
             # does not have a fast path for handling the UTC timezone and has to do
             # multiple local timezone conversions.
