@@ -969,6 +969,55 @@ async def test_options_flow_with_invalid_data(hass: HomeAssistant, client) -> No
         }
 
 
+async def test_get(hass: HomeAssistant, hass_ws_client: WebSocketGenerator) -> None:
+    """Test that we can get a config entry."""
+    assert await async_setup_component(hass, "config", {})
+    ws_client = await hass_ws_client(hass)
+
+    entry = MockConfigEntry(domain="demo", state=core_ce.ConfigEntryState.LOADED)
+    entry.add_to_hass(hass)
+
+    assert entry.pref_disable_new_entities is False
+    assert entry.pref_disable_polling is False
+
+    await ws_client.send_json_auto_id(
+        {
+            "type": "config_entries/get",
+            "entry_id": entry.entry_id,
+        }
+    )
+    response = await ws_client.receive_json()
+
+    assert response["success"]
+    assert response["result"]["config_entry"] == {
+        "disabled_by": None,
+        "domain": "demo",
+        "entry_id": entry.entry_id,
+        "pref_disable_new_entities": False,
+        "pref_disable_polling": False,
+        "reason": None,
+        "source": "user",
+        "state": "loaded",
+        "supports_options": False,
+        "supports_remove_device": False,
+        "supports_unload": False,
+        "title": "Mock Title",
+    }
+
+    await ws_client.send_json_auto_id(
+        {
+            "type": "config_entries/get",
+            "entry_id": "blah",
+        }
+    )
+    response = await ws_client.receive_json()
+    assert not response["success"]
+    assert response["error"] == {
+        "code": "not_found",
+        "message": "Config entry not found",
+    }
+
+
 async def test_update_prefrences(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator
 ) -> None:
@@ -1217,7 +1266,7 @@ async def test_ignore_flow_nonexisting(
     assert response["error"]["code"] == "not_found"
 
 
-async def test_get_entries_ws(
+async def test_get_matching_entries_ws(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, clear_handlers
 ) -> None:
     """Test get entries with the websocket api."""
@@ -1268,14 +1317,8 @@ async def test_get_entries_ws(
 
     ws_client = await hass_ws_client(hass)
 
-    await ws_client.send_json(
-        {
-            "id": 5,
-            "type": "config_entries/get",
-        }
-    )
+    await ws_client.send_json_auto_id({"type": "config_entries/get_matching"})
     response = await ws_client.receive_json()
-    assert response["id"] == 5
     assert response["result"] == [
         {
             "disabled_by": None,
@@ -1349,16 +1392,14 @@ async def test_get_entries_ws(
         },
     ]
 
-    await ws_client.send_json(
+    await ws_client.send_json_auto_id(
         {
-            "id": 6,
-            "type": "config_entries/get",
+            "type": "config_entries/get_matching",
             "domain": "comp1",
             "type_filter": "hub",
         }
     )
     response = await ws_client.receive_json()
-    assert response["id"] == 6
     assert response["result"] == [
         {
             "disabled_by": None,
@@ -1376,15 +1417,13 @@ async def test_get_entries_ws(
         }
     ]
 
-    await ws_client.send_json(
+    await ws_client.send_json_auto_id(
         {
-            "id": 7,
-            "type": "config_entries/get",
+            "type": "config_entries/get_matching",
             "type_filter": ["service", "device"],
         }
     )
     response = await ws_client.receive_json()
-    assert response["id"] == 7
     assert response["result"] == [
         {
             "disabled_by": None,
@@ -1416,15 +1455,13 @@ async def test_get_entries_ws(
         },
     ]
 
-    await ws_client.send_json(
+    await ws_client.send_json_auto_id(
         {
-            "id": 8,
-            "type": "config_entries/get",
+            "type": "config_entries/get_matching",
             "type_filter": "hub",
         }
     )
     response = await ws_client.receive_json()
-    assert response["id"] == 8
     assert response["result"] == [
         {
             "disabled_by": None,
@@ -1461,16 +1498,14 @@ async def test_get_entries_ws(
         "homeassistant.components.config.config_entries.async_get_integrations",
         return_value={"any": IntegrationNotFound("any")},
     ):
-        await ws_client.send_json(
+        await ws_client.send_json_auto_id(
             {
-                "id": 9,
-                "type": "config_entries/get",
+                "type": "config_entries/get_matching",
                 "type_filter": "hub",
             }
         )
         response = await ws_client.receive_json()
 
-    assert response["id"] == 9
     assert response["result"] == [
         {
             "disabled_by": None,
@@ -1549,16 +1584,14 @@ async def test_get_entries_ws(
         "homeassistant.components.config.config_entries.async_get_integrations",
         return_value={"any": IntegrationNotFound("any")},
     ):
-        await ws_client.send_json(
+        await ws_client.send_json_auto_id(
             {
-                "id": 10,
-                "type": "config_entries/get",
+                "type": "config_entries/get_matching",
                 "type_filter": ["helper"],
             }
         )
         response = await ws_client.receive_json()
 
-    assert response["id"] == 10
     assert response["result"] == []
 
     # Verify we raise if something really goes wrong
@@ -1567,16 +1600,14 @@ async def test_get_entries_ws(
         "homeassistant.components.config.config_entries.async_get_integrations",
         return_value={"any": Exception()},
     ):
-        await ws_client.send_json(
+        await ws_client.send_json_auto_id(
             {
-                "id": 11,
-                "type": "config_entries/get",
+                "type": "config_entries/get_matching",
                 "type_filter": ["device", "hub", "service"],
             }
         )
         response = await ws_client.receive_json()
 
-    assert response["id"] == 11
     assert response["success"] is False
 
 
