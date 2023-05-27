@@ -220,14 +220,10 @@ class OnvifFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if self.devices:
             devices = {CONF_MANUAL_INPUT: CONF_MANUAL_INPUT}
             for device in self.devices:
-                if device[CONF_HARDWARE]:
-                    devices[
-                        device[CONF_HOST]
-                    ] = f"{device[CONF_NAME]} ({device[CONF_HOST]}) [{device[CONF_HARDWARE]}]"
-                else:
-                    devices[
-                        device[CONF_HOST]
-                    ] = f"{device[CONF_NAME]} ({device[CONF_HOST]})"
+                description = f"{device[CONF_NAME]} ({device[CONF_HOST]})"
+                if hardware := device[CONF_HARDWARE]:
+                    description += f" [{hardware}]"
+                devices[device[CONF_HOST]] = description
 
             return self.async_show_form(
                 step_id="device",
