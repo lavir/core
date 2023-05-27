@@ -856,8 +856,8 @@ class EntityPlatform:
                 # If we know are going to update sequentially, we want to update
                 # to avoid scheduling the coroutines as tasks that will we know
                 # are going to wait on the semaphore lock.
-                for entity in self.entities.values():
-                    if entity.should_poll:
+                for entity in list(self.entities.values()):
+                    if entity.should_poll and entity.hass:
                         await entity.async_update_ha_state(True)
                 return
 
