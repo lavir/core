@@ -78,9 +78,10 @@ def websocket_list_entities_for_display(
     msg_json = (
         msg_json_prefix
         + ",".join(
-            entry.display_json_repr
+            display
             for entry in registry.entities.values()
-            if entry.disabled_by is None and entry.display_json_repr is not None
+            if entry.disabled_by is None
+            and (display := entry.display_json_repr) is not None
         )
         + "]}}"
     )
