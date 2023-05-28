@@ -219,11 +219,13 @@ def _get_statistic_to_display_unit_converter(
     if display_unit == statistic_unit:
         return None
 
-    convert = partial(converter.convert, from_unit=statistic_unit, to_unit=display_unit)
+    convert = converter.convert
 
     def _from_normalized_unit(val: float | None) -> float | None:
         """Return val."""
-        return None if val is None else convert(val)
+        if val is None:
+            return val
+        return convert(val, statistic_unit, display_unit)
 
     return _from_normalized_unit
 
@@ -1490,9 +1492,9 @@ def statistic_during_period(
     state_unit = unit = metadata[1]["unit_of_measurement"]
     if state := hass.states.get(statistic_id):
         state_unit = state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
-    if convert := _get_statistic_to_display_unit_converter(unit, state_unit, units):
-        return {key: convert(value) for key, value in result.items()}
-    return result
+    convert = _get_statistic_to_display_unit_converter(unit, state_unit, units)
+
+    return {key: convert(value) if convert else value for key, value in result.items()}
 
 
 _type_column_mapping = {
