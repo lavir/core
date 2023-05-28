@@ -73,12 +73,12 @@ class BaseUnitConverter:
         return cls.converter_factory(from_unit, to_unit)(value)
 
     @classmethod
-    @lru_cache(maxsize=128)
+    @lru_cache
     def converter_factory(
         cls, from_unit: str | None, to_unit: str | None
     ) -> Callable[[float], float]:
         """Return a function to convert one unit of measurement to another."""
-        ratio = cls._get_unit_ratio_or_raise(from_unit, to_unit)
+        ratio = cls.get_unit_ratio(from_unit, to_unit)
 
         def _converter(value: float) -> float:
             return value / ratio
@@ -86,12 +86,12 @@ class BaseUnitConverter:
         return _converter
 
     @classmethod
-    @lru_cache(maxsize=128)
+    @lru_cache
     def converter_factory_allow_none(
         cls, from_unit: str | None, to_unit: str | None
     ) -> Callable[[float | None], float | None]:
         """Return a function to convert one unit of measurement to another which allows None."""
-        ratio = cls._get_unit_ratio_or_raise(from_unit, to_unit)
+        ratio = cls.get_unit_ratio(from_unit, to_unit)
 
         def _converter_allow_none(value: float | None) -> float | None:
             return None if value is None else value / ratio
@@ -99,10 +99,9 @@ class BaseUnitConverter:
         return _converter_allow_none
 
     @classmethod
-    def _get_unit_ratio_or_raise(
-        cls, from_unit: str | None, to_unit: str | None
-    ) -> float:
-        """Return the from_ratio and to_ratio for a unit conversion."""
+    @lru_cache
+    def get_unit_ratio(cls, from_unit: str | None, to_unit: str | None) -> float:
+        """Get unit ratio between units of measurement."""
         if from_unit == to_unit:
             return 1
 
@@ -121,11 +120,6 @@ class BaseUnitConverter:
             ) from err
 
         return from_ratio / to_ratio
-
-    @classmethod
-    def get_unit_ratio(cls, from_unit: str | None, to_unit: str | None) -> float:
-        """Get unit ratio between units of measurement."""
-        return cls._UNIT_CONVERSION[from_unit] / cls._UNIT_CONVERSION[to_unit]
 
 
 class DataRateConverter(BaseUnitConverter):
@@ -374,7 +368,7 @@ class TemperatureConverter(BaseUnitConverter):
     }
 
     @classmethod
-    @lru_cache(maxsize=16)
+    @lru_cache(maxsize=8)
     def converter_factory(
         cls, from_unit: str | None, to_unit: str | None
     ) -> Callable[[float], float]:
@@ -388,7 +382,7 @@ class TemperatureConverter(BaseUnitConverter):
         return cls._converter_factory(from_unit, to_unit)
 
     @classmethod
-    @lru_cache(maxsize=16)
+    @lru_cache(maxsize=8)
     def converter_factory_allow_none(
         cls, from_unit: str | None, to_unit: str | None
     ) -> Callable[[float | None], float | None]:
