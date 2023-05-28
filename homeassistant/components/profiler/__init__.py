@@ -281,6 +281,14 @@ async def async_setup_entry(  # noqa: C901
         # integration is used at a time
         import objgraph  # pylint: disable=import-outside-toplevel
 
+        for resource in hass.http.app.router.resources():
+            _LOGGER.critical("Resource %s", resource)
+
+        for route in hass.http.app.router.routes():
+            _LOGGER.critical("Route %s", route)
+
+        _LOGGER.critical("named_resources %s", hass.http.app.router.named_resources())
+
         for obj in objgraph.by_type("SSLObject"):
             obj = cast(ssl.SSLObject, obj)
             try:
