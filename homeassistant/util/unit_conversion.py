@@ -1,6 +1,9 @@
 """Typing Helpers for Home Assistant."""
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import lru_cache
+
 from homeassistant.const import (
     CONCENTRATION_PARTS_PER_BILLION,
     CONCENTRATION_PARTS_PER_MILLION,
@@ -67,9 +70,45 @@ class BaseUnitConverter:
     @classmethod
     def convert(cls, value: float, from_unit: str | None, to_unit: str | None) -> float:
         """Convert one unit of measurement to another."""
-        if from_unit == to_unit:
-            return value
+        return cls.converter_factory(from_unit, to_unit, True)(value)
 
+    @classmethod
+    @lru_cache(maxsize=128)
+    def converter_factory(
+        cls, from_unit: str | None, to_unit: str | None, allow_same_unit: bool = False
+    ) -> Callable[[float], float]:
+        """Return a function to convert one unit of measurement to another."""
+        if not allow_same_unit and from_unit == to_unit:
+            raise HomeAssistantError("from_unit and to_unit cannot be the same")
+
+        ratio = cls._get_unit_ratio_or_raise(from_unit, to_unit)
+
+        def _converter(value: float) -> float:
+            return value / ratio
+
+        return _converter
+
+    @classmethod
+    @lru_cache(maxsize=128)
+    def converter_factory_allow_none(
+        cls, from_unit: str | None, to_unit: str | None
+    ) -> Callable[[float | None], float | None]:
+        """Return a function to convert one unit of measurement to another which allows None."""
+        if from_unit == to_unit:
+            raise HomeAssistantError("from_unit and to_unit cannot be the same")
+
+        ratio = cls._get_unit_ratio_or_raise(from_unit, to_unit)
+
+        def _converter_allow_none(value: float | None) -> float | None:
+            return None if value is None else value / ratio
+
+        return _converter_allow_none
+
+    @classmethod
+    def _get_unit_ratio_or_raise(
+        cls, from_unit: str | None, to_unit: str | None
+    ) -> float:
+        """Return the from_ratio and to_ratio for a unit conversion."""
         try:
             from_ratio = cls._UNIT_CONVERSION[from_unit]
         except KeyError as err:
@@ -84,8 +123,7 @@ class BaseUnitConverter:
                 UNIT_NOT_RECOGNIZED_TEMPLATE.format(to_unit, cls.UNIT_CLASS)
             ) from err
 
-        new_value = value / from_ratio
-        return new_value * to_ratio
+        return from_ratio / to_ratio
 
     @classmethod
     def get_unit_ratio(cls, from_unit: str | None, to_unit: str | None) -> float:
@@ -339,7 +377,30 @@ class TemperatureConverter(BaseUnitConverter):
     }
 
     @classmethod
-    def convert(cls, value: float, from_unit: str | None, to_unit: str | None) -> float:
+    @lru_cache(maxsize=16)
+    def converter_factory(
+        cls, from_unit: str | None, to_unit: str | None, allow_same_unit: bool = False
+    ) -> Callable[[float], float]:
+        """Return a function to convert a temperature from one unit to another."""
+        return cls._converter_factory(from_unit, to_unit, allow_same_unit)
+
+    @classmethod
+    @lru_cache(maxsize=16)
+    def converter_factory_allow_none(
+        cls, from_unit: str | None, to_unit: str | None
+    ) -> Callable[[float | None], float | None]:
+        """Return a function to convert a temperature from one unit to another which allows None."""
+        convert = cls._converter_factory(from_unit, to_unit, True)
+
+        def _converter_allow_none(value: float | None) -> float | None:
+            return None if value is None else convert(value)
+
+        return _converter_allow_none
+
+    @classmethod
+    def _converter_factory(
+        cls, from_unit: str | None, to_unit: str | None, allow_same_unit: bool = False
+    ) -> Callable[[float], float]:
         """Convert a temperature from one unit to another.
 
         eg. 10°C will return 50°F
@@ -350,31 +411,33 @@ class TemperatureConverter(BaseUnitConverter):
         # We cannot use the implementation from BaseUnitConverter here because the
         # temperature units do not use the same floor: 0°C, 0°F and 0K do not align
         if from_unit == to_unit:
-            return value
+            if not allow_same_unit:
+                raise HomeAssistantError("from_unit and to_unit cannot be the same")
+            return lambda value: value
 
         if from_unit == UnitOfTemperature.CELSIUS:
             if to_unit == UnitOfTemperature.FAHRENHEIT:
-                return cls._celsius_to_fahrenheit(value)
+                return cls._celsius_to_fahrenheit
             if to_unit == UnitOfTemperature.KELVIN:
-                return cls._celsius_to_kelvin(value)
+                return cls._celsius_to_kelvin
             raise HomeAssistantError(
                 UNIT_NOT_RECOGNIZED_TEMPLATE.format(to_unit, cls.UNIT_CLASS)
             )
 
         if from_unit == UnitOfTemperature.FAHRENHEIT:
             if to_unit == UnitOfTemperature.CELSIUS:
-                return cls._fahrenheit_to_celsius(value)
+                return cls._fahrenheit_to_celsius
             if to_unit == UnitOfTemperature.KELVIN:
-                return cls._celsius_to_kelvin(cls._fahrenheit_to_celsius(value))
+                return cls._fahrenheit_to_kelvin
             raise HomeAssistantError(
                 UNIT_NOT_RECOGNIZED_TEMPLATE.format(to_unit, cls.UNIT_CLASS)
             )
 
         if from_unit == UnitOfTemperature.KELVIN:
             if to_unit == UnitOfTemperature.CELSIUS:
-                return cls._kelvin_to_celsius(value)
+                return cls._kelvin_to_celsius
             if to_unit == UnitOfTemperature.FAHRENHEIT:
-                return cls._celsius_to_fahrenheit(cls._kelvin_to_celsius(value))
+                return cls._kelvin_to_fahrenheit
             raise HomeAssistantError(
                 UNIT_NOT_RECOGNIZED_TEMPLATE.format(to_unit, cls.UNIT_CLASS)
             )
@@ -393,7 +456,17 @@ class TemperatureConverter(BaseUnitConverter):
         """
         # We use BaseUnitConverter implementation here because we are only interested
         # in the ratio between the units.
-        return super().convert(interval, from_unit, to_unit)
+        return super().converter_factory(from_unit, to_unit, True)(interval)
+
+    @classmethod
+    def _kelvin_to_fahrenheit(cls, kelvin: float) -> float:
+        """Convert a temperature in Kelvin to Fahrenheit."""
+        return (kelvin - 273.15) * 1.8 + 32.0
+
+    @classmethod
+    def _fahrenheit_to_kelvin(cls, fahrenheit: float) -> float:
+        """Convert a temperature in Fahrenheit to Kelvin."""
+        return 273.15 + ((fahrenheit - 32.0) / 1.8)
 
     @classmethod
     def _fahrenheit_to_celsius(cls, fahrenheit: float) -> float:
