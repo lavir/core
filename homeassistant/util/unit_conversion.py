@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import lru_cache
-from operator import truediv
-from typing import cast
 
 from homeassistant.const import (
     CONCENTRATION_PARTS_PER_BILLION,
@@ -83,12 +81,15 @@ class BaseUnitConverter:
         if from_unit == to_unit:
             return lambda value: value
 
-        from_ratio, to_ratio = cls._get_from_to_ratio(from_unit, to_unit)
+        try:
+            from_ratio = cls._UNIT_CONVERSION[from_unit]
+            to_ratio = cls._UNIT_CONVERSION[to_unit]
+        except KeyError as ex:
+            raise HomeAssistantError(
+                UNIT_NOT_RECOGNIZED_TEMPLATE.format(ex.args[0], cls.UNIT_CLASS)
+            ) from ex
 
-        def _converter(value: float) -> float:
-            return (value / from_ratio) * to_ratio
-
-        return _converter
+        return lambda val: (val / from_ratio) * to_ratio
 
     @classmethod
     @lru_cache
@@ -99,31 +100,26 @@ class BaseUnitConverter:
         if from_unit == to_unit:
             return lambda value: value
 
-        from_ratio, to_ratio = cls._get_from_to_ratio(from_unit, to_unit)
-
-        def _converter_allow_none(value: float | None) -> float | None:
-            return None if value is None else (value / from_ratio) * to_ratio
-
-        return _converter_allow_none
-
-    @classmethod
-    @lru_cache
-    def _get_from_to_ratio(
-        cls, from_unit: str | None, to_unit: str | None
-    ) -> tuple[float, float]:
-        """Get the from_ratio and to_ratio  for units."""
         try:
-            return cls._UNIT_CONVERSION[from_unit], cls._UNIT_CONVERSION[to_unit]
+            from_ratio = cls._UNIT_CONVERSION[from_unit]
+            to_ratio = cls._UNIT_CONVERSION[to_unit]
         except KeyError as ex:
             raise HomeAssistantError(
                 UNIT_NOT_RECOGNIZED_TEMPLATE.format(ex.args[0], cls.UNIT_CLASS)
             ) from ex
 
+        return lambda val: None if val is None else (val / from_ratio) * to_ratio
+
     @classmethod
     @lru_cache
     def get_unit_ratio(cls, from_unit: str | None, to_unit: str | None) -> float:
         """Get unit ratio between units of measurement."""
-        return cast(float, truediv(*cls._get_from_to_ratio(from_unit, to_unit)))
+        try:
+            return cls._UNIT_CONVERSION[from_unit] / cls._UNIT_CONVERSION[to_unit]
+        except KeyError as ex:
+            raise HomeAssistantError(
+                UNIT_NOT_RECOGNIZED_TEMPLATE.format(ex.args[0], cls.UNIT_CLASS)
+            ) from ex
 
 
 class DataRateConverter(BaseUnitConverter):
