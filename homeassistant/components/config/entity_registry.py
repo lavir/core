@@ -48,9 +48,9 @@ def websocket_list_entities(
     msg_json = (
         msg_json_prefix
         + ",".join(
-            entry.partial_json_repr
+            json_repr
             for entry in registry.entities.values()
-            if entry.partial_json_repr is not None
+            if (json_repr := entry.partial_json_repr) is not None
         )
         + "]}"
     )
@@ -78,10 +78,10 @@ def websocket_list_entities_for_display(
     msg_json = (
         msg_json_prefix
         + ",".join(
-            display
+            json_repr
             for entry in registry.entities.values()
             if entry.disabled_by is None
-            and (display := entry.display_json_repr) is not None
+            and (json_repr := entry.display_json_repr) is not None
         )
         + "]}}"
     )
