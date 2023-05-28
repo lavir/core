@@ -50,9 +50,9 @@ def websocket_list_devices(
     msg_json = (
         msg_json_prefix
         + ",".join(
-            entry.json_repr
+            json
             for entry in registry.devices.values()
-            if entry.json_repr is not None
+            if (json := entry.json_repr) is not None
         )
         + "]}"
     )
