@@ -12,11 +12,9 @@ from typing import Any, Final
 
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
+from bleak_retry_connector import NO_RSSI_VALUE
 from bluetooth_adapters import DiscoveredDeviceAdvertisementData, adapter_human_name
-from home_assistant_bluetooth import (
-    BluetoothAdvertisementStream,
-    BluetoothServiceInfoBleak,
-)
+from home_assistant_bluetooth import BluetoothServiceInfoBleak
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import (
@@ -191,8 +189,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
         "_details",
         "_expire_seconds",
         "_storage",
-        "_stream",
-        "_process",
     )
 
     def __init__(
@@ -218,39 +214,15 @@ class BaseHaRemoteScanner(BaseHaScanner):
         self._expire_seconds = CONNECTABLE_FALLBACK_MAXIMUM_STALE_ADVERTISEMENT_SECONDS
         assert models.MANAGER is not None
         self._storage = models.MANAGER.storage
-        self._stream = BluetoothAdvertisementStream(
-            connectable, self.source, self._details
-        )
-        self._process = self._stream.process
 
     @hass_callback
     def async_setup(self) -> CALLBACK_TYPE:
         """Set up the scanner."""
         if history := self._storage.async_get_advertisement_history(self.source):
-            discovered_device_timestamps = history.discovered_device_timestamps
-            discovered_device_advertisement_datas = (
+            self._discovered_device_advertisement_datas = (
                 history.discovered_device_advertisement_datas
             )
-            self._discovered_device_advertisement_datas = (
-                discovered_device_advertisement_datas
-            )
-            self._discovered_device_timestamps = discovered_device_timestamps
-            for (
-                ble_device,
-                advertisement_data,
-            ) in discovered_device_advertisement_datas.values():
-                address = ble_device.address
-                self._process(
-                    discovered_device_timestamps[address],
-                    address,
-                    advertisement_data.rssi,
-                    advertisement_data.local_name,
-                    advertisement_data.service_uuids,
-                    advertisement_data.service_data,
-                    advertisement_data.manufacturer_data,
-                    advertisement_data.tx_power,
-                    ble_device.details,
-                )
+            self._discovered_device_timestamps = history.discovered_device_timestamps
             # Expire anything that is too old
             self._async_expire_devices(dt_util.utcnow())
 
@@ -330,24 +302,85 @@ class BaseHaRemoteScanner(BaseHaScanner):
     ) -> None:
         """Call the registered callback."""
         now = MONOTONIC_TIME()
-        bluetooth_service_info_bleak = self._process(
-            now,
-            address,
-            rssi,
-            local_name,
-            service_uuids,
-            service_data,
-            manufacturer_data,
-            tx_power,
-            details,
-        )
         self._last_detection = now
+        if prev_discovery := self._discovered_device_advertisement_datas.get(address):
+            # Merge the new data with the old data
+            # to function the same as BlueZ which
+            # merges the dicts on PropertiesChanged
+            prev_device = prev_discovery[0]
+            prev_advertisement = prev_discovery[1]
+            prev_service_uuids = prev_advertisement.service_uuids
+            prev_service_data = prev_advertisement.service_data
+            prev_manufacturer_data = prev_advertisement.manufacturer_data
+            prev_name = prev_device.name
+
+            if local_name and prev_name and len(prev_name) > len(local_name):
+                local_name = prev_name
+
+            if service_uuids and service_uuids != prev_service_uuids:
+                service_uuids = list(set(service_uuids + prev_service_uuids))
+            elif not service_uuids:
+                service_uuids = prev_service_uuids
+
+            if service_data and service_data != prev_service_data:
+                service_data = prev_service_data | service_data
+            elif not service_data:
+                service_data = prev_service_data
+
+            if manufacturer_data and manufacturer_data != prev_manufacturer_data:
+                manufacturer_data = prev_manufacturer_data | manufacturer_data
+            elif not manufacturer_data:
+                manufacturer_data = prev_manufacturer_data
+            #
+            # Bleak updates the BLEDevice via create_or_update_device.
+            # We need to do the same to ensure integrations that already
+            # have the BLEDevice object get the updated details when they
+            # change.
+            #
+            # https://github.com/hbldh/bleak/blob/222618b7747f0467dbb32bd3679f8cfaa19b1668/bleak/backends/scanner.py#L203
+            #
+            device = prev_device
+            device.name = local_name
+            device.details = self._details | details
+            # pylint: disable-next=protected-access
+            device._rssi = rssi  # deprecated, will be removed in newer bleak
+        else:
+            device = BLEDevice(
+                address=address,
+                name=local_name,
+                details=self._details | details,
+                rssi=rssi,  # deprecated, will be removed in newer bleak
+            )
+
+        advertisement_data = AdvertisementData(
+            local_name=None if local_name == "" else local_name,
+            manufacturer_data=manufacturer_data,
+            service_data=service_data,
+            service_uuids=service_uuids,
+            tx_power=NO_RSSI_VALUE if tx_power is None else tx_power,
+            rssi=rssi,
+            platform_data=(),
+        )
         self._discovered_device_advertisement_datas[address] = (
-            bluetooth_service_info_bleak.device,
-            bluetooth_service_info_bleak.advertisement,
+            device,
+            advertisement_data,
         )
         self._discovered_device_timestamps[address] = now
-        self._new_info_callback(bluetooth_service_info_bleak)
+        self._new_info_callback(
+            BluetoothServiceInfoBleak(
+                name=local_name or address,
+                address=address,
+                rssi=rssi,
+                manufacturer_data=manufacturer_data,
+                service_data=service_data,
+                service_uuids=service_uuids,
+                source=self.source,
+                device=device,
+                advertisement=advertisement_data,
+                connectable=self.connectable,
+                time=now,
+            )
+        )
 
     async def async_diagnostics(self) -> dict[str, Any]:
         """Return diagnostic information about the scanner."""
