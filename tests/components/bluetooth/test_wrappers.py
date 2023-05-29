@@ -186,13 +186,18 @@ def _generate_scanners_with_fake_devices(hass):
     for device, adv_data in hci1_device_advs.values():
         scanner_hci1.inject_advertisement(device, adv_data)
 
+    # Remove the source values so we treat devices as local scanners
+    for scanner in (scanner_hci0, scanner_hci1):
+        for device, _ in scanner.discovered_devices_and_advertisement_data.values():
+            del device.details["source"]
+
     cancel_hci0 = manager.async_register_scanner(scanner_hci0, True, 2)
     cancel_hci1 = manager.async_register_scanner(scanner_hci1, True, 1)
 
     return hci0_device_advs, cancel_hci0, cancel_hci1
 
 
-async def test_test_switch_adapters_when_out_of_slots(
+async def test_switch_adapters_when_out_of_slots(
     hass: HomeAssistant,
     two_adapters: None,
     enable_bluetooth: None,
