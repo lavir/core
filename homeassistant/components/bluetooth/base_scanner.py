@@ -192,6 +192,7 @@ class BaseHaRemoteScanner(BaseHaScanner):
         "_expire_seconds",
         "_storage",
         "_stream",
+        "_process",
     )
 
     def __init__(
@@ -220,15 +221,36 @@ class BaseHaRemoteScanner(BaseHaScanner):
         self._stream = BluetoothAdvertisementStream(
             connectable, self.source, self._details
         )
+        self._process = self._stream.process
 
     @hass_callback
     def async_setup(self) -> CALLBACK_TYPE:
         """Set up the scanner."""
         if history := self._storage.async_get_advertisement_history(self.source):
-            self._discovered_device_advertisement_datas = (
+            discovered_device_timestamps = history.discovered_device_timestamps
+            discovered_device_advertisement_datas = (
                 history.discovered_device_advertisement_datas
             )
-            self._discovered_device_timestamps = history.discovered_device_timestamps
+            self._discovered_device_advertisement_datas = (
+                discovered_device_advertisement_datas
+            )
+            self._discovered_device_timestamps = discovered_device_timestamps
+            for (
+                ble_device,
+                advertisement_data,
+            ) in discovered_device_advertisement_datas.values():
+                address = ble_device.address
+                self._process(
+                    discovered_device_timestamps[address],
+                    ble_device.address,
+                    advertisement_data.rssi,
+                    ble_device.name,
+                    advertisement_data.service_uuids,
+                    advertisement_data.service_data,
+                    advertisement_data.manufacturer_data,
+                    advertisement_data.tx_power,
+                    ble_device.details,
+                )
             # Expire anything that is too old
             self._async_expire_devices(dt_util.utcnow())
 
@@ -307,7 +329,9 @@ class BaseHaRemoteScanner(BaseHaScanner):
         details: dict[Any, Any],
     ) -> None:
         """Call the registered callback."""
-        bluetooth_service_info_bleak = self._stream.process(
+        now = MONOTONIC_TIME()
+        bluetooth_service_info_bleak = self._process(
+            now,
             address,
             rssi,
             local_name,
@@ -317,7 +341,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
             tx_power,
             details,
         )
-        now = bluetooth_service_info_bleak.time
         self._last_detection = now
         self._discovered_device_advertisement_datas[address] = (
             bluetooth_service_info_bleak.device,
