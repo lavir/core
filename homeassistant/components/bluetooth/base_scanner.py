@@ -242,9 +242,9 @@ class BaseHaRemoteScanner(BaseHaScanner):
                 address = ble_device.address
                 self._process(
                     discovered_device_timestamps[address],
-                    ble_device.address,
+                    address,
                     advertisement_data.rssi,
-                    ble_device.name,
+                    advertisement_data.local_name,
                     advertisement_data.service_uuids,
                     advertisement_data.service_data,
                     advertisement_data.manufacturer_data,
