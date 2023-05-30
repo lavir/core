@@ -352,14 +352,16 @@ def _async_track_event(
     if isinstance(keys, str):
         keys = [keys]
 
-    callbacks: dict[str, list[HassJob[[Event], Any]]] | None = hass.data.get(
+    hass_data = hass.data
+
+    callbacks: dict[str, list[HassJob[[Event], Any]]] | None = hass_data.get(
         callbacks_key
     )
     if not callbacks:
-        callbacks = hass.data[callbacks_key] = {}
+        callbacks = hass_data[callbacks_key] = {}
 
-    if listeners_key not in hass.data:
-        hass.data[listeners_key] = hass.bus.async_listen(
+    if listeners_key not in hass_data:
+        hass_data[listeners_key] = hass.bus.async_listen(
             event_type,
             callback(ft.partial(dispatcher_callable, hass, callbacks)),
             event_filter=callback(ft.partial(filter_callable, hass, callbacks)),
