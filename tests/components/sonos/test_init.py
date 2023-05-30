@@ -1,17 +1,30 @@
 """Tests for the Sonos config flow."""
 import asyncio
 import logging
-from unittest.mock import AsyncMock, Mock, patch
+import sys
+from unittest.mock import Mock, patch
+
+if sys.version_info[:2] < (3, 11):
+    from async_timeout import timeout as asyncio_timeout
+else:
+    from asyncio import timeout as asyncio_timeout
 
 import pytest
 
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.components import sonos, zeroconf
 from homeassistant.components.sonos import SonosDiscoveryManager
-from homeassistant.components.sonos.const import DATA_SONOS_DISCOVERY_MANAGER
+from homeassistant.components.sonos.const import (
+    DATA_SONOS_DISCOVERY_MANAGER,
+    SONOS_SPEAKER_ACTIVITY,
+)
 from homeassistant.components.sonos.exception import SonosUpdateError
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.setup import async_setup_component
+
+from .conftest import MockSoCo, SoCoMockFactory
 
 
 async def test_creating_entry_sets_up_media_player(
@@ -143,246 +156,285 @@ async def test_async_poll_manual_hosts_warnings(
         assert mock_async_call_later.call_count == 5
 
 
-async def patch_gethostbyname(host: str) -> str:
-    """Mock to return host name as ip address for testing."""
-    return host
+class _MockSoCoOsError(MockSoCo):
+    @property
+    def visible_zones(self):
+        raise OSError()
 
 
-async def test_async_poll_manual_hosts_ping_failure(
-    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+class _MockSoCoVisibleZones(MockSoCo):
+    def set_visible_zones(self, visible_zones) -> None:
+        """Set visible zones."""
+        self.vz_return = visible_zones  # pylint: disable=attribute-defined-outside-init
+
+    @property
+    def visible_zones(self):
+        return self.vz_return
+
+
+async def _setup_hass(hass: HomeAssistant):
+    await async_setup_component(
+        hass,
+        sonos.DOMAIN,
+        {
+            "sonos": {
+                "media_player": {
+                    "interface_addr": "127.0.0.1",
+                    "hosts": ["10.10.10.1", "10.10.10.2"],
+                }
+            }
+        },
+    )
+    await hass.async_block_till_done()
+
+
+async def test_async_poll_manual_hosts_1(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test that a failure to ping device is handled properly."""
-    await async_setup_component(
-        hass,
-        sonos.DOMAIN,
-        {"sonos": {"media_player": {"interface_addr": "127.0.0.1"}}},
-    )
-    await hass.async_block_till_done()
-    manager: SonosDiscoveryManager = hass.data[DATA_SONOS_DISCOVERY_MANAGER]
-    with patch.object(manager, "_async_gethostbyname", side_effect=patch_gethostbyname):
-        manager.hosts.add("10.10.10.10")
+    """Tests first device fails, second device successful, speakers do not exist."""
+    soco_1 = soco_factory.cache_mock(_MockSoCoOsError(), "10.10.10.1", "Living Room")
+    soco_2 = soco_factory.cache_mock(MockSoCo(), "10.10.10.2", "Bedroom")
 
-        with caplog.at_level(logging.DEBUG), patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ), patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            mock_async_add_executor_job.return_value = []
+    with caplog.at_level(logging.WARNING):
+        await _setup_hass(hass)
+        assert "media_player.bedroom" in entity_registry.entities
+        assert "media_player.living_room" not in entity_registry.entities
+        assert (
+            f"Could not get visible Sonos devices from {soco_1.ip_address}"
+            in caplog.text
+        )
+        assert (
+            f"Could not get visible Sonos devices from {soco_2.ip_address}"
+            not in caplog.text
+        )
+
+
+async def test_async_poll_manual_hosts_2(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test first device success, second device fails, speakers do not exist."""
+    soco_1 = soco_factory.cache_mock(MockSoCo(), "10.10.10.1", "Living Room")
+    soco_2 = soco_factory.cache_mock(_MockSoCoOsError(), "10.10.10.2", "Bedroom")
+
+    with caplog.at_level(logging.WARNING):
+        await _setup_hass(hass)
+        assert "media_player.bedroom" not in entity_registry.entities
+        assert "media_player.living_room" in entity_registry.entities
+        assert (
+            f"Could not get visible Sonos devices from {soco_1.ip_address}"
+            not in caplog.text
+        )
+        assert (
+            f"Could not get visible Sonos devices from {soco_2.ip_address}"
+            in caplog.text
+        )
+
+
+async def test_async_poll_manual_hosts_3(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test both devices fail, speakers do not exist."""
+    soco_1 = soco_factory.cache_mock(_MockSoCoOsError(), "10.10.10.1", "Living Room")
+    soco_2 = soco_factory.cache_mock(_MockSoCoOsError(), "10.10.10.2", "Bedroom")
+
+    with caplog.at_level(logging.WARNING):
+        await _setup_hass(hass)
+        assert "media_player.bedroom" not in entity_registry.entities
+        assert "media_player.living_room" not in entity_registry.entities
+        assert (
+            f"Could not get visible Sonos devices from {soco_1.ip_address}"
+            in caplog.text
+        )
+        assert (
+            f"Could not get visible Sonos devices from {soco_2.ip_address}"
+            in caplog.text
+        )
+
+
+async def test_async_poll_manual_hosts_4(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test both devices are successful, speakers do not exist."""
+    soco_1 = soco_factory.cache_mock(MockSoCo(), "10.10.10.1", "Living Room")
+    soco_2 = soco_factory.cache_mock(MockSoCo(), "10.10.10.2", "Bedroom")
+
+    with caplog.at_level(logging.WARNING):
+        await _setup_hass(hass)
+        assert "media_player.bedroom" in entity_registry.entities
+        assert "media_player.living_room" in entity_registry.entities
+        assert (
+            f"Could not get visible Sonos devices from {soco_1.ip_address}"
+            not in caplog.text
+        )
+        assert (
+            f"Could not get visible Sonos devices from {soco_2.ip_address}"
+            not in caplog.text
+        )
+
+
+class SpeakerActivity:
+    """Unit test class to track speaker activity messages."""
+
+    def __init__(self, hass: HomeAssistant, soco: MockSoCo) -> None:
+        """Create the object from soco."""
+        self.soco = soco
+        self.hass = hass
+        self.call_count: int = 0
+        self.event = asyncio.Event()
+        async_dispatcher_connect(
+            self.hass,
+            f"{SONOS_SPEAKER_ACTIVITY}-{self.soco.uid}",
+            self.speaker_activity,
+        )
+
+    @callback
+    def speaker_activity(self, source: str) -> None:
+        """Track the last activity on this speaker, set availability and resubscribe."""
+        if source == "manual zone scan":
+            self.event.set()
+            self.call_count += 1
+
+
+async def test_async_poll_manual_hosts_5(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test both succeed, speakers exist and unavailable, ping succeeds."""
+    soco_1 = soco_factory.cache_mock(MockSoCo(), "10.10.10.1", "Living Room")
+    soco_1.renderingControl = Mock()
+    soco_1.renderingControl.GetVolume = Mock()
+    speaker_1_activity = SpeakerActivity(hass, soco_1)
+    soco_2 = soco_factory.cache_mock(MockSoCo(), "10.10.10.2", "Bedroom")
+    soco_2.renderingControl = Mock()
+    soco_2.renderingControl.GetVolume = Mock()
+    speaker_2_activity = SpeakerActivity(hass, soco_2)
+    with patch(
+        "homeassistant.components.sonos.DISCOVERY_INTERVAL"
+    ) as mock_discovery_interval:
+        # Speed up manual discovery interval so second iteration runs sooner
+        mock_discovery_interval.total_seconds = Mock(side_effect=[0.5, 60])
+
+        await _setup_hass(hass)
+
+        assert "media_player.bedroom" in entity_registry.entities
+        assert "media_player.living_room" in entity_registry.entities
+
+        with caplog.at_level(logging.DEBUG):
             caplog.clear()
-
-            mock_discovery_message.side_effect = asyncio.TimeoutError("TimeoutError")
-            await manager.async_poll_manual_hosts()
-            assert len(caplog.messages) == 1
-            record = caplog.records[0]
-            assert record.levelname == "WARNING"
-            assert "Discovery message failed" in record.message
-            assert "TimeoutError" in record.message
-            mock_async_call_later.assert_called_once()
+            await speaker_1_activity.event.wait()
+            await speaker_2_activity.event.wait()
+            await hass.async_block_till_done()
+            assert speaker_1_activity.call_count == 1
+            assert speaker_2_activity.call_count == 1
+            assert "Activity on Living Room" in caplog.text
+            assert "Activity on Bedroom" in caplog.text
 
 
-async def test_async_poll_manual_hosts(hass: HomeAssistant) -> None:
-    """Tests the logic and execution branches for the function."""
-    await async_setup_component(
-        hass,
-        sonos.DOMAIN,
-        {"sonos": {"media_player": {"interface_addr": "127.0.0.1"}}},
+async def test_async_poll_manual_hosts_6(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test both succeed, speakers exist and unavailable, pings fail."""
+    soco_1 = soco_factory.cache_mock(MockSoCo(), "10.10.10.1", "Living Room")
+    # Rendering Control Get Volume is what speaker ping calls.
+    soco_1.renderingControl = Mock()
+    soco_1.renderingControl.GetVolume = Mock()
+    soco_1.renderingControl.GetVolume.side_effect = SonosUpdateError()
+    speaker_1_activity = SpeakerActivity(hass, soco_1)
+    soco_2 = soco_factory.cache_mock(MockSoCo(), "10.10.10.2", "Bedroom")
+    soco_2.renderingControl = Mock()
+    soco_2.renderingControl.GetVolume = Mock()
+    soco_2.renderingControl.GetVolume.side_effect = SonosUpdateError()
+    speaker_2_activity = SpeakerActivity(hass, soco_2)
+
+    with patch(
+        "homeassistant.components.sonos.DISCOVERY_INTERVAL"
+    ) as mock_discovery_interval:
+        # Speed up manual discovery interval so second iteration runs sooner
+        mock_discovery_interval.total_seconds = Mock(side_effect=[0.5, 60])
+        await _setup_hass(hass)
+
+        assert "media_player.bedroom" in entity_registry.entities
+        assert "media_player.living_room" in entity_registry.entities
+
+        with caplog.at_level(logging.DEBUG):
+            caplog.clear()
+            # The discovery events should not fire, wait with a timeout.
+            with pytest.raises(asyncio.TimeoutError):
+                async with asyncio_timeout(1.0):
+                    await speaker_1_activity.event.wait()
+            await hass.async_block_till_done()
+            assert "Activity on Living Room" not in caplog.text
+            assert "Activity on Bedroom" not in caplog.text
+            assert speaker_1_activity.call_count == 0
+            assert speaker_2_activity.call_count == 0
+
+
+async def test_async_poll_manual_hosts_7(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test both succeed, speaker do not exist, new hosts found in visible zones."""
+    soco_1 = soco_factory.cache_mock(
+        _MockSoCoVisibleZones(), "10.10.10.1", "Living Room"
     )
+    soco_2 = soco_factory.cache_mock(_MockSoCoVisibleZones(), "10.10.10.2", "Bedroom")
+    soco_3 = soco_factory.cache_mock(MockSoCo(), "10.10.10.3", "Basement")
+    soco_4 = soco_factory.cache_mock(MockSoCo(), "10.10.10.4", "Garage")
+    soco_5 = soco_factory.cache_mock(MockSoCo(), "10.10.10.5", "Studio")
+
+    soco_1.set_visible_zones({soco_1, soco_2, soco_3, soco_4, soco_5})
+    soco_2.set_visible_zones({soco_1, soco_2, soco_3, soco_4, soco_5})
+
+    await _setup_hass(hass)
     await hass.async_block_till_done()
-    manager: SonosDiscoveryManager = hass.data[DATA_SONOS_DISCOVERY_MANAGER]
 
-    with patch.object(manager, "_async_gethostbyname", side_effect=patch_gethostbyname):
-        manager.hosts.add("10.10.10.1")
-        manager.hosts.add("10.10.10.2")
+    assert "media_player.bedroom" in entity_registry.entities
+    assert "media_player.living_room" in entity_registry.entities
+    assert "media_player.basement" in entity_registry.entities
+    assert "media_player.garage" in entity_registry.entities
+    assert "media_player.studio" in entity_registry.entities
 
-        # Test 1 first device fails, second device successful, speakers do not exist
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ), patch.object(
-            hass,
-            "async_add_executor_job",
-            new=AsyncMock(),
-        ) as mock_async_add_executor_job:
-            mock_async_add_executor_job.side_effect = [OSError(), []]
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_discovery_message.call_count == 1
-            assert mock_async_call_later.call_count == 1
 
-        # Test 2 first device successful, second device fails, speakers do not exist
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ), patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            mock_async_add_executor_job.side_effect = [[], OSError()]
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_discovery_message.call_count == 1
-            assert mock_async_call_later.call_count == 1
+async def test_async_poll_manual_hosts_8(
+    hass: HomeAssistant,
+    soco_factory: SoCoMockFactory,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test both succeed, speaker do not exist, invisible zone."""
+    soco_1 = soco_factory.cache_mock(
+        _MockSoCoVisibleZones(), "10.10.10.1", "Living Room"
+    )
+    soco_2 = soco_factory.cache_mock(_MockSoCoVisibleZones(), "10.10.10.2", "Bedroom")
+    soco_3 = soco_factory.cache_mock(MockSoCo(), "10.10.10.3", "Basement")
+    soco_4 = soco_factory.cache_mock(MockSoCo(), "10.10.10.4", "Garage")
+    soco_5 = soco_factory.cache_mock(MockSoCo(), "10.10.10.5", "Studio")
 
-        # Test 3 both devices fail, speakers do not exist
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ), patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            mock_async_add_executor_job.side_effect = OSError()
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_discovery_message.call_count == 0
-            assert mock_async_call_later.call_count == 1
+    soco_1.set_visible_zones({soco_2, soco_3, soco_4, soco_5})
+    soco_2.set_visible_zones({soco_2, soco_3, soco_4, soco_5})
 
-        # Test 4 both devices are successful, speakers do not exist
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ), patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            mock_async_add_executor_job.return_value = []
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_discovery_message.call_count == 2
-            assert mock_async_call_later.call_count == 1
+    await _setup_hass(hass)
+    await hass.async_block_till_done()
 
-        # Test 5 both succeed, speakers exist and unavailable, ping succeeds
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ) as mock_async_dispatcher_send, patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            speaker_1_mock = Mock()
-            speaker_1_mock.soco.ip_address = "10.10.10.1"
-            speaker_1_mock.available = False
-            speaker_2_mock = Mock()
-            speaker_2_mock.soco.ip_address = "10.10.10.2"
-            speaker_2_mock.available = False
-            manager.data.discovered = {
-                "10.10.10.1": speaker_1_mock,
-                "10.10.10.2": speaker_2_mock,
-            }
-            mock_async_add_executor_job.return_value = []
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 4
-            assert mock_async_dispatcher_send.call_count == 2
-            assert mock_discovery_message.call_count == 0
-            assert mock_async_call_later.call_count == 1
-            manager.data.discovered = {}
-
-        # Test 6 both succeed, speakers exist and unavailable, pings fail
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ) as mock_async_dispatcher_send, patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            speaker_1_mock = Mock()
-            speaker_1_mock.soco.ip_address = "10.10.10.1"
-            speaker_1_mock.available = False
-            speaker_2_mock = Mock()
-            speaker_2_mock.soco.ip_address = "10.10.10.2"
-            speaker_2_mock.available = False
-            manager.data.discovered = {
-                "10.10.10.1": speaker_1_mock,
-                "10.10.10.2": speaker_2_mock,
-            }
-            mock_async_add_executor_job.side_effect = [
-                [],
-                [],
-                SonosUpdateError(),
-                SonosUpdateError(),
-            ]
-            await manager.async_poll_manual_hosts()
-            assert mock_async_add_executor_job.call_count == 4
-            assert mock_async_dispatcher_send.call_count == 0
-            assert mock_discovery_message.call_count == 0
-            assert mock_async_call_later.call_count == 1
-            manager.data.discovered = {}
-
-        # Test 7 both succeed, speaker do not exist, new host found in visible zones
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ) as mock_async_dispatcher_send, patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job:
-            visible_zone_3_mock = Mock()
-            visible_zone_3_mock.ip_address = "10.10.10.3"
-            visible_zone_4_mock = Mock()
-            visible_zone_4_mock.ip_address = "10.10.10.4"
-            visible_zone_5_mock = Mock()
-            visible_zone_5_mock.ip_address = "10.10.10.5"
-            mock_async_add_executor_job.side_effect = [
-                [visible_zone_3_mock],
-                [visible_zone_4_mock, visible_zone_5_mock],
-            ]
-            await manager.async_poll_manual_hosts()
-            assert len(manager.hosts) == 5
-            assert "10.10.10.3" in manager.hosts
-            assert "10.10.10.4" in manager.hosts
-            assert "10.10.10.5" in manager.hosts
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_async_dispatcher_send.call_count == 0
-            assert mock_discovery_message.call_count == 5
-            assert mock_async_call_later.call_count == 1
-            manager.data.discovered = {}
-            manager.hosts.discard("10.10.10.3")
-            manager.hosts.discard("10.10.10.4")
-            manager.hosts.discard("10.10.10.5")
-
-        def device_is_invisible(ip_addr: str) -> bool:
-            if ip_addr == "10.10.10.1":
-                return True
-            return False
-
-        # Test 8 both succeed, speakers do not exist, first one is invisible
-        with patch.object(
-            manager, "_async_handle_discovery_message", new=AsyncMock()
-        ) as mock_discovery_message, patch(
-            "homeassistant.components.sonos.async_call_later"
-        ) as mock_async_call_later, patch(
-            "homeassistant.components.sonos.async_dispatcher_send"
-        ) as mock_async_dispatcher_send, patch.object(
-            hass, "async_add_executor_job", new=AsyncMock()
-        ) as mock_async_add_executor_job, patch.object(
-            manager, "is_device_invisible"
-        ) as mock_is_device_invisible:
-            mock_async_add_executor_job.return_value = []
-            mock_is_device_invisible.side_effect = device_is_invisible
-            await manager.async_poll_manual_hosts()
-            assert len(manager.hosts) == 1
-            assert "10.10.10.2" in manager.hosts
-            assert mock_async_add_executor_job.call_count == 2
-            assert mock_async_dispatcher_send.call_count == 0
-            assert mock_discovery_message.call_count == 1
-            assert mock_async_call_later.call_count == 1
-            manager.data.discovered = {}
+    assert "media_player.bedroom" in entity_registry.entities
+    assert "media_player.living_room" not in entity_registry.entities
+    assert "media_player.basement" in entity_registry.entities
+    assert "media_player.garage" in entity_registry.entities
+    assert "media_player.studio" in entity_registry.entities
