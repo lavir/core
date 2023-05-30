@@ -77,6 +77,20 @@ async def _resetup_platform(
 
         root_config[integration_platform].append(p_config)
 
+    # If new adr0007 style, include that as well.
+    if integration_config := conf.get(integration_name):
+        # Check if it's a multi-platform config
+        added = False
+        for item in integration_config:
+            if isinstance(item, dict) and (
+                current_platform_config := item.get(integration_platform)
+            ):
+                added = True
+                root_config[integration_platform].extend(current_platform_config)
+        # If no valid item was found, it's a simple single platform config
+        if not added:
+            root_config[integration_platform].extend(conf[integration_name])
+
     component = integration.get_component()
 
     if hasattr(component, "async_reset_platform"):
