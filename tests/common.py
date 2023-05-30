@@ -252,7 +252,14 @@ async def async_test_home_assistant(event_loop, load_registries=True):
     # Load the registries
     entity.async_setup(hass)
     if load_registries:
-        with patch("homeassistant.helpers.storage.Store.async_load", return_value=None):
+        with patch(
+            "homeassistant.helpers.storage.Store.async_load", return_value=None
+        ), patch(
+            "homeassistant.helpers.restore_state.RestoreStateData.async_setup_dump",
+            return_value=None,
+        ), patch(
+            "homeassistant.helpers.restore_state.start.async_at_start"
+        ):
             await asyncio.gather(
                 ar.async_load(hass),
                 dr.async_load(hass),
@@ -1062,6 +1069,26 @@ def mock_restore_cache_with_extra_data(
     assert len(data.last_states) == len(states), f"Duplicate entity_id? {states}"
 
     hass.data[key] = data
+
+
+async def async_mock_restore_state_shutdown_restart(
+    hass: HomeAssistant,
+) -> restore_state.RestoreStateData:
+    """Mock shutting down and saving restore state and restoring."""
+    data = restore_state.async_get(hass)
+    await data.async_dump_states()
+    await async_mock_load_restore_state_from_storage(data)
+    return data
+
+
+async def async_mock_load_restore_state_from_storage(
+    hass: HomeAssistant,
+) -> None:
+    """Mock loading restore state from storage.
+
+    hass_storage must already be mocked.
+    """
+    await restore_state.async_get(hass).async_load()
 
 
 class MockEntity(entity.Entity):
