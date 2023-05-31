@@ -496,6 +496,9 @@ discovery30303==0.2.1
 # homeassistant.components.doorbird
 doorbirdpy==2.1.0
 
+# homeassistant.components.dremel_3d_printer
+dremel3dpy==2.1.1
+
 # homeassistant.components.dsmr
 dsmr_parser==0.33
 
@@ -719,7 +722,7 @@ hole==0.8.0
 holidays==0.21.13
 
 # homeassistant.components.frontend
-home-assistant-frontend==20230526.0
+home-assistant-frontend==20230531.0
 
 # homeassistant.components.conversation
 home-assistant-intents==2023.5.30
@@ -794,7 +797,7 @@ justnimbus==0.6.0
 kegtron-ble==0.4.0
 
 # homeassistant.components.knx
-knx_frontend==2023.5.28.94855
+knx_frontend==2023.5.31.141540
 
 # homeassistant.components.konnected
 konnected==1.2.0
@@ -851,7 +854,7 @@ mcstatus==6.0.0
 meater-python==0.0.8
 
 # homeassistant.components.melnor
-melnor-bluetooth==0.0.21
+melnor-bluetooth==0.0.22
 
 # homeassistant.components.meteo_france
 meteofrance-api==1.2.0
@@ -1895,7 +1898,7 @@ velbus-aio==2023.2.0
 venstarcolortouch==0.19
 
 # homeassistant.components.vilfo
-vilfo-api-client==0.3.2
+vilfo-api-client==0.4.1
 
 # homeassistant.components.voip
 voip-utils==0.0.7
@@ -1995,7 +1998,7 @@ zeroconf==0.63.0
 zeversolar==0.3.1
 
 # homeassistant.components.zha
-zha-quirks==0.0.99
+zha-quirks==0.0.100
 
 # homeassistant.components.zha
 zigpy-deconz==0.21.0
@@ -2013,7 +2016,7 @@ zigpy-znp==0.11.1
 zigpy==0.55.0
 
 # homeassistant.components.zwave_js
-zwave-js-server-python==0.48.1
+zwave-js-server-python==0.49.0
 
 # homeassistant.components.zwave_me
 zwave_me_ws==0.4.3

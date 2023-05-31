@@ -97,6 +97,14 @@
         }
       }
     },
+    "switch": {
+      "child_lock": {
+        "name": "Child lock"
+      },
+      "status_indicator": {
+        "name": "Status indicator light"
+      }
+    },
     "vacuum": {
       "roborock": {
         "state_attributes": {
