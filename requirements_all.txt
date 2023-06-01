@@ -990,7 +990,7 @@ hole==0.8.0
 holidays==0.21.13
 
 # homeassistant.components.frontend
-home-assistant-frontend==20230601.0
+home-assistant-frontend==20230601.1
 
 # homeassistant.components.conversation
 home-assistant-intents==2023.5.30
@@ -1245,7 +1245,7 @@ ndms2-client==0.1.2
 nessclient==0.10.0
 
 # homeassistant.components.netdata
-netdata==1.0.1
+netdata==1.1.0
 
 # homeassistant.components.discovery
 netdisco==3.0.0
@@ -1628,7 +1628,7 @@ pydaikin==2.9.1
 pydanfossair==0.1.0
 
 # homeassistant.components.deconz
-pydeconz==112
+pydeconz==113
 
 # homeassistant.components.delijn
 pydelijn==1.0.0
