@@ -153,7 +153,7 @@ async def async_ip_on_same_subnet(
 async def async_get_announced_addresses(hass: HomeAssistant) -> list[str]:
     """Return a list of IP addresses to announce via zeroconf.
 
-    If first_ip is not None, it will be the first address in the list.
+    The default ip address is always returned first if available.
     """
     adapters = await async_get_adapters(hass)
     addresses: list[str] = []
@@ -164,7 +164,7 @@ async def async_get_announced_addresses(hass: HomeAssistant) -> list[str]:
         for ips in adapter["ipv4"]:
             addresses.append(str(IPv4Address(ips["address"])))
         for ips in adapter["ipv6"]:
-            addresses.append(str(IPv6Address(f"{ips['address']}%{ips['scope_id']}")))
+            addresses.append(str(IPv6Address(ips["address"])))
 
     # Puts the default IPv4 address first in the list to preserve compatibility,
     # because some mDNS implementations ignores anything but the first announced
