@@ -2143,7 +2143,7 @@ python-qbittorrent==0.4.2
 python-ripple-api==0.0.3
 
 # homeassistant.components.roborock
-python-roborock==0.21.0
+python-roborock==0.23.4
 
 # homeassistant.components.smarttub
 python-smarttub==0.0.33
@@ -2643,7 +2643,7 @@ wakeonlan==2.1.0
 wallbox==0.4.12
 
 # homeassistant.components.waqi
-waqiasync==1.0.0
+waqiasync==1.1.0
 
 # homeassistant.components.folder_watcher
 watchdog==2.3.1
