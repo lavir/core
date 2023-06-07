@@ -770,7 +770,7 @@ hole==0.8.0
 holidays==0.21.13
 
 # homeassistant.components.frontend
-home-assistant-frontend==20230605.0
+home-assistant-frontend==20230606.0
 
 # homeassistant.components.conversation
 home-assistant-intents==2023.6.5
@@ -1206,6 +1206,9 @@ pydeconz==113
 # homeassistant.components.dexcom
 pydexcom==0.2.3
 
+# homeassistant.components.discovergy
+pydiscovergy==1.2.1
+
 # homeassistant.components.android_ip_webcam
 pydroid-ipcam==2.0.0
 
@@ -1598,7 +1601,7 @@ pytrafikverket==0.3.3
 pyudev==0.23.2
 
 # homeassistant.components.unifiprotect
-pyunifiprotect==4.9.1
+pyunifiprotect==4.10.0
 
 # homeassistant.components.uptimerobot
 pyuptimerobot==22.2.0
