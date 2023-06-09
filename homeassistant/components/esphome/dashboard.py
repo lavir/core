@@ -19,6 +19,9 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import DOMAIN
 
+_LOGGER = logging.getLogger(__name__)
+
+
 KEY_DASHBOARD_MANAGER = "esphome_dashboard_manager"
 
 STORAGE_KEY = "esphome.dashboard"
@@ -64,9 +67,9 @@ class ESPHomeDashboardManager:
     async def async_setup(self) -> None:
         """Restore the dashboard from storage."""
         self._data = await self._store.async_load()
-        if data := self._data:
+        if (data := self._data) and (info := data.get("info")):
             await self.async_set_dashboard_info(
-                data["addon_slug"], data["host"], data["port"]
+                info["addon_slug"], info["host"], info["port"]
             )
 
     @callback
@@ -98,7 +101,7 @@ class ESPHomeDashboardManager:
         try:
             await dashboard.async_request_refresh()
         except UpdateFailed as err:
-            logging.getLogger(__name__).error("Ignoring dashboard info: %s", err)
+            _LOGGER.error("Ignoring dashboard info: %s", err)
             return
 
         self._current_dashboard = dashboard
@@ -110,7 +113,7 @@ class ESPHomeDashboardManager:
             EVENT_HOMEASSISTANT_STOP, on_hass_stop
         )
 
-        new_data = {"addon_slug": addon_slug, "host": host, "port": port}
+        new_data = {"info": {"addon_slug": addon_slug, "host": host, "port": port}}
         if self._data != new_data:
             await self._store.async_save(new_data)
 
@@ -125,6 +128,9 @@ class ESPHomeDashboardManager:
             for flow in hass.config_entries.flow.async_progress()
             if flow["handler"] == DOMAIN and flow["context"]["source"] == SOURCE_REAUTH
         ]
+        _LOGGER.debug(
+            "Reloading %d and re-authenticating %d", len(reloads), len(reauths)
+        )
         if reloads or reauths:
             await asyncio.gather(*reloads, *reauths)
 
@@ -158,7 +164,7 @@ class ESPHomeDashboard(DataUpdateCoordinator[dict[str, ConfiguredDevice]]):
         """Initialize."""
         super().__init__(
             hass,
-            logging.getLogger(__name__),
+            _LOGGER,
             name="ESPHome Dashboard",
             update_interval=timedelta(minutes=5),
         )
