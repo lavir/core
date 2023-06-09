@@ -1,4 +1,5 @@
 """Test ESPHome dashboard features."""
+import asyncio
 from unittest.mock import patch
 
 from aioesphomeapi import DeviceInfo, InvalidAuthAPIError
@@ -9,6 +10,55 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from . import VALID_NOISE_PSK
+
+from tests.common import MockConfigEntry
+
+
+async def test_dashboard_storage(
+    hass: HomeAssistant, init_integration, mock_dashboard, hass_storage
+) -> None:
+    """Test dashboard storage."""
+    assert hass_storage[dashboard.STORAGE_KEY]["data"] == {
+        "info": {"addon_slug": "mock-slug", "host": "mock-host", "port": 1234}
+    }
+    await dashboard.async_set_dashboard_info(hass, "test-slug", "new-host", 6052)
+    assert hass_storage[dashboard.STORAGE_KEY]["data"] == {
+        "info": {"addon_slug": "test-slug", "host": "new-host", "port": 6052}
+    }
+
+
+async def test_restore_dashboard_storage(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, hass_storage
+) -> MockConfigEntry:
+    """Restore dashboard url and slug from storage."""
+    hass_storage[dashboard.STORAGE_KEY] = {
+        "version": dashboard.STORAGE_VERSION,
+        "minor_version": dashboard.STORAGE_VERSION,
+        "key": dashboard.STORAGE_KEY,
+        "data": {"info": {"addon_slug": "test-slug", "host": "new-host", "port": 6052}},
+    }
+    with patch.object(
+        dashboard, "async_get_or_create_dashboard_manager"
+    ) as mock_get_or_create:
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+        assert mock_get_or_create.call_count == 1
+
+
+async def test_setup_dashboard_fails(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, hass_storage
+) -> MockConfigEntry:
+    """Test that nothing is stored on failed dashboard setup."""
+    with patch.object(
+        dashboard.ESPHomeDashboardAPI, "get_devices", side_effect=asyncio.TimeoutError
+    ) as mock_get_devices:
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+        await dashboard.async_set_dashboard_info(hass, "test-slug", "test-host", 6052)
+        assert mock_config_entry.state == ConfigEntryState.LOADED
+        assert mock_get_devices.call_count == 1
+
+    assert dashboard.STORAGE_KEY not in hass_storage
 
 
 async def test_new_dashboard_fix_reauth(
