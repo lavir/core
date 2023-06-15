@@ -14,6 +14,7 @@ from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.singleton import singleton
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -36,23 +37,13 @@ async def async_setup(hass: HomeAssistant) -> None:
     await async_get_or_create_dashboard_manager(hass)
 
 
-@callback
-def async_get_dashboard_manager(hass: HomeAssistant) -> ESPHomeDashboardManager | None:
-    """Get the dashboard manager if it already exists."""
-    manager: ESPHomeDashboardManager | None = hass.data.get(KEY_DASHBOARD_MANAGER)
-    return manager
-
-
+@singleton(KEY_DASHBOARD_MANAGER)
 async def async_get_or_create_dashboard_manager(
     hass: HomeAssistant,
 ) -> ESPHomeDashboardManager:
     """Get the dashboard manager or create it."""
-    if KEY_DASHBOARD_MANAGER not in hass.data:
-        manager = ESPHomeDashboardManager(hass)
-        await manager.async_setup()
-        hass.data[KEY_DASHBOARD_MANAGER] = manager
-    else:
-        manager = hass.data[KEY_DASHBOARD_MANAGER]
+    manager = ESPHomeDashboardManager(hass)
+    await manager.async_setup()
     return manager
 
 
@@ -102,8 +93,12 @@ class ESPHomeDashboardManager:
             hass, addon_slug, url, async_get_clientsession(hass)
         )
         await dashboard.async_request_refresh()
-        if not dashboard.last_update_success:
-            _LOGGER.error("Ignoring dashboard info: %s", dashboard.last_exception)
+        if not cur_dashboard and not dashboard.last_update_success:
+            # If there was no previous dashboard and the new one is not available,
+            # we skip setup and wait for discovery.
+            _LOGGER.error(
+                "Dashboard unavailable; skipping setup: %s", dashboard.last_exception
+            )
             return
 
         self._current_dashboard = dashboard
@@ -125,11 +120,20 @@ class ESPHomeDashboardManager:
             if entry.state == ConfigEntryState.LOADED
         ]
         # Re-auth flows will check the dashboard for encryption key when the form is requested
-        reauths = [
-            hass.config_entries.flow.async_configure(flow["flow_id"])
-            for flow in hass.config_entries.flow.async_progress()
-            if flow["handler"] == DOMAIN and flow["context"]["source"] == SOURCE_REAUTH
-        ]
+        # but we only trigger reauth if the dashboard is available.
+        if dashboard.last_update_success:
+            reauths = [
+                hass.config_entries.flow.async_configure(flow["flow_id"])
+                for flow in hass.config_entries.flow.async_progress()
+                if flow["handler"] == DOMAIN
+                and flow["context"]["source"] == SOURCE_REAUTH
+            ]
+        else:
+            reauths = []
+            _LOGGER.error(
+                "Dashboard unavailable; skipping reauth: %s", dashboard.last_exception
+            )
+
         _LOGGER.debug(
             "Reloading %d and re-authenticating %d", len(reloads), len(reauths)
         )
@@ -140,9 +144,8 @@ class ESPHomeDashboardManager:
 @callback
 def async_get_dashboard(hass: HomeAssistant) -> ESPHomeDashboard | None:
     """Get an instance of the dashboard if set."""
-    if manager := async_get_dashboard_manager(hass):
-        return manager.async_get()
-    return None
+    manager: ESPHomeDashboardManager | None = hass.data.get(KEY_DASHBOARD_MANAGER)
+    return manager.async_get() if manager else None
 
 
 async def async_set_dashboard_info(
