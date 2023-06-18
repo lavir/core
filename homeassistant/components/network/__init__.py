@@ -151,7 +151,7 @@ async def async_ip_on_same_subnet(
 
 
 async def async_get_announce_addresses(hass: HomeAssistant) -> list[str]:
-    """Return a list of IP addresses to announce via zeroconf.
+    """Return a list of IP addresses to announce/use via zeroconf/ssdp/etc.
 
     The default ip address is always returned first if available.
     """
