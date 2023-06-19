@@ -564,8 +564,8 @@ def _safe_repr(obj: Any) -> str:
     """
     try:
         return repr(obj)
-    except Exception:  # pylint: disable=broad-except
-        return f"Failed to serialize {type(obj)}"
+    except Exception as ex:  # pylint: disable=broad-except
+        return f"Failed to serialize {type(obj)}: {ex}"
 
 
 def _find_backrefs_not_to_self(_object: Any) -> list[str]:
