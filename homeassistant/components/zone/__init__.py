@@ -115,7 +115,6 @@ def async_active_zone(
     closest = None
     # This can be called before async_setup by device tracker
     zone_entity_ids: list[str] = hass.data.get(ZONE_ENTITY_IDS, [])
-
     for entity_id in zone_entity_ids:
         zone = hass.states.get(entity_id)
         if (
@@ -148,6 +147,28 @@ def async_active_zone(
             closest = zone
 
     return closest
+
+
+@callback
+def async_setup_track_zone_entity_ids(hass: HomeAssistant) -> None:
+    """Set up track of entity IDs for zones."""
+    zone_entity_ids: list[str] = hass.states.async_entity_ids(DOMAIN)
+    hass.data[ZONE_ENTITY_IDS] = zone_entity_ids
+
+    @callback
+    def _async_add_zone_entity_id(event_: Event) -> None:
+        """Add zone entity ID."""
+        zone_entity_ids.append(event_.data[ATTR_ENTITY_ID])
+        zone_entity_ids.sort()
+
+    @callback
+    def _async_remove_zone_entity_id(event_: Event) -> None:
+        """Remove zone entity ID."""
+        zone_entity_ids.remove(event_.data[ATTR_ENTITY_ID])
+        zone_entity_ids.sort()
+
+    event.async_track_state_added_domain(hass, DOMAIN, _async_add_zone_entity_id)
+    event.async_track_state_removed_domain(hass, DOMAIN, _async_remove_zone_entity_id)
 
 
 def in_zone(zone: State, latitude: float, longitude: float, radius: float = 0) -> bool:
@@ -193,8 +214,7 @@ class ZoneStorageCollection(collection.DictStorageCollection):
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up configured zones as well as Home Assistant zone if necessary."""
-    zone_entity_ids: list[str] = []
-    hass.data[ZONE_ENTITY_IDS] = zone_entity_ids
+    async_setup_track_zone_entity_ids(hass)
 
     component = entity_component.EntityComponent[Zone](_LOGGER, DOMAIN, hass)
     id_manager = collection.IDManager()
@@ -385,14 +405,6 @@ class Zone(collection.CollectionEntity):
                 self._person_state_change_listener,
             ).async_remove
         )
-        zone_entity_ids: list[str] = self.hass.data[ZONE_ENTITY_IDS]
-        zone_entity_ids.append(self.entity_id)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Run when entity is about to be removed from hass."""
-        await super().async_will_remove_from_hass()
-        zone_entity_ids: list[str] = self.hass.data[ZONE_ENTITY_IDS]
-        zone_entity_ids.remove(self.entity_id)
 
     @callback
     def _generate_attrs(self) -> None:
