@@ -897,8 +897,7 @@ class EsphomeEntity(Entity, Generic[_InfoT, _StateT]):
             # Don't update the HA state yet when the device comes online.
             # Only update the HA state when the full state arrives
             # through the next entity state packet.
-            return
-        self._on_state_update()
+            self._on_state_update()
 
     @callback
     def _on_entry_data_changed(self) -> None:
