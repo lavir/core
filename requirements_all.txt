@@ -194,7 +194,7 @@ aioairq==0.2.4
 aioairzone-cloud==0.1.8
 
 # homeassistant.components.airzone
-aioairzone==0.6.3
+aioairzone==0.6.4
 
 # homeassistant.components.ambient_station
 aioambient==2023.04.0
@@ -234,7 +234,7 @@ aioecowitt==2023.5.0
 aioemonitor==1.0.5
 
 # homeassistant.components.esphome
-aioesphomeapi==14.0.0
+aioesphomeapi==14.1.0
 
 # homeassistant.components.flo
 aioflo==2021.11.0
