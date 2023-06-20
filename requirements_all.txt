@@ -549,7 +549,7 @@ bluetooth-data-tools==1.2.0
 bond-async==0.1.23
 
 # homeassistant.components.bosch_shc
-boschshcpy==0.2.35
+boschshcpy==0.2.57
 
 # homeassistant.components.amazon_polly
 # homeassistant.components.route53
@@ -945,13 +945,13 @@ ha-ffmpeg==3.1.0
 ha-iotawattpy==0.1.1
 
 # homeassistant.components.philips_js
-ha-philipsjs==3.0.0
+ha-philipsjs==3.1.0
 
 # homeassistant.components.habitica
 habitipy==0.2.0
 
 # homeassistant.components.cloud
-hass-nabucasa==0.67.1
+hass-nabucasa==0.68.0
 
 # homeassistant.components.splunk
 hass-splunk==0.1.1
@@ -1026,7 +1026,7 @@ ibeacon-ble==1.0.1
 ibmiotf==0.3.4
 
 # homeassistant.components.local_calendar
-ical==4.5.1
+ical==4.5.4
 
 # homeassistant.components.ping
 icmplib==3.0
@@ -1667,7 +1667,7 @@ pyeverlights==0.1.0
 pyevilgenius==2.0.0
 
 # homeassistant.components.ezviz
-pyezviz==0.2.0.17
+pyezviz==0.2.1.2
 
 # homeassistant.components.fibaro
 pyfibaro==0.7.1
