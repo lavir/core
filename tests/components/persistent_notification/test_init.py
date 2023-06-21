@@ -1,8 +1,6 @@
 """The tests for the persistent notification component."""
 from typing import Any
 
-import pytest
-
 import homeassistant.components.persistent_notification as pn
 from homeassistant.components.persistent_notification import trigger
 from homeassistant.components.websocket_api.const import TYPE_RESULT
@@ -10,12 +8,6 @@ from homeassistant.core import Context, HomeAssistant, callback
 from homeassistant.setup import async_setup_component
 
 from tests.typing import WebSocketGenerator
-
-
-@pytest.fixture(autouse=True)
-async def setup_integration(hass):
-    """Set up persistent notification integration."""
-    assert await async_setup_component(hass, pn.DOMAIN, {})
 
 
 async def test_create(hass: HomeAssistant) -> None:
