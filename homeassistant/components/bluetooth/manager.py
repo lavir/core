@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
+from functools import cache
 import itertools
 import logging
 from typing import TYPE_CHECKING, Any, Final
@@ -100,7 +101,11 @@ def _dispatch_bleak_callback(
 
 
 class BluetoothManager:
-    """Manage Bluetooth."""
+    """Manage Bluetooth.
+
+    This class is expected to be a singleton and should
+    never be instantiated more than once.
+    """
 
     def __init__(
         self,
@@ -688,24 +693,42 @@ class BluetoothManager:
         if service_info := self._all_history.get(address):
             self._async_trigger_matching_discovery(service_info)
 
+    @cache  # BluetoothManager is immortal # pylint: disable=method-cache-max-size-none
     def _get_scanners_by_type(self, connectable: bool) -> list[BaseHaScanner]:
-        """Return the scanners by type."""
+        """Return the scanners by type.
+
+        This is a convenience wrapper to fetch the right attribute.
+
+        The underlying attributes never change.
+        """
         if connectable:
             return self._connectable_scanners
         return self._non_connectable_scanners
 
+    @cache  # BluetoothManager is immortal # pylint: disable=method-cache-max-size-none
     def _get_unavailable_callbacks_by_type(
         self, connectable: bool
     ) -> dict[str, list[Callable[[BluetoothServiceInfoBleak], None]]]:
-        """Return the unavailable callbacks by type."""
+        """Return the unavailable callbacks by type.
+
+        This is a convenience wrapper to fetch the right attribute.
+
+        The underlying attributes never change.
+        """
         if connectable:
             return self._connectable_unavailable_callbacks
         return self._unavailable_callbacks
 
+    @cache  # BluetoothManager is immortal # pylint: disable=method-cache-max-size-none
     def _get_history_by_type(
         self, connectable: bool
     ) -> dict[str, BluetoothServiceInfoBleak]:
-        """Return the history by type."""
+        """Return the history by type.
+
+        This is a convenience wrapper to fetch the right attribute.
+
+        The underlying attributes never change.
+        """
         return self._connectable_history if connectable else self._all_history
 
     def async_register_scanner(
