@@ -100,11 +100,7 @@ def _dispatch_bleak_callback(
 
 
 class BluetoothManager:
-    """Manage Bluetooth.
-
-    This class is expected to be a singleton and should
-    never be instantiated more than once.
-    """
+    """Manage Bluetooth."""
 
     def __init__(
         self,
@@ -250,9 +246,12 @@ class BluetoothManager:
         self, address: str, connectable: bool
     ) -> list[BluetoothScannerDevice]:
         """Get BluetoothScannerDevice by address."""
-        scanners = [*self._connectable_scanners]
         if not connectable:
-            scanners.extend(self._non_connectable_scanners)
+            scanners: Iterable[BaseHaScanner] = itertools.chain(
+                self._connectable_scanners, self._non_connectable_scanners
+            )
+        else:
+            scanners = self._connectable_scanners
         return [
             BluetoothScannerDevice(scanner, *device_adv)
             for scanner in scanners
