@@ -375,6 +375,12 @@ class EsphomeLight(EsphomeEntity[LightInfo, LightState], LightEntity):
         """Return the CT color value in Kelvin."""
         return _mired_to_kelvin(self._state.color_temperature)
 
+    @property
+    @esphome_state_property
+    def effect(self) -> str | None:
+        """Return the current effect."""
+        return self._state.effect
+
     @callback
     def _on_static_info_update(self, static_info: EntityInfo) -> None:
         """Set attrs from static info."""
