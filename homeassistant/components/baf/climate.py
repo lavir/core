@@ -27,7 +27,9 @@ async def async_setup_entry(
     """Set up BAF fan auto comfort."""
     data: BAFData = hass.data[DOMAIN][entry.entry_id]
     if data.device.has_fan and data.device.has_auto_comfort:
-        async_add_entities([BAFAutoComfort(data.device)])
+        async_add_entities(
+            [BAFAutoComfort(data.device, f"{data.device.name} Auto Comfort")]
+        )
 
 
 class BAFAutoComfort(BAFEntity, ClimateEntity):
@@ -36,7 +38,6 @@ class BAFAutoComfort(BAFEntity, ClimateEntity):
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.FAN_ONLY]
-    _attr_translation_key = "auto_comfort"
 
     @callback
     def _async_update_attrs(self) -> None:

@@ -63,11 +63,9 @@ class BAFLight(BAFEntity, LightEntity):
 class BAFFanLight(BAFLight):
     """Representation of a Big Ass Fans light on a fan."""
 
-    _attr_name = None
-
     def __init__(self, device: Device) -> None:
         """Init a fan light."""
-        super().__init__(device)
+        super().__init__(device, device.name)
         self._attr_supported_color_modes = {ColorMode.BRIGHTNESS}
         self._attr_color_mode = ColorMode.BRIGHTNESS
 
@@ -77,7 +75,7 @@ class BAFStandaloneLight(BAFLight):
 
     def __init__(self, device: Device) -> None:
         """Init a standalone light."""
-        super().__init__(device)
+        super().__init__(device, f"{device.name} Light")
         self._attr_supported_color_modes = {ColorMode.COLOR_TEMP}
         self._attr_color_mode = ColorMode.COLOR_TEMP
         self._attr_min_mireds = color_temperature_kelvin_to_mired(
