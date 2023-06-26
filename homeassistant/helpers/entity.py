@@ -563,7 +563,7 @@ class Entity(ABC):
         """Time that a context is considered recent."""
         return self._attr_context_recent_time
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added.
 
@@ -575,7 +575,7 @@ class Entity(ABC):
             return self.entity_description.entity_registry_enabled_default
         return True
 
-    @property
+    @cached_property
     def entity_registry_visible_default(self) -> bool:
         """Return if the entity should be visible when first added.
 
@@ -587,12 +587,12 @@ class Entity(ABC):
             return self.entity_description.entity_registry_visible_default
         return True
 
-    @property
+    @cached_property
     def attribution(self) -> str | None:
         """Return the attribution."""
         return self._attr_attribution
 
-    @property
+    @cached_property
     def entity_category(self) -> EntityCategory | None:
         """Return the category of the entity, if any."""
         if hasattr(self, "_attr_entity_category"):
@@ -601,7 +601,7 @@ class Entity(ABC):
             return self.entity_description.entity_category
         return None
 
-    @property
+    @cached_property
     def translation_key(self) -> str | None:
         """Return the translation key to translate the entity's states."""
         if hasattr(self, "_attr_translation_key"):
