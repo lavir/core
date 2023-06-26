@@ -241,15 +241,15 @@ async def async_setup_entry(  # noqa: C901
                 severity=IssueSeverity.WARNING,
                 translation_key="service_calls_not_allowed",
                 translation_placeholders={
-                    "name": device_info.name,
+                    "name": device_info.friendly_name or device_info.name,
                 },
             )
             _LOGGER.error(
                 "%s: Service call %s.%s: with data %s rejected; "
                 "If you trust this device and want to allow access for it to make "
-                "arbitrary Home Assistant service calls, you can enable this "
+                "Home Assistant service calls, you can enable this "
                 "functionality in the options flow",
-                device_info.name,
+                device_info.friendly_name or device_info.name,
                 domain,
                 service_name,
                 service_data,

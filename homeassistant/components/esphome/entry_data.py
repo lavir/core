@@ -117,7 +117,7 @@ class RuntimeEntryData:
     entity_info_callbacks: dict[
         type[EntityInfo], list[Callable[[list[EntityInfo]], None]]
     ] = field(default_factory=dict)
-    entity_info_key_remove_coros: dict[
+    entity_info_key_remove_callbacks: dict[
         tuple[type[EntityInfo], int], list[Callable[[], Coroutine[Any, Any, None]]]
     ] = field(default_factory=dict)
     entity_info_key_updated_callbacks: dict[
@@ -163,18 +163,18 @@ class RuntimeEntryData:
         return _unsub
 
     @callback
-    def async_register_key_static_info_remove_coro(
+    def async_register_key_static_info_remove_callback(
         self,
         static_info: EntityInfo,
-        coro: Callable[[], Coroutine[Any, Any, None]],
+        callback_: Callable[[], Coroutine[Any, Any, None]],
     ) -> CALLBACK_TYPE:
         """Register to receive callbacks when static info is removed for a specific key."""
-        coro_key = (type(static_info), static_info.key)
-        coros = self.entity_info_key_remove_coros.setdefault(coro_key, [])
-        coros.append(coro)
+        callback_key = (type(static_info), static_info.key)
+        callbacks = self.entity_info_key_remove_callbacks.setdefault(callback_key, [])
+        callbacks.append(callback_)
 
         def _unsub() -> None:
-            coros.remove(coro)
+            callbacks.remove(callback_)
 
         return _unsub
 
@@ -245,13 +245,13 @@ class RuntimeEntryData:
 
     async def async_remove_entities(self, static_infos: Iterable[EntityInfo]) -> None:
         """Schedule the removal of an entity."""
-        coros: list[Coroutine[Any, Any, None]] = []
+        callbacks: list[Coroutine[Any, Any, None]] = []
         for static_info in static_infos:
-            coro_key = (type(static_info), static_info.key)
-            if coros_for_key := self.entity_info_key_remove_coros.get(coro_key):
-                coros.extend([coros_for_key() for coros_for_key in coros_for_key])
-        if coros:
-            await asyncio.gather(*coros)
+            callback_key = (type(static_info), static_info.key)
+            if key_callbacks := self.entity_info_key_remove_callbacks.get(callback_key):
+                callbacks.extend([callback_() for callback_ in key_callbacks])
+        if callbacks:
+            await asyncio.gather(*callbacks)
 
     @callback
     def async_update_entity_infos(self, static_infos: Iterable[EntityInfo]) -> None:
@@ -420,7 +420,7 @@ class RuntimeEntryData:
             return store_data
 
         self._pending_storage = _memorized_storage
-        self.store.async_delay_save(self._pending_storage, SAVE_DELAY)
+        self.store.async_delay_save(_memorized_storage, SAVE_DELAY)
 
     async def async_cleanup(self) -> None:
         """Cleanup the entry data when disconnected or unloading."""
