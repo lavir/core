@@ -498,7 +498,7 @@ class Entity(ABC):
         """
         return self._attr_device_info
 
-    @property
+    @cached_property
     def device_class(self) -> str | None:
         """Return the class of this device, from component DEVICE_CLASSES."""
         if hasattr(self, "_attr_device_class"):
