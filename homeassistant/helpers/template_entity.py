@@ -8,6 +8,7 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     CONF_STATE_CLASS,
     DEVICE_CLASSES_SCHEMA,
@@ -528,7 +529,7 @@ class TriggerBaseEntity(Entity):
         """Return unique ID of the entity."""
         return self._unique_id
 
-    @property
+    @cached_property
     def device_class(self):  # type: ignore[no-untyped-def]
         """Return device class of the entity."""
         return self._config.get(CONF_DEVICE_CLASS)

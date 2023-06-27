@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from aiomusiccast.capabilities import OptionSetter
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -46,7 +47,7 @@ class SelectableCapapility(MusicCastCapabilityEntity, SelectEntity):
         value = {val: key for key, val in self.capability.options.items()}[option]
         await self.capability.set(value)
 
-    @property
+    @cached_property
     def translation_key(self) -> str | None:
         """Return the translation key to translate the entity's states."""
         return TRANSLATION_KEY_MAPPING.get(self.capability.id)

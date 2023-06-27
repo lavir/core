@@ -6,6 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA,
     PLATFORM_SCHEMA,
@@ -231,7 +232,7 @@ class ThresholdSensor(BinarySensorEntity):
         """Return true if sensor is on."""
         return self._state
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the sensor class of the sensor."""
         return self._device_class

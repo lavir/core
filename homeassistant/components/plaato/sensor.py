@@ -4,6 +4,7 @@ from __future__ import annotations
 from pyplaato.models.device import PlaatoDevice
 from pyplaato.plaato import PlaatoKeg
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -72,7 +73,7 @@ async def async_setup_entry(
 class PlaatoSensor(PlaatoEntity, SensorEntity):
     """Representation of a Plaato Sensor."""
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the class of this device, from SensorDeviceClass."""
         if (

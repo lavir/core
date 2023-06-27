@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.cover import (
     ATTR_CURRENT_POSITION,
     CoverDeviceClass,
@@ -36,7 +37,7 @@ async def async_setup_entry(
 class DynaliteCover(DynaliteBase, CoverEntity):
     """Representation of a Dynalite Channel as a Home Assistant Cover."""
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass:
         """Return the class of the device."""
         device_class = try_parse_enum(CoverDeviceClass, self._device.device_class)

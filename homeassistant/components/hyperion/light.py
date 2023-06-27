@@ -9,6 +9,7 @@ from typing import Any
 
 from hyperion import client, const
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_EFFECT,
@@ -173,11 +174,6 @@ class HyperionBaseLight(LightEntity):
     def _compute_name(self, instance_name: str) -> str:
         """Compute the name of the light."""
         raise NotImplementedError
-
-    @property
-    def entity_registry_enabled_default(self) -> bool:
-        """Whether or not the entity is enabled by default."""
-        return True
 
     @property
     def name(self) -> str:
@@ -564,7 +560,7 @@ class HyperionPriorityLight(HyperionBaseLight):
         """Compute the name of the light."""
         return f"{instance_name} {NAME_SUFFIX_HYPERION_PRIORITY_LIGHT}".strip()
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Whether or not the entity is enabled by default."""
         return False

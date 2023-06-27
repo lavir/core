@@ -6,6 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.media_player import (
     ATTR_APP_ID,
     ATTR_APP_NAME,
@@ -271,7 +272,7 @@ class UniversalMediaPlayer(MediaPlayerEntity):
             DOMAIN, service_name, service_data, blocking=True, context=self._context
         )
 
-    @property
+    @cached_property
     def device_class(self) -> MediaPlayerDeviceClass | None:
         """Return the class of this device."""
         return self._device_class

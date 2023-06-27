@@ -6,6 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.cover import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
@@ -317,7 +318,7 @@ class CoverTemplate(TemplateEntity, CoverEntity):
         """
         return self._tilt_value
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass | None:
         """Return the device class of the cover."""
         return self._device_class

@@ -9,6 +9,7 @@ from typing import Any
 import pysaj
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     PLATFORM_SCHEMA,
     SensorDeviceClass,
@@ -211,7 +212,7 @@ class SAJsensor(SensorEntity):
         """Return the unit the value is expressed in."""
         return SAJ_UNIT_MAPPINGS[self._sensor.unit]
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the device class the sensor belongs to."""
         if self.native_unit_of_measurement == UnitOfPower.WATT:

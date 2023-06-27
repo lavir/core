@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
@@ -246,7 +247,7 @@ class WeatherTemplate(TemplateEntity, WeatherEntity):
         """Return the forecast."""
         return self._forecast
 
-    @property
+    @cached_property
     def attribution(self) -> str | None:
         """Return the attribution."""
         if self._attribution is None:

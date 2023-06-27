@@ -4,6 +4,7 @@ import logging
 from serial import SerialException
 
 from homeassistant import core
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.media_player import (
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
@@ -167,7 +168,7 @@ class MonopriceZone(MediaPlayerEntity):
         idx = state.source
         self._attr_source = self._source_id_name.get(idx)
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         return self._zone_id < 20 or self._update_success

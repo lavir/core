@@ -6,6 +6,7 @@ from typing import cast
 from jaraco.abode.devices.sensor import BinarySensor as ABBinarySensor
 from jaraco.abode.helpers import constants as CONST
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -50,7 +51,7 @@ class AbodeBinarySensor(AbodeDevice, BinarySensorEntity):
         """Return True if the binary sensor is on."""
         return cast(bool, self._device.is_on)
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the class of the binary sensor."""
         if self._device.get_value("is_window") == "1":

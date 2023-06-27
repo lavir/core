@@ -14,6 +14,7 @@ from pyisy.constants import (
 from pyisy.helpers import NodeProperty
 from pyisy.nodes import Group, Node
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -258,7 +259,7 @@ class ISYBinarySensorEntity(ISYNodeEntity, BinarySensorEntity):
             return None
         return bool(self._node.status)
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the class of this device.
 
@@ -521,7 +522,7 @@ class ISYBinarySensorHeartbeat(ISYNodeEntity, BinarySensorEntity, RestoreEntity)
         """
         return bool(self._computed_state)
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass:
         """Get the class of this device."""
         return BinarySensorDeviceClass.BATTERY

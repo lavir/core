@@ -10,6 +10,7 @@ from typing import Any
 from typing_extensions import Self
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA,
     DOMAIN as BINARY_SENSOR_DOMAIN,
@@ -294,7 +295,7 @@ class BinarySensorTemplate(TemplateEntity, BinarySensorEntity, RestoreEntity):
         """Return true if sensor is on."""
         return self._state
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the sensor class of the binary sensor."""
         return self._device_class

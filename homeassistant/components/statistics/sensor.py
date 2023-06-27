@@ -11,6 +11,7 @@ from typing import Any, cast
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.components.recorder import get_instance, history
 from homeassistant.components.sensor import (
@@ -386,7 +387,7 @@ class StatisticsSensor(SensorEntity):
             unit = base_unit + "/s"
         return unit
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the class of this device."""
         if self._state_characteristic in STATS_DATETIME:

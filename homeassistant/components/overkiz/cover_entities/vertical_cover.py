@@ -11,6 +11,7 @@ from pyoverkiz.enums import (
     UIWidget,
 )
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.cover import (
     ATTR_POSITION,
     CoverDeviceClass,
@@ -64,7 +65,7 @@ class VerticalCover(OverkizGenericCover):
 
         return supported_features
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass:
         """Return the class of the device."""
         return (
