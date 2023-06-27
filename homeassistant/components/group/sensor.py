@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.components.input_number import DOMAIN as INPUT_NUMBER_DOMAIN
 from homeassistant.components.number import DOMAIN as NUMBER_DOMAIN
 from homeassistant.components.sensor import (
@@ -362,7 +361,10 @@ class SensorGroup(GroupEntity, SensorEntity):
         """Return the state attributes of the sensor."""
         return {ATTR_ENTITY_ID: self._entity_ids, **self._extra_state_attribute}
 
-    @cached_property
+    @property  # type: ignore[override]
+    # Because the device class is calculated, there is no guarantee that the
+    # sensors will be available when the entity is created so we do not want to
+    # cache the value.
     def device_class(self) -> SensorDeviceClass | None:
         """Return device class."""
         if self._attr_device_class is not None:
