@@ -560,9 +560,19 @@ class ProtectDeviceBinarySensor(ProtectDeviceEntity, BinarySensorEntity):
         self._attr_is_on = self.entity_description.get_ufp_value(self.device)
         # UP Sense can be any of the 3 contact sensor device classes
         if self.entity_description.key == _KEY_DOOR and isinstance(self.device, Sensor):
-            self.entity_description.device_class = MOUNT_DEVICE_CLASS_MAP.get(
-                self.device.mount_type, BinarySensorDeviceClass.DOOR
+            self._device_class: BinarySensorDeviceClass | None = (
+                MOUNT_DEVICE_CLASS_MAP.get(
+                    self.device.mount_type, BinarySensorDeviceClass.DOOR
+                )
             )
+        else:
+            self._device_class = self.entity_description.device_class
+
+    @property  # type: ignore[override]
+    # UFP smart sensors can change device class at runtime
+    def device_class(self) -> BinarySensorDeviceClass | None:
+        """Return the class of this sensor."""
+        return self._device_class
 
 
 class ProtectDiskBinarySensor(ProtectNVREntity, BinarySensorEntity):
