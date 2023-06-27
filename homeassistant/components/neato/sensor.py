@@ -44,6 +44,9 @@ async def async_setup_entry(
 class NeatoSensor(SensorEntity):
     """Neato sensor."""
 
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
     def __init__(self, neato: NeatoHub, robot: Robot) -> None:
         """Initialize Neato sensor."""
         self.robot = robot
@@ -77,16 +80,6 @@ class NeatoSensor(SensorEntity):
     def unique_id(self) -> str:
         """Return unique ID."""
         return self._robot_serial
-
-    @property
-    def device_class(self) -> SensorDeviceClass:
-        """Return the device class."""
-        return SensorDeviceClass.BATTERY
-
-    @property
-    def entity_category(self) -> EntityCategory:
-        """Device entity category."""
-        return EntityCategory.DIAGNOSTIC
 
     @property
     def available(self) -> bool:

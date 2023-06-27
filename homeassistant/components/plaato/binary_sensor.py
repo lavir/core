@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pyplaato.plaato import PlaatoKeg
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -46,7 +47,7 @@ class PlaatoBinarySensor(PlaatoEntity, BinarySensorEntity):
             return self._coordinator.data.binary_sensors.get(self._sensor_type)
         return False
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the class of this device, from BinarySensorDeviceClass."""
         if self._coordinator is None:

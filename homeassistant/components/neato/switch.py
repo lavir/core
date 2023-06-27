@@ -48,6 +48,8 @@ async def async_setup_entry(
 class NeatoConnectedSwitch(SwitchEntity):
     """Neato Connected Switches."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+
     def __init__(self, neato: NeatoHub, robot: Robot, switch_type: str) -> None:
         """Initialize the Neato Connected switches."""
         self.type = switch_type
@@ -106,11 +108,6 @@ class NeatoConnectedSwitch(SwitchEntity):
         return bool(
             self.type == SWITCH_TYPE_SCHEDULE and self._schedule_state == STATE_ON
         )
-
-    @property
-    def entity_category(self) -> EntityCategory:
-        """Device entity category."""
-        return EntityCategory.CONFIG
 
     @property
     def device_info(self) -> DeviceInfo:

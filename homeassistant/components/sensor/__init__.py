@@ -14,6 +14,7 @@ from typing import Any, Final, cast, final
 
 from typing_extensions import Self
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.config_entries import ConfigEntry
 
 # pylint: disable=[hass-deprecated-import]
@@ -264,7 +265,7 @@ class SensorEntity(Entity):
         """
         return self.device_class not in (None, SensorDeviceClass.ENUM)
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the class of this entity."""
         if hasattr(self, "_attr_device_class"):

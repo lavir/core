@@ -5,6 +5,7 @@ from pyspcwebgw import SpcWebGateway
 from pyspcwebgw.const import ZoneInput, ZoneType
 from pyspcwebgw.zone import Zone
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -79,7 +80,7 @@ class SpcBinarySensor(BinarySensorEntity):
         """Whether the device is switched on."""
         return self._zone.input == ZoneInput.OPEN
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the device class."""
         return _get_device_class(self._zone.type)

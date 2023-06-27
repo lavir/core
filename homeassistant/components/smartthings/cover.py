@@ -6,6 +6,7 @@ from typing import Any
 
 from pysmartthings import Attribute, Capability
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.cover import (
     ATTR_POSITION,
     DOMAIN as COVER_DOMAIN,
@@ -146,7 +147,7 @@ class SmartThingsCover(SmartThingsEntity, CoverEntity):
             return None
         return self._device.status.level
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass | None:
         """Define this cover as a garage door."""
         return self._device_class

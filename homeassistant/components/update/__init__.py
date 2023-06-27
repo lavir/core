@@ -10,6 +10,7 @@ from awesomeversion import AwesomeVersion, AwesomeVersionCompareException
 import voluptuous as vol
 
 from homeassistant.backports.enum import StrEnum
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_OFF, STATE_ON, EntityCategory
@@ -209,7 +210,7 @@ class UpdateEntity(RestoreEntity):
         """Version installed and in use."""
         return self._attr_installed_version
 
-    @property
+    @cached_property
     def device_class(self) -> UpdateDeviceClass | None:
         """Return the class of this entity."""
         if hasattr(self, "_attr_device_class"):
@@ -218,7 +219,7 @@ class UpdateEntity(RestoreEntity):
             return self.entity_description.device_class
         return None
 
-    @property
+    @cached_property
     def entity_category(self) -> EntityCategory | None:
         """Return the category of the entity, if any."""
         if hasattr(self, "_attr_entity_category"):

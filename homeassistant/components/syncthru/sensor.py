@@ -107,7 +107,10 @@ class SyncThruMainSensor(SyncThruSensor):
 
     It also shows the detailed state and presents
     the displayed current status message.
+
     """
+
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator: DataUpdateCoordinator[SyncThru], name: str) -> None:
         """Initialize the sensor."""
@@ -125,11 +128,6 @@ class SyncThruMainSensor(SyncThruSensor):
         return {
             "display_text": self.syncthru.device_status_details(),
         }
-
-    @property
-    def entity_registry_enabled_default(self) -> bool:
-        """Disable entity by default."""
-        return False
 
 
 class SyncThruTonerSensor(SyncThruSensor):

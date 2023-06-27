@@ -1,6 +1,7 @@
 """A entity class for mobile_app."""
 from __future__ import annotations
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ICON, CONF_NAME, CONF_UNIQUE_ID, STATE_UNAVAILABLE
 from homeassistant.core import callback
@@ -60,7 +61,7 @@ class MobileAppEntity(RestoreEntity):
         """Return the name of the mobile app sensor."""
         return self._name
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if entity should be enabled by default."""
         return not self._config.get(ATTR_SENSOR_DISABLED)
@@ -80,12 +81,12 @@ class MobileAppEntity(RestoreEntity):
         """Return the icon to use in the frontend, if any."""
         return self._config[ATTR_SENSOR_ICON]
 
-    @property
+    @cached_property
     def entity_category(self):
         """Return the entity category, if any."""
         return self._config.get(ATTR_SENSOR_ENTITY_CATEGORY)
 
-    @property
+    @cached_property
     def device_info(self):
         """Return device registry information for this entity."""
         return device_info(self._registration)

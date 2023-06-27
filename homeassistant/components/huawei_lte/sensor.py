@@ -10,6 +10,7 @@ import re
 
 from huawei_lte_api.enums.net import NetworkModeEnum
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
     SensorDeviceClass,
@@ -760,7 +761,7 @@ class HuaweiLteSensor(HuaweiLteBaseEntityWithDevice, SensorEntity):
             return self.entity_description.icon_fn(self.state)
         return self.entity_description.icon
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return device class for sensor."""
         if self.entity_description.device_class_fn:

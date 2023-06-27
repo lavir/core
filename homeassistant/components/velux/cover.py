@@ -6,6 +6,7 @@ from typing import Any
 from pyvlx import OpeningDevice, Position
 from pyvlx.opening_device import Awning, Blind, GarageDoor, Gate, RollerShutter, Window
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.cover import (
     ATTR_POSITION,
     ATTR_TILT_POSITION,
@@ -69,7 +70,7 @@ class VeluxCover(VeluxEntity, CoverEntity):
             return 100 - self.node.orientation.position_percent
         return None
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass:
         """Define this cover as either awning, blind, garage, gate, shutter or window."""
         if isinstance(self.node, Awning):

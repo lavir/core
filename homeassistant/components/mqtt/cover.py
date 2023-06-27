@@ -8,6 +8,7 @@ from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import cover
 from homeassistant.components.cover import (
     ATTR_POSITION,
@@ -505,7 +506,7 @@ class MqttCover(MqttEntity, CoverEntity):
         """Return current position of cover tilt."""
         return self._tilt_value
 
-    @property
+    @cached_property
     def device_class(self) -> CoverDeviceClass | None:
         """Return the class of this sensor."""
         return self._config.get(CONF_DEVICE_CLASS)

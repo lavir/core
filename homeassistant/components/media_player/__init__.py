@@ -24,6 +24,7 @@ import voluptuous as vol
 from yarl import URL
 
 from homeassistant.backports.enum import StrEnum
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import websocket_api
 from homeassistant.components.http import KEY_AUTHENTICATED, HomeAssistantView
 from homeassistant.components.websocket_api import ERR_NOT_SUPPORTED, ERR_UNKNOWN_ERROR
@@ -497,7 +498,7 @@ class MediaPlayerEntity(Entity):
     _attr_volume_level: float | None = None
 
     # Implement these for your media player
-    @property
+    @cached_property
     def device_class(self) -> MediaPlayerDeviceClass | None:
         """Return the class of this entity."""
         if hasattr(self, "_attr_device_class"):

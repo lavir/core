@@ -102,6 +102,7 @@ class SrpEntity(SensorEntity):
     _attr_attribution = "Powered by SRP Energy"
     _attr_icon = "mdi:flash"
     _attr_should_poll = False
+    _attr_device_class = SensorDeviceClass.ENERGY
 
     def __init__(self, coordinator) -> None:
         """Initialize the SrpEntity class."""
@@ -130,11 +131,6 @@ class SrpEntity(SensorEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         return self.coordinator.last_update_success
-
-    @property
-    def device_class(self) -> SensorDeviceClass:
-        """Return the device class."""
-        return SensorDeviceClass.ENERGY
 
     @property
     def state_class(self) -> SensorStateClass:

@@ -76,18 +76,11 @@ class SmartTubOnline(SmartTubSensorBase, BinarySensorEntity):
     """A binary sensor indicating whether the spa is currently online (connected to the cloud)."""
 
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_registry_enabled_default = False
 
     def __init__(self, coordinator, spa):
         """Initialize the entity."""
         super().__init__(coordinator, spa, "Online", "online")
-
-    @property
-    def entity_registry_enabled_default(self) -> bool:
-        """Return if the entity should be enabled when first added to the entity registry.
-
-        This seems to be very noisy and not generally useful, so disable by default.
-        """
-        return False
 
     @property
     def is_on(self) -> bool:

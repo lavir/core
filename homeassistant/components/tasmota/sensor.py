@@ -8,6 +8,7 @@ from hatasmota import const as hc, sensor as tasmota_sensor, status_sensor
 from hatasmota.entity import TasmotaEntity as HATasmotaEntity
 from hatasmota.models import DiscoveryHashType
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import sensor
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -293,7 +294,7 @@ class TasmotaSensor(TasmotaAvailability, TasmotaDiscoveryUpdate, SensorEntity):
             self._state = state
         self.async_write_ha_state()
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the device class of the sensor."""
         class_or_icon = SENSOR_DEVICE_CLASS_ICON_MAP.get(
@@ -309,14 +310,14 @@ class TasmotaSensor(TasmotaAvailability, TasmotaDiscoveryUpdate, SensorEntity):
         )
         return class_or_icon.get(STATE_CLASS)
 
-    @property
+    @cached_property
     def entity_category(self) -> EntityCategory | None:
         """Return the category of the entity, if any."""
         if self._tasmota_entity.quantity in status_sensor.SENSORS:
             return EntityCategory.DIAGNOSTIC
         return None
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         # Hide fast changing status sensors

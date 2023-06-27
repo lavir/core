@@ -20,6 +20,7 @@ from zwave_js_server.model.node.statistics import NodeStatisticsDataType
 from zwave_js_server.model.value import ConfigurationValue, ConfigurationValueType
 from zwave_js_server.util.command_class.meter import get_meter_type
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
     SensorDeviceClass,
@@ -722,7 +723,7 @@ class ZWaveListSensor(ZwaveSensor):
             return list(self.info.primary_value.metadata.states.values())
         return None
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return sensor device class."""
         if (device_class := super().device_class) is not None:
@@ -766,7 +767,7 @@ class ZWaveConfigParameterSensor(ZWaveListSensor):
             additional_info=[property_key_name] if property_key_name else None,
         )
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return sensor device class."""
         # mypy doesn't know about fget: https://github.com/python/mypy/issues/6185

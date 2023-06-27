@@ -86,6 +86,8 @@ class RachioControllerBinarySensor(RachioDevice, BinarySensorEntity):
 class RachioControllerOnlineBinarySensor(RachioControllerBinarySensor):
     """Represent a binary sensor that reflects if the controller is online."""
 
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+
     @property
     def name(self) -> str:
         """Return the name of this sensor including the controller name."""
@@ -95,11 +97,6 @@ class RachioControllerOnlineBinarySensor(RachioControllerBinarySensor):
     def unique_id(self) -> str:
         """Return a unique id for this entity."""
         return f"{self._controller.controller_id}-online"
-
-    @property
-    def device_class(self) -> BinarySensorDeviceClass:
-        """Return the class of this device, from BinarySensorDeviceClass."""
-        return BinarySensorDeviceClass.CONNECTIVITY
 
     @property
     def icon(self) -> str:
@@ -135,6 +132,8 @@ class RachioControllerOnlineBinarySensor(RachioControllerBinarySensor):
 class RachioRainSensor(RachioControllerBinarySensor):
     """Represent a binary sensor that reflects the status of the rain sensor."""
 
+    _attr_device_class = BinarySensorDeviceClass.MOISTURE
+
     @property
     def name(self) -> str:
         """Return the name of this sensor including the controller name."""
@@ -144,11 +143,6 @@ class RachioRainSensor(RachioControllerBinarySensor):
     def unique_id(self) -> str:
         """Return a unique id for this entity."""
         return f"{self._controller.controller_id}-rain_sensor"
-
-    @property
-    def device_class(self) -> BinarySensorDeviceClass:
-        """Return the class of this device."""
-        return BinarySensorDeviceClass.MOISTURE
 
     @property
     def icon(self) -> str:

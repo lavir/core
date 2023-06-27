@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pysma
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -108,7 +109,7 @@ class SMAsensor(CoordinatorEntity, SensorEntity):
             f"{self._config_entry_unique_id}-{self._sensor.key}_{self._sensor.key_idx}"
         )
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         return self._enabled_default

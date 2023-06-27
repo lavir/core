@@ -17,6 +17,7 @@ from dsmr_parser.clients.rfxtrx_protocol import (
 from dsmr_parser.objects import DSMRObject
 import serial
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -592,7 +593,7 @@ class DSMREntity(SensorEntity):
         """Entity is only available if there is a telegram."""
         return self.telegram is not None
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the device class of this entity."""
         device_class = super().device_class

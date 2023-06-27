@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import (
     RestoreSensor,
     SensorDeviceClass,
@@ -154,7 +155,7 @@ class HERETravelTimeSensor(
             )
             self.async_write_ha_state()
 
-    @property
+    @cached_property
     def attribution(self) -> str | None:
         """Return the attribution."""
         if self.coordinator.data is not None:

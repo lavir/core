@@ -8,6 +8,7 @@ from aiomusiccast import MusicCastConnectionException
 from aiomusiccast.capabilities import Capability
 from aiomusiccast.musiccast_device import MusicCastData, MusicCastDevice
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import ssdp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
@@ -147,7 +148,7 @@ class MusicCastEntity(CoordinatorEntity[MusicCastDataUpdateCoordinator]):
         """Return the mdi icon of the entity."""
         return self._icon
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         return self._enabled_default
