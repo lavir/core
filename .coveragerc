@@ -309,7 +309,6 @@ omit =
     homeassistant/components/esphome/__init__.py
     homeassistant/components/esphome/bluetooth/*
     homeassistant/components/esphome/camera.py
-    homeassistant/components/esphome/cover.py
     homeassistant/components/esphome/domain_data.py
     homeassistant/components/esphome/entry_data.py
     homeassistant/components/esphome/light.py
@@ -358,6 +357,7 @@ omit =
     homeassistant/components/fitbit/*
     homeassistant/components/fivem/__init__.py
     homeassistant/components/fivem/binary_sensor.py
+    homeassistant/components/fivem/coordinator.py
     homeassistant/components/fivem/sensor.py
     homeassistant/components/fixer/sensor.py
     homeassistant/components/fjaraskupan/__init__.py
