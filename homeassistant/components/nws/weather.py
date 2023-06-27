@@ -4,6 +4,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_SUNNY,
@@ -314,7 +315,7 @@ class NWSWeather(WeatherEntity):
         await self.coordinator_observation.async_request_refresh()
         await self.coordinator_forecast.async_request_refresh()
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         return self.mode == DAYNIGHT

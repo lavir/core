@@ -66,7 +66,7 @@ class MobileAppEntity(RestoreEntity):
         """Return if entity should be enabled by default."""
         return not self._config.get(ATTR_SENSOR_DISABLED)
 
-    @property
+    @cached_property
     def device_class(self):
         """Return the device class."""
         return self._config.get(ATTR_SENSOR_DEVICE_CLASS)

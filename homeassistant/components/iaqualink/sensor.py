@@ -1,6 +1,7 @@
 """Support for Aqualink temperature sensors."""
 from __future__ import annotations
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.sensor import DOMAIN, SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
@@ -53,7 +54,7 @@ class HassAqualinkSensor(AqualinkEntity, SensorEntity):
         except ValueError:
             return float(self.dev.state)
 
-    @property
+    @cached_property
     def device_class(self) -> SensorDeviceClass | None:
         """Return the class of the sensor."""
         if self.dev.name.endswith("_temp"):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA,
     DOMAIN as BINARY_SENSOR_DOMAIN,
@@ -149,7 +150,7 @@ class BinarySensorGroup(GroupEntity, BinarySensorEntity):
             # Set as ON if any / all member is ON
             self._attr_is_on = self.mode(state == STATE_ON for state in states)
 
-    @property
+    @cached_property
     def device_class(self) -> BinarySensorDeviceClass | None:
         """Return the sensor class of the binary sensor."""
         return self._device_class

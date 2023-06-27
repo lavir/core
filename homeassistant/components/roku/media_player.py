@@ -10,6 +10,7 @@ from rokuecp.helpers import guess_stream_format
 import voluptuous as vol
 import yarl
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     ATTR_MEDIA_EXTRA,
@@ -129,7 +130,7 @@ class RokuMediaPlayer(RokuEntity, MediaPlayerEntity):
 
         return self.coordinator.data.media.duration > 0
 
-    @property
+    @cached_property
     def device_class(self) -> MediaPlayerDeviceClass:
         """Return the class of this device."""
         if self.coordinator.data.info.device_type == "tv":

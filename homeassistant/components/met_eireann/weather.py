@@ -1,6 +1,7 @@
 """Support for Met Éireann weather service."""
 import logging
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_TIME,
@@ -89,7 +90,7 @@ class MetEireannWeather(CoordinatorEntity, WeatherEntity):
 
         return f"{DEFAULT_NAME}{name_appendix}"
 
-    @property
+    @cached_property
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the entity registry."""
         return not self._hourly
