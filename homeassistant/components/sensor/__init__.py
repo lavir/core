@@ -302,7 +302,7 @@ class SensorEntity(Entity):
             return self.entity_description.options
         return None
 
-    @property
+    @cached_property
     def state_class(self) -> SensorStateClass | str | None:
         """Return the state class of this entity, if any."""
         if hasattr(self, "_attr_state_class"):
@@ -408,7 +408,7 @@ class SensorEntity(Entity):
             return self.entity_description.suggested_display_precision
         return None
 
-    @property
+    @cached_property
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the sensor, if any."""
         if hasattr(self, "_attr_native_unit_of_measurement"):
