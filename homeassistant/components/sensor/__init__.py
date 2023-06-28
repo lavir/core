@@ -399,7 +399,7 @@ class SensorEntity(Entity):
         """Return the value reported by the sensor."""
         return self._attr_native_value
 
-    @property
+    @cached_property
     def suggested_display_precision(self) -> int | None:
         """Return the suggested number of decimal digits for display."""
         if hasattr(self, "_attr_suggested_display_precision"):
@@ -417,7 +417,7 @@ class SensorEntity(Entity):
             return self.entity_description.native_unit_of_measurement
         return None
 
-    @property
+    @cached_property
     def suggested_unit_of_measurement(self) -> str | None:
         """Return the unit which should be used for the sensor's state.
 
