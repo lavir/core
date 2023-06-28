@@ -291,10 +291,12 @@ class ESPHomeManager:
         async def send_home_assistant_state_event(event: Event) -> None:
             """Forward Home Assistant states updates to ESPHome."""
             event_data = event.data
+            new_state: State | None = event_data.get("new_state")
+            old_state: State | None = event_data.get("old_state")
             # Only communicate changes to the state or attribute tracked
-            if (new_state := event_data.get("new_state")) is None or (
-                (old_state := event_data.get("old_state")) is not None
-                and "new_state" in event_data
+            if new_state is None or (
+                old_state is not None
+                and new_state
                 and (
                     (not attribute and old_state.state == new_state.state)
                     or (
