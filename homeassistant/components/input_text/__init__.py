@@ -6,7 +6,6 @@ import logging
 from typing_extensions import Self
 import voluptuous as vol
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.const import (
     ATTR_EDITABLE,
     ATTR_MODE,
@@ -236,7 +235,7 @@ class InputText(collection.CollectionEntity, RestoreEntity):
         """Return the state of the component."""
         return self._current_value
 
-    @cached_property
+    @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
         return self._config.get(CONF_UNIT_OF_MEASUREMENT)

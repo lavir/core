@@ -442,7 +442,7 @@ class SensorEntity(Entity):
         return None
 
     @final
-    @cached_property
+    @property
     def unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the entity, after unit conversion."""
         # Highest priority, for registered entities: unit set by user,with fallback to

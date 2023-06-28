@@ -6,7 +6,6 @@ import logging
 from math import cos, pi, radians, sin
 import random
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.components.geo_location import GeolocationEvent
 from homeassistant.const import UnitOfLength
 from homeassistant.core import HomeAssistant
@@ -153,7 +152,7 @@ class DemoGeolocationEvent(GeolocationEvent):
         """Return longitude value of this external event."""
         return self._longitude
 
-    @cached_property
+    @property
     def unit_of_measurement(self) -> str:
         """Return the unit of measurement."""
         return self._unit_of_measurement

@@ -7,7 +7,6 @@ import logging
 from typing_extensions import Self
 import voluptuous as vol
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.const import (
     ATTR_EDITABLE,
     ATTR_MODE,
@@ -263,7 +262,7 @@ class InputNumber(collection.CollectionEntity, RestoreEntity):
         """Return entity's increment/decrement step."""
         return self._config[CONF_STEP]
 
-    @cached_property
+    @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
         return self._config.get(CONF_UNIT_OF_MEASUREMENT)

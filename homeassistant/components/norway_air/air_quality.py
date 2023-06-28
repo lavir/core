@@ -7,7 +7,6 @@ import logging
 import metno
 import voluptuous as vol
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.components.air_quality import PLATFORM_SCHEMA, AirQualityEntity
 from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE, CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -133,7 +132,7 @@ class AirSensor(AirQualityEntity):
         """Return the particulate matter 10 level."""
         return self._api.data.get("pm10_concentration")
 
-    @cached_property
+    @property
     def unit_of_measurement(self):
         """Return the unit of measurement of this entity, if any."""
         return self._api.units.get("pm25_concentration")

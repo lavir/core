@@ -4,7 +4,6 @@ import logging
 
 from miio import AirQualityMonitor, AirQualityMonitorCGDN1, DeviceException
 
-from homeassistant.backports.functools import cached_property
 from homeassistant.components.air_quality import AirQualityEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_TOKEN
@@ -162,7 +161,7 @@ class AirMonitorV1(AirMonitorB1):
                 self._available = False
                 _LOGGER.error("Got exception while fetching the state: %s", ex)
 
-    @cached_property
+    @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
         return None

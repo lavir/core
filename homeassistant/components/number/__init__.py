@@ -330,7 +330,7 @@ class NumberEntity(Entity):
             return self.entity_description.native_unit_of_measurement
         return None
 
-    @cached_property
+    @property
     @final
     def unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of the entity, after unit conversion."""
