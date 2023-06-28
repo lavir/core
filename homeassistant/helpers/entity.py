@@ -551,7 +551,7 @@ class Entity(ABC):
             return self.entity_description.device_class
         return None
 
-    @property
+    @cached_property
     def unit_of_measurement(self) -> str | None:
         """Return the unit of measurement of this entity, if any."""
         if hasattr(self, "_attr_unit_of_measurement"):

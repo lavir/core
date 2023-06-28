@@ -5,6 +5,7 @@ from datetime import timedelta
 import logging
 from typing import Final, final
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONCENTRATION_MICROGRAMS_PER_CUBIC_METER
 from homeassistant.core import HomeAssistant
@@ -149,7 +150,7 @@ class AirQualityEntity(Entity):
         """Return the current state."""
         return self.particulate_matter_2_5
 
-    @property
+    @cached_property
     def unit_of_measurement(self) -> str:
         """Return the unit of measurement of this entity."""
         return CONCENTRATION_MICROGRAMS_PER_CUBIC_METER

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 import zigpy.zcl
 from zigpy.zcl.clusters import smartenergy
 
+from homeassistant.backports.functools import cached_property
+
 from .. import registries
 from ..const import (
     REPORT_CONFIG_ASAP,
@@ -177,7 +179,7 @@ class Metering(ClusterHandler):
             return self.DeviceStatusElectric(status)
         return self.DeviceStatusDefault(status)
 
-    @property
+    @cached_property
     def unit_of_measurement(self) -> int:
         """Return unit of measurement."""
         return self.cluster.get("unit_of_measure")

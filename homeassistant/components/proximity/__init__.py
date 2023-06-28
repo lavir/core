@@ -5,6 +5,7 @@ import logging
 
 import voluptuous as vol
 
+from homeassistant.backports.functools import cached_property
 from homeassistant.const import (
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
@@ -145,7 +146,7 @@ class Proximity(Entity):
         """Return the state."""
         return self.dist_to
 
-    @property
+    @cached_property
     def unit_of_measurement(self) -> str:
         """Return the unit of measurement of this entity."""
         return self._unit_of_measurement
