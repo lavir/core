@@ -9,6 +9,7 @@ from gtts import gTTS, gTTSError
 import voluptuous as vol
 
 from homeassistant.components.tts import (
+    ATTR_AUDIO_OUTPUT,
     CONF_LANG,
     PLATFORM_SCHEMA,
     Provider,
@@ -32,7 +33,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-SUPPORT_OPTIONS = ["tld"]
+SUPPORT_OPTIONS = ["tld", ATTR_AUDIO_OUTPUT]
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -91,6 +92,11 @@ class GoogleTTSEntity(TextToSpeechEntity):
         """Return a list of supported options."""
         return SUPPORT_OPTIONS
 
+    @property
+    def default_options(self):
+        """Return a dict include default options."""
+        return {ATTR_AUDIO_OUTPUT: "mp3"}
+
     def get_tts_audio(
         self, message: str, language: str, options: dict[str, Any] | None = None
     ) -> TtsAudioType:
@@ -145,6 +151,11 @@ class GoogleProvider(Provider):
     def supported_options(self):
         """Return a list of supported options."""
         return SUPPORT_OPTIONS
+
+    @property
+    def default_options(self):
+        """Return a dict include default options."""
+        return {ATTR_AUDIO_OUTPUT: "mp3"}
 
     def get_tts_audio(self, message, language, options):
         """Load TTS from google."""
