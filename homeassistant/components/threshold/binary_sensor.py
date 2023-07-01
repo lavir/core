@@ -97,6 +97,7 @@ async def async_setup_entry(
     ):
         device_info = DeviceInfo(
             identifiers=device.identifiers,
+            connections=device.connections,
         )
     else:
         device_info = None
