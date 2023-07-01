@@ -921,7 +921,17 @@ class ConfigEntriesFlowManager(data_entry_flow.FlowManager):
 
         # Abort all flows in progress with same unique ID
         # or the default discovery ID
+        _LOGGER.error(
+            "finish flow flow.handler: %s with unique id: %s",
+            flow.handler,
+            flow.unique_id,
+        )
         for progress_flow in self.async_progress_by_handler(flow.handler):
+            _LOGGER.error(
+                "finish flow progress_flow: %s with context %s",
+                progress_flow,
+                progress_flow["context"],
+            )
             progress_unique_id = progress_flow["context"].get("unique_id")
             if progress_flow["flow_id"] != flow.flow_id and (
                 (flow.unique_id and progress_unique_id == flow.unique_id)
