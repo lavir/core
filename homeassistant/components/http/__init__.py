@@ -729,8 +729,10 @@ class FastUrlDispatcher(UrlDispatcher):
         url_parts = request.rel_url.raw_parts
         for i in range(len(url_parts), 1, -1):
             base_url_path = "/" + "/".join(url_parts[1:i])
-            if (resource := self._resource_index.get(base_url_path)) is not None:
-                match_dict, _ = await resource.resolve(request)
+            if (
+                resource_candidate := self._resource_index.get(base_url_path)
+            ) is not None:
+                match_dict, _ = await resource_candidate.resolve(request)
                 if match_dict is not None:
                     return match_dict
         # Fallback to the linear search
