@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import datetime as dt
-from functools import lru_cache
+from functools import lru_cache, partial
 import json
 from typing import Any, cast
 
 import voluptuous as vol
 
+from homeassistant.auth.models import User
 from homeassistant.auth.permissions.const import CAT_ENTITIES, POLICY_READ
 from homeassistant.const import (
     EVENT_STATE_CHANGED,
@@ -280,6 +281,27 @@ def _send_handle_get_states_response(
     connection.send_message(construct_result_message(msg_id, f"[{joined_states}]"))
 
 
+def _forward_entity_changes(
+    connection: ActiveConnection,
+    entity_ids: set[str],
+    user: User,
+    msg_id: int,
+    event: Event,
+) -> None:
+    """Forward entity state changed events to websocket."""
+    entity_id = event.data["entity_id"]
+    if entity_ids and entity_id not in entity_ids:
+        return
+    # We have to lookup the permissions again because the user might have
+    # changed since the subscription was created.
+    permissions = user.permissions
+    if not permissions.access_all_entities(
+        POLICY_READ
+    ) and not permissions.check_entity(event.data["entity_id"], POLICY_READ):
+        return
+    connection.send_message(messages.cached_state_diff_message(msg_id, event))
+
+
 @callback
 @decorators.websocket_command(
     {
@@ -292,29 +314,22 @@ def handle_subscribe_entities(
 ) -> None:
     """Handle subscribe entities command."""
     entity_ids = set(msg.get("entity_ids", []))
-    user = connection.user
-
-    @callback
-    def forward_entity_changes(event: Event) -> None:
-        """Forward entity state changed events to websocket."""
-        entity_id = event.data["entity_id"]
-        if entity_ids and entity_id not in entity_ids:
-            return
-        # We have to lookup the permissions again because the user might have
-        # changed since the subscription was created.
-        permissions = user.permissions
-        if not permissions.access_all_entities(
-            POLICY_READ
-        ) and not permissions.check_entity(event.data["entity_id"], POLICY_READ):
-            return
-        connection.send_message(messages.cached_state_diff_message(msg["id"], event))
-
     # We must never await between sending the states and listening for
     # state changed events or we will introduce a race condition
     # where some states are missed
     states = _async_get_allowed_states(hass, connection)
     connection.subscriptions[msg["id"]] = hass.bus.async_listen(
-        EVENT_STATE_CHANGED, forward_entity_changes, run_immediately=True
+        EVENT_STATE_CHANGED,
+        callback(
+            partial(
+                _forward_entity_changes,
+                connection,
+                entity_ids,
+                connection.user,
+                msg["id"],
+            )
+        ),
+        run_immediately=True,
     )
     connection.send_result(msg["id"])
 
