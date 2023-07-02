@@ -722,7 +722,7 @@ class FastUrlDispatcher(UrlDispatcher):
         _LOGGER.warning("register_resource %s %s", canonical, resource)
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
-            canonical.rstrip("/")
+            canonical = canonical.rstrip("/")
         self._resource_index[canonical] = resource
         _LOGGER.warning("register_resource %s (modified) %s", canonical, resource)
 
