@@ -23,8 +23,6 @@ from aiohttp.web_log import AccessLogger
 from aiohttp.web_protocol import RequestHandler
 from aiohttp.web_urldispatcher import (
     AbstractResource,
-    PlainResource,
-    StaticResource,
     UrlDispatcher,
     UrlMappingMatchInfo,
 )
@@ -720,8 +718,11 @@ class FastUrlDispatcher(UrlDispatcher):
     def register_resource(self, resource: AbstractResource) -> None:
         """Register a resource."""
         super().register_resource(resource)
-        if isinstance(resource, (StaticResource, PlainResource)):
-            self._resource_index[resource.canonical] = resource
+        canonical = resource.canonical
+        if "{" in canonical:  # strip at the first { to allow for variables
+            canonical = canonical.split("{")[0]
+            canonical.rstrip("/")
+        self._resource_index[canonical] = resource
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
