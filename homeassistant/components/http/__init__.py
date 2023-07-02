@@ -719,12 +719,10 @@ class FastUrlDispatcher(UrlDispatcher):
         """Register a resource."""
         super().register_resource(resource)
         canonical = resource.canonical
-        _LOGGER.warning("register_resource %s %s", canonical, resource)
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
         self._resource_index[canonical] = resource
-        _LOGGER.warning("register_resource %s (modified) %s", canonical, resource)
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
@@ -732,19 +730,13 @@ class FastUrlDispatcher(UrlDispatcher):
         resource_index = self._resource_index
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
-            _LOGGER.warning("url %s candidate %s", request.rel_url, url_part)
-            if (resource_candidate := resource_index.get(url_part)) is not None:
-                _LOGGER.warning("url %s match candidate %s", request.rel_url, url_part)
-                if (
-                    match_dict := (await resource_candidate.resolve(request))[0]
-                ) is not None:
-                    return match_dict
-        if (index_view_candidate := resource_index.get("/")) is not None:
-            _LOGGER.warning("url %s match candidate %s", request.rel_url, "/")
-            if (
-                match_dict := (await index_view_candidate.resolve(request))[0]
+            if (resource_candidate := resource_index.get(url_part)) is not None and (
+                match_dict := (await resource_candidate.resolve(request))[0]
             ) is not None:
                 return match_dict
+        if (index_view_candidate := resource_index.get("/")) is not None and (
+            match_dict := (await index_view_candidate.resolve(request))[0]
+        ) is not None:
+            return match_dict
         # Fallback to the linear search
-        _LOGGER.warning("Fallback to linear search for %s", request.rel_url)
         return await super().resolve(request)
