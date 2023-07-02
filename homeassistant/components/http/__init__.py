@@ -735,9 +735,18 @@ class FastUrlDispatcher(UrlDispatcher):
             _LOGGER.warning("url %s candidate %s", request.rel_url, url_part)
             if (resource_candidate := resource_index.get(url_part)) is not None:
                 _LOGGER.warning("url %s match candidate %s", request.rel_url, url_part)
-                match_dict, _ = await resource_candidate.resolve(request)
-                if match_dict is not None:
+                if (
+                    match_dict := (await resource_candidate.resolve(request)[0])
+                    is not None
+                ):
                     return match_dict
+        if (index_view_candidate := resource_index.get("/")) is not None:
+            _LOGGER.warning("url %s match candidate %s", request.rel_url, "/")
+            if (
+                match_dict := (await index_view_candidate.resolve(request)[0])
+                is not None
+            ):
+                return match_dict
         # Fallback to the linear search
         _LOGGER.warning("Fallback to linear search for %s", request.rel_url)
         return await super().resolve(request)
