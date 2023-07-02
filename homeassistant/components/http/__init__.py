@@ -729,11 +729,10 @@ class FastUrlDispatcher(UrlDispatcher):
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
         url_parts = request.rel_url.raw_parts
+        resource_index = self._resource_index
         for i in range(len(url_parts), 1, -1):
-            base_url_path = "/" + "/".join(url_parts[1:i])
-            if (
-                resource_candidate := self._resource_index.get(base_url_path)
-            ) is not None:
+            url_part = "/" + "/".join(url_parts[1:i])
+            if (resource_candidate := resource_index.get(url_part)) is not None:
                 match_dict, _ = await resource_candidate.resolve(request)
                 if match_dict is not None:
                     return match_dict
