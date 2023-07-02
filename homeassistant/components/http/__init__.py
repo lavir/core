@@ -719,10 +719,12 @@ class FastUrlDispatcher(UrlDispatcher):
         """Register a resource."""
         super().register_resource(resource)
         canonical = resource.canonical
+        _LOGGER.warning("register_resource %s %s", canonical, resource)
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical.rstrip("/")
         self._resource_index[canonical] = resource
+        _LOGGER.warning("register_resource %s (modified) %s", canonical, resource)
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
