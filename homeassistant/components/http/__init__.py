@@ -728,15 +728,17 @@ class FastUrlDispatcher(UrlDispatcher):
         """Resolve a request."""
         url_parts = request.rel_url.raw_parts
         resource_index = self._resource_index
+        # Walk the url parts looking for candidates
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
             if (resource_candidate := resource_index.get(url_part)) is not None and (
                 match_dict := (await resource_candidate.resolve(request))[0]
             ) is not None:
                 return match_dict
+        # Next try the index view if we don't have a match
         if (index_view_candidate := resource_index.get("/")) is not None and (
             match_dict := (await index_view_candidate.resolve(request))[0]
         ) is not None:
             return match_dict
-        # Fallback to the linear search
+        # Finally, fallback to the linear search
         return await super().resolve(request)
