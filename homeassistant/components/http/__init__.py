@@ -21,6 +21,13 @@ from aiohttp.typedefs import JSONDecoder, StrOrURL
 from aiohttp.web_exceptions import HTTPMovedPermanently, HTTPRedirection
 from aiohttp.web_log import AccessLogger
 from aiohttp.web_protocol import RequestHandler
+from aiohttp.web_urldispatcher import (
+    AbstractResource,
+    PlainResource,
+    StaticResource,
+    UrlDispatcher,
+    UrlMappingMatchInfo,
+)
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -396,6 +403,7 @@ class HomeAssistantHTTP:
                 "max_field_size": MAX_LINE_SIZE,
             },
         )
+        self.app._router = FastUrlDispatcher()  # pylint: disable=protected-access
         self.hass = hass
         self.site_configs = site_configs
         self.trusted_proxies = trusted_proxies
@@ -699,3 +707,31 @@ async def start_http_server_and_save_config(
         ]
 
     store.async_delay_save(lambda: conf, SAVE_DELAY)
+
+
+class FastUrlDispatcher(UrlDispatcher):
+    """UrlDispatcher that uses a dict lookup for resolving."""
+
+    def __init__(self) -> None:
+        """Initialize the dispatcher."""
+        super().__init__()
+        self._resource_index: dict[str, AbstractResource] = {}
+
+    def register_resource(self, resource: AbstractResource) -> None:
+        """Register a resource."""
+        super().register_resource(resource)
+        if isinstance(resource, (StaticResource, PlainResource)):
+            self._resource_index[resource.canonical] = resource
+
+    async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
+        """Resolve a request."""
+        url_parts = request.rel_url.raw_parts
+        for i in range(len(url_parts), 1, -1):
+            base_url_path = "/" + "/".join(url_parts[1:i])
+            if (resource := self._resource_index.get(base_url_path)) is not None:
+                match_dict, _ = await resource.resolve(request)
+                if match_dict is not None:
+                    return match_dict
+        # Fallback to the linear search
+        _LOGGER.warning("Fallback to linear search for %s", request.rel_url)
+        return await super().resolve(request)
