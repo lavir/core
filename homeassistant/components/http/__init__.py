@@ -401,6 +401,9 @@ class HomeAssistantHTTP:
                 "max_field_size": MAX_LINE_SIZE,
             },
         )
+        # By default aiohttp does a linear search for routing rules,
+        # we have a lot of routes, so use a dict lookup with a fallback
+        # to the linear search.
         self.app._router = FastUrlDispatcher()  # pylint: disable=protected-access
         self.hass = hass
         self.site_configs = site_configs
