@@ -732,6 +732,7 @@ class FastUrlDispatcher(UrlDispatcher):
         resource_index = self._resource_index
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
+            _LOGGER.warning("url %s candidate %s", request.rel_url, url_part)
             if (resource_candidate := resource_index.get(url_part)) is not None:
                 match_dict, _ = await resource_candidate.resolve(request)
                 if match_dict is not None:
