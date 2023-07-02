@@ -734,6 +734,7 @@ class FastUrlDispatcher(UrlDispatcher):
             url_part = "/" + "/".join(url_parts[1:i])
             _LOGGER.warning("url %s candidate %s", request.rel_url, url_part)
             if (resource_candidate := resource_index.get(url_part)) is not None:
+                _LOGGER.warning("url %s match candidate %s", request.rel_url, url_part)
                 match_dict, _ = await resource_candidate.resolve(request)
                 if match_dict is not None:
                     return match_dict
