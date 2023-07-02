@@ -89,6 +89,32 @@ def pong_message(iden: int) -> dict[str, Any]:
     return {"id": iden, "type": "pong"}
 
 
+def _forward_events_check_permissions(
+    send_message: Callable[[str | dict[str, Any] | Callable[[], str]], None],
+    user: User,
+    msg_id: int,
+    event: Event,
+) -> None:
+    """Forward state changed events to websocket."""
+    # We have to lookup the permissions again because the user might have
+    # changed since the subscription was created.
+    permissions = user.permissions
+    if not permissions.access_all_entities(
+        POLICY_READ
+    ) and not permissions.check_entity(event.data["entity_id"], POLICY_READ):
+        return
+    send_message(messages.cached_event_message(msg_id, event))
+
+
+def _forward_events_unconditional(
+    send_message: Callable[[str | dict[str, Any] | Callable[[], str]], None],
+    msg_id: int,
+    event: Event,
+) -> None:
+    """Forward events to websocket."""
+    send_message(messages.cached_event_message(msg_id, event))
+
+
 @callback
 @decorators.websocket_command(
     {
@@ -110,26 +136,18 @@ def handle_subscribe_events(
         raise Unauthorized
 
     if event_type == EVENT_STATE_CHANGED:
-        user = connection.user
-
-        @callback
-        def forward_events(event: Event) -> None:
-            """Forward state changed events to websocket."""
-            # We have to lookup the permissions again because the user might have
-            # changed since the subscription was created.
-            permissions = user.permissions
-            if not permissions.access_all_entities(
-                POLICY_READ
-            ) and not permissions.check_entity(event.data["entity_id"], POLICY_READ):
-                return
-            connection.send_message(messages.cached_event_message(msg["id"], event))
-
+        forward_events = callback(
+            partial(
+                _forward_events_check_permissions,
+                connection.send_message,
+                connection.user,
+                msg["id"],
+            )
+        )
     else:
-
-        @callback
-        def forward_events(event: Event) -> None:
-            """Forward events to websocket."""
-            connection.send_message(messages.cached_event_message(msg["id"], event))
+        forward_events = callback(
+            partial(_forward_events_unconditional, connection.send_message, msg["id"])
+        )
 
     connection.subscriptions[msg["id"]] = hass.bus.async_listen(
         event_type, forward_events, run_immediately=True
@@ -282,7 +300,7 @@ def _send_handle_get_states_response(
 
 
 def _forward_entity_changes(
-    connection: ActiveConnection,
+    send_message: Callable[[str | dict[str, Any] | Callable[[], str]], None],
     entity_ids: set[str],
     user: User,
     msg_id: int,
@@ -299,7 +317,7 @@ def _forward_entity_changes(
         POLICY_READ
     ) and not permissions.check_entity(event.data["entity_id"], POLICY_READ):
         return
-    connection.send_message(messages.cached_state_diff_message(msg_id, event))
+    send_message(messages.cached_state_diff_message(msg_id, event))
 
 
 @callback
@@ -323,7 +341,7 @@ def handle_subscribe_entities(
         callback(
             partial(
                 _forward_entity_changes,
-                connection,
+                connection.send_message,
                 entity_ids,
                 connection.user,
                 msg["id"],
