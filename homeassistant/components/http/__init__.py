@@ -705,7 +705,9 @@ class FastUrlDispatcher(UrlDispatcher):
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
-        self._resource_index[canonical] = {route.method: resource for route in resource}
+        self._resource_index.setdefault(canonical, {}).update(
+            {route.method: resource for route in resource}
+        )
         _LOGGER.warning(
             "Registered %s route %s", canonical, self._resource_index[canonical]
         )
