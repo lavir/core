@@ -705,9 +705,7 @@ class FastUrlDispatcher(UrlDispatcher):
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
-        for route in resource:
-            method = route.method
-            self._resource_index.setdefault(canonical, {})[method] = resource
+        self._resource_index[canonical] = {route.method: resource for route in resource}
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
