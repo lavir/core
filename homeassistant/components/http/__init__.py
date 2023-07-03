@@ -695,7 +695,8 @@ class FastUrlDispatcher(UrlDispatcher):
     def __init__(self) -> None:
         """Initialize the dispatcher."""
         super().__init__()
-        self._resource_index: dict[str, AbstractResource] = {}
+        # _resource_index is a dict of canonical -> method -> resource
+        self._resource_index: dict[str, dict[str, AbstractResource]] = {}
 
     def register_resource(self, resource: AbstractResource) -> None:
         """Register a resource."""
@@ -704,31 +705,39 @@ class FastUrlDispatcher(UrlDispatcher):
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
-        self._resource_index[canonical] = resource
+        for route in resource:
+            method = route.method
+            self._resource_index.setdefault(canonical, {})[method] = resource
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
         url_parts = request.rel_url.raw_parts
+        method = request.method
         resource_index = self._resource_index
         # Walk the url parts looking for candidates
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
-            if (resource_candidate := resource_index.get(url_part)) is not None:
-                _LOGGER.warning("Found route for %s: %s", url_part, resource_candidate)
-                match_dict, allowed = await resource_candidate.resolve(request)
+            if (resource_candidate := resource_index.get(url_part)) is not None and (
+                method_candidate := resource_candidate.get(method)
+            ):
+                _LOGGER.warning("Found route for %s: %s", url_part, method_candidate)
+                match_dict, allowed = await method_candidate.resolve(request)
                 if match_dict is not None:
                     return match_dict
                 _LOGGER.warning(
                     "Rejected %s route %s match dict: %s allowed: %s",
-                    resource_candidate,
+                    method_candidate,
                     request.url,
                     match_dict,
                     allowed,
                 )
         # Next try the index view if we don't have a match
-        if (index_view_candidate := resource_index.get("/")) is not None and (
-            match_dict := (await index_view_candidate.resolve(request))[0]
-        ) is not None:
+        if (
+            (index_view_candidate := resource_index.get("/")) is not None
+            and (index_view_method_candidate := index_view_candidate.get(method))
+            and (match_dict := (await index_view_method_candidate.resolve(request))[0])
+            is not None
+        ):
             return match_dict
 
         # Finally, fallback to the linear search
