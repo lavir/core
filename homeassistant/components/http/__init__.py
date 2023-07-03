@@ -706,6 +706,9 @@ class FastUrlDispatcher(UrlDispatcher):
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
         self._resource_index[canonical] = {route.method: resource for route in resource}
+        _LOGGER.warning(
+            "Registered %s route %s", canonical, self._resource_index[canonical]
+        )
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
