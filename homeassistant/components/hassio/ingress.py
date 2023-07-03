@@ -185,6 +185,13 @@ class HassIOIngress(HomeAssistantView):
                 if content_length_int > MIN_COMPRESSED_SIZE:
                     simple_response.enable_compression()
                 await simple_response.prepare(request)
+                _LOGGER.warning(
+                    "Simple response %s, request %s _compression=%s content_length_int=%s",
+                    simple_response,
+                    request,
+                    simple_response._compression,
+                    content_length_int,
+                )
                 return simple_response
 
             # Stream response
