@@ -62,7 +62,7 @@ MAXIMUM_CONNECTIONS_PER_HOST = 100
 # We have a lot of integrations that poll every 10-30 seconds
 # and we want to keep the connection open for a while so we
 # don't have to reconnect every time.
-KEEP_ALIVE_TIMEOUT = 32
+KEEP_ALIVE_TIMEOUT = 15
 
 
 class HassClientResponse(aiohttp.ClientResponse):
