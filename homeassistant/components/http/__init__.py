@@ -704,47 +704,29 @@ class FastUrlDispatcher(UrlDispatcher):
         if "{" in canonical:  # strip at the first { to allow for variables
             canonical = canonical.split("{")[0]
             canonical = canonical.rstrip("/")
+        # There may be multiple resources for a canonical path
+        # so we use a list to avoid falling back to a full linear search
         self._resource_index.setdefault(canonical, []).append(resource)
-        _LOGGER.warning(
-            "Registered %s with %s route %s",
-            canonical,
-            resource,
-            self._resource_index[canonical],
-        )
 
     async def resolve(self, request: web.Request) -> UrlMappingMatchInfo:
         """Resolve a request."""
         url_parts = request.rel_url.raw_parts
         resource_index = self._resource_index
+
         # Walk the url parts looking for candidates
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
             if (resource_candidates := resource_index.get(url_part)) is not None:
                 for candidate in resource_candidates:
-                    _LOGGER.warning("Found route for %s: %s", url_part, candidate)
-                    match_dict, allowed = await candidate.resolve(request)
-                    if match_dict is not None:
+                    if (
+                        match_dict := (await candidate.resolve(request))[0]
+                    ) is not None:
                         return match_dict
-                _LOGGER.warning(
-                    "Rejected %s route %s match dict: %s allowed: %s",
-                    resource_candidates,
-                    request.url,
-                    match_dict,
-                    allowed,
-                )
         # Next try the index view if we don't have a match
         if (index_view_candidates := resource_index.get("/")) is not None:
-            _LOGGER.warning("Found index view candidate %s", index_view_candidates)
             for candidate in index_view_candidates:
-                _LOGGER.warning("Found route for %s: %s", url_part, candidate)
-                match_dict, allowed = await candidate.resolve(request)
-                if match_dict is not None:
+                if (match_dict := (await candidate.resolve(request))[0]) is not None:
                     return match_dict
 
         # Finally, fallback to the linear search
-        super_result = await super().resolve(request)
-
-        _LOGGER.warning(
-            "Unable to find route %s super result: %s", request.url, super_result
-        )
-        return super_result
+        return await super().resolve(request)
