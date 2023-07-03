@@ -719,6 +719,12 @@ class FastUrlDispatcher(UrlDispatcher):
                     match_dict := (await resource_candidate.resolve(request))[0]
                 ) is not None:
                     return match_dict
+                _LOGGER.warning(
+                    "Rejected %s route %s match dict: %s",
+                    resource_candidate,
+                    request.url,
+                    match_dict,
+                )
         # Next try the index view if we don't have a match
         if (index_view_candidate := resource_index.get("/")) is not None and (
             match_dict := (await index_view_candidate.resolve(request))[0]
