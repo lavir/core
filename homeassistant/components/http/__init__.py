@@ -722,8 +722,11 @@ class FastUrlDispatcher(UrlDispatcher):
             match_dict := (await index_view_candidate.resolve(request))[0]
         ) is not None:
             return match_dict
-        _LOGGER.warning(
-            "Unable to find route %s index: %s", request.url, resource_index
-        )
+
         # Finally, fallback to the linear search
-        return await super().resolve(request)
+        super_result = await super().resolve(request)
+
+        _LOGGER.warning(
+            "Unable to find route %s super result: %s", request.url, super_result
+        )
+        return super_result
