@@ -177,12 +177,6 @@ class HassIOIngress(HomeAssistantView):
                     body=body,
                 )
                 simple_response.enable_compression()
-                _LOGGER.warning(
-                    "simple_response: %s, compression: %s request: %s",
-                    simple_response,
-                    simple_response._compression,
-                    request.headers,
-                )
                 await simple_response.prepare(request)
                 return simple_response
 
@@ -192,13 +186,6 @@ class HassIOIngress(HomeAssistantView):
 
             try:
                 response.enable_compression()
-                _LOGGER.warning(
-                    "stream_response: %s, compression: %s request: %s",
-                    response,
-                    response._compression,
-                    request.headers,
-                )
-
                 await response.prepare(request)
                 async for data in result.content.iter_chunked(8192):
                     await response.write(data)
