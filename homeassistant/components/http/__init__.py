@@ -713,10 +713,12 @@ class FastUrlDispatcher(UrlDispatcher):
         # Walk the url parts looking for candidates
         for i in range(len(url_parts), 1, -1):
             url_part = "/" + "/".join(url_parts[1:i])
-            if (resource_candidate := resource_index.get(url_part)) is not None and (
-                match_dict := (await resource_candidate.resolve(request))[0]
-            ) is not None:
-                return match_dict
+            if (resource_candidate := resource_index.get(url_part)) is not None:
+                _LOGGER.warning("Found route for %s: %s", url_part, resource_candidate)
+                if (
+                    match_dict := (await resource_candidate.resolve(request))[0]
+                ) is not None:
+                    return match_dict
         # Next try the index view if we don't have a match
         if (index_view_candidate := resource_index.get("/")) is not None and (
             match_dict := (await index_view_candidate.resolve(request))[0]
