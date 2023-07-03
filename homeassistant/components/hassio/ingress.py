@@ -184,12 +184,6 @@ class HassIOIngress(HomeAssistantView):
                     request.headers,
                 )
                 await simple_response.prepare(request)
-                _LOGGER.warning(
-                    "simple_response2: %s, compression: %s request: %s",
-                    simple_response,
-                    simple_response._compression,
-                    request.headers,
-                )
                 return simple_response
 
             # Stream response
