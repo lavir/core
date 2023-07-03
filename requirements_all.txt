@@ -348,7 +348,7 @@ aioshelly==5.4.0
 aioskybell==22.7.0
 
 # homeassistant.components.slimproto
-aioslimproto==2.1.1
+aioslimproto==2.3.2
 
 # homeassistant.components.steamist
 aiosteamist==0.3.2
@@ -503,7 +503,7 @@ beautifulsoup4==4.11.1
 bellows==0.35.8
 
 # homeassistant.components.bmw_connected_drive
-bimmer-connected==0.13.7
+bimmer-connected==0.13.8
 
 # homeassistant.components.bizkaibus
 bizkaibus==0.1.1
@@ -733,7 +733,7 @@ enocean==0.50
 enturclient==0.2.4
 
 # homeassistant.components.environment_canada
-env-canada==0.5.34
+env-canada==0.5.35
 
 # homeassistant.components.enphase_envoy
 envoy-reader==0.20.1
@@ -1364,6 +1364,9 @@ openwrt-luci-rpc==1.1.16
 
 # homeassistant.components.ubus
 openwrt-ubus-rpc==0.0.2
+
+# homeassistant.components.opower
+opower==0.0.12
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
