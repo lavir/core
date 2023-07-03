@@ -715,15 +715,15 @@ class FastUrlDispatcher(UrlDispatcher):
             url_part = "/" + "/".join(url_parts[1:i])
             if (resource_candidate := resource_index.get(url_part)) is not None:
                 _LOGGER.warning("Found route for %s: %s", url_part, resource_candidate)
-                if (
-                    match_dict := (await resource_candidate.resolve(request))[0]
-                ) is not None:
+                match_dict, allowed = await resource_candidate.resolve(request)
+                if match_dict is not None:
                     return match_dict
                 _LOGGER.warning(
-                    "Rejected %s route %s match dict: %s",
+                    "Rejected %s route %s match dict: %s allowed: %s",
                     resource_candidate,
                     request.url,
                     match_dict,
+                    allowed,
                 )
         # Next try the index view if we don't have a match
         if (index_view_candidate := resource_index.get("/")) is not None and (
