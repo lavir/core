@@ -1412,6 +1412,8 @@ class State:
 class StateMachine:
     """Helper class that tracks the state of different entities."""
 
+    __slots__ = ("_states", "_reservations", "_bus", "_loop")
+
     def __init__(self, bus: EventBus, loop: asyncio.events.AbstractEventLoop) -> None:
         """Initialize state machine."""
         self._states: dict[str, State] = {}
