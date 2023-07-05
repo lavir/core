@@ -385,14 +385,6 @@ async def test_event_listener(
             "updated_at": datetime.datetime(2017, 1, 1, 0, 0),
             "multi_periods": "0.120.240.2023873",
         }
-        state = MagicMock(
-            state=in_,
-            domain="fake",
-            entity_id="fake.entity_id",
-            object_id="entity_id",
-            attributes=attrs,
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": "foobars",
@@ -418,7 +410,7 @@ async def test_event_listener(
         if out[1] is not None:
             body[0]["fields"]["value"] = out[1]
 
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("fake.entity_id", in_, attrs)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -457,14 +449,6 @@ async def test_event_listener_no_units(
             attrs = {"unit_of_measurement": unit}
         else:
             attrs = {}
-        state = MagicMock(
-            state=1,
-            domain="fake",
-            entity_id="fake.entity_id",
-            object_id="entity_id",
-            attributes=attrs,
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": "fake.entity_id",
@@ -473,7 +457,7 @@ async def test_event_listener_no_units(
                 "fields": {"value": 1},
             }
         ]
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("fake.entity_id", 1, attrs)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -508,14 +492,6 @@ async def test_event_listener_inf(
     await _setup(hass, mock_client, config_ext, get_write_api)
 
     attrs = {"bignumstring": "9" * 999, "nonumstring": "nan"}
-    state = MagicMock(
-        state=8,
-        domain="fake",
-        entity_id="fake.entity_id",
-        object_id="entity_id",
-        attributes=attrs,
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "fake.entity_id",
@@ -524,7 +500,7 @@ async def test_event_listener_inf(
             "fields": {"value": 8},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("fake.entity_id", 8, attrs)
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -558,14 +534,6 @@ async def test_event_listener_states(
     await _setup(hass, mock_client, config_ext, get_write_api)
 
     for state_state in (1, "unknown", "", "unavailable"):
-        state = MagicMock(
-            state=state_state,
-            domain="fake",
-            entity_id="fake.entity_id",
-            object_id="entity_id",
-            attributes={},
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": "fake.entity_id",
@@ -574,7 +542,7 @@ async def test_event_listener_states(
                 "fields": {"value": 1},
             }
         ]
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("fake.entity_id", state_state)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -591,14 +559,6 @@ async def execute_filter_test(hass: HomeAssistant, tests, write_api, get_mock_ca
     """Execute all tests for a given filtering test."""
     for test in tests:
         domain, entity_id = split_entity_id(test.id)
-        state = MagicMock(
-            state=1,
-            domain=domain,
-            entity_id=test.id,
-            object_id=entity_id,
-            attributes={},
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": test.id,
@@ -607,7 +567,7 @@ async def execute_filter_test(hass: HomeAssistant, tests, write_api, get_mock_ca
                 "fields": {"value": 1},
             }
         ]
-        hass.states.async_set(test.id, state.state, state.attributes)
+        hass.states.async_set(test.id, 1)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -953,14 +913,6 @@ async def test_event_listener_invalid_type(
             "latitude": "2.2",
             "invalid_attribute": ["value1", "value2"],
         }
-        state = MagicMock(
-            state=in_,
-            domain="fake",
-            entity_id="fake.entity_id",
-            object_id="entity_id",
-            attributes=attrs,
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": "foobars",
@@ -978,7 +930,7 @@ async def test_event_listener_invalid_type(
         if out[1] is not None:
             body[0]["fields"]["value"] = out[1]
 
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("fake.entity_id", in_, attrs)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1013,15 +965,6 @@ async def test_event_listener_default_measurement(
     config = {"default_measurement": "state"}
     config.update(config_ext)
     await _setup(hass, mock_client, config, get_write_api)
-
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="fake.ok",
-        object_id="ok",
-        attributes={},
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "state",
@@ -1030,7 +973,7 @@ async def test_event_listener_default_measurement(
             "fields": {"value": 1},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("fake.ok", 1)
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1066,14 +1009,6 @@ async def test_event_listener_unit_of_measurement_field(
     await _setup(hass, mock_client, config, get_write_api)
 
     attrs = {"unit_of_measurement": "foobars"}
-    state = MagicMock(
-        state="foo",
-        domain="fake",
-        entity_id="fake.entity_id",
-        object_id="entity_id",
-        attributes=attrs,
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "state",
@@ -1082,7 +1017,7 @@ async def test_event_listener_unit_of_measurement_field(
             "fields": {"state": "foo", "unit_of_measurement_str": "foobars"},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("fake.entity_id", "foo", attrs)
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1118,14 +1053,6 @@ async def test_event_listener_tags_attributes(
     await _setup(hass, mock_client, config, get_write_api)
 
     attrs = {"friendly_fake": "tag_str", "field_fake": "field_str"}
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="fake.something",
-        object_id="something",
-        attributes=attrs,
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "fake.something",
@@ -1138,7 +1065,7 @@ async def test_event_listener_tags_attributes(
             "fields": {"value": 1, "field_fake_str": "field_str"},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("fake.something", 1, attrs)
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1188,14 +1115,6 @@ async def test_event_listener_component_override_measurement(
         {"domain": "other", "id": "just_fake", "res": "other.just_fake"},
     ]
     for comp in test_components:
-        state = MagicMock(
-            state=1,
-            domain=comp["domain"],
-            entity_id=f"{comp['domain']}.{comp['id']}",
-            object_id=comp["id"],
-            attributes={},
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": comp["res"],
@@ -1204,7 +1123,7 @@ async def test_event_listener_component_override_measurement(
                 "fields": {"value": 1},
             }
         ]
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set(f"{comp['domain']}.{comp['id']}", 1)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1262,14 +1181,6 @@ async def test_event_listener_component_measurement_attr(
         {"domain": "other", "id": "just_fake", "attrs": {}, "res": "other"},
     ]
     for comp in test_components:
-        state = MagicMock(
-            state=1,
-            domain=comp["domain"],
-            entity_id=f"{comp['domain']}.{comp['id']}",
-            object_id=comp["id"],
-            attributes=comp["attrs"],
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         body = [
             {
                 "measurement": comp["res"],
@@ -1278,7 +1189,7 @@ async def test_event_listener_component_measurement_attr(
                 "fields": {"value": 1},
             }
         ]
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set(f"{comp['domain']}.{comp['id']}", 1, comp["attrs"])
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1344,19 +1255,6 @@ async def test_event_listener_ignore_attributes(
     ]
     for comp in test_components:
         entity_id = f"{comp['domain']}.{comp['id']}"
-        state = MagicMock(
-            state=1,
-            domain=comp["domain"],
-            entity_id=entity_id,
-            object_id=comp["id"],
-            attributes={
-                "ignore": 1,
-                "id_ignore": 1,
-                "glob_ignore": 1,
-                "domain_ignore": 1,
-            },
-        )
-        MagicMock(data={"new_state": state}, time_fired=12345)
         fields = {"value": 1}
         fields.update(comp["attrs"])
         body = [
@@ -1367,7 +1265,16 @@ async def test_event_listener_ignore_attributes(
                 "fields": fields,
             }
         ]
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set(
+            entity_id,
+            1,
+            {
+                "ignore": 1,
+                "id_ignore": 1,
+                "glob_ignore": 1,
+                "domain_ignore": 1,
+            },
+        )
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1405,15 +1312,6 @@ async def test_event_listener_ignore_attributes_overlapping_entities(
     }
     config.update(config_ext)
     await _setup(hass, mock_client, config, get_write_api)
-
-    state = MagicMock(
-        state=1,
-        domain="sensor",
-        entity_id="sensor.fake",
-        object_id="fake",
-        attributes={"ignore": 1},
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "units",
@@ -1422,7 +1320,7 @@ async def test_event_listener_ignore_attributes_overlapping_entities(
             "fields": {"value": 1},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("sensor.fake", 1, {"ignore": 1})
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1457,21 +1355,12 @@ async def test_event_listener_scheduled_write(
     config = {"max_retries": 1}
     config.update(config_ext)
     await _setup(hass, mock_client, config, get_write_api)
-
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="entity.entity_id",
-        object_id="entity_id",
-        attributes={},
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     write_api = get_write_api(mock_client)
     write_api.side_effect = OSError("foo")
 
     # Write fails
     with patch.object(influxdb.time, "sleep") as mock_sleep:
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("entity.entity_id", 1)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
         assert mock_sleep.called
@@ -1480,7 +1369,7 @@ async def test_event_listener_scheduled_write(
     # Write works again
     write_api.side_effect = None
     with patch.object(influxdb.time, "sleep") as mock_sleep:
-        hass.states.async_set(state.entity_id, "2", state.attributes)
+        hass.states.async_set("entity.entity_id", "2")
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
         assert not mock_sleep.called
@@ -1511,15 +1400,6 @@ async def test_event_listener_backlog_full(
     """Test the event listener drops old events when backlog gets full."""
     await _setup(hass, mock_client, config_ext, get_write_api)
 
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="entity.id",
-        object_id="entity",
-        attributes={},
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
-
     monotonic_time = 0
 
     def fast_monotonic():
@@ -1529,7 +1409,7 @@ async def test_event_listener_backlog_full(
         return monotonic_time
 
     with patch("homeassistant.components.influxdb.time.monotonic", new=fast_monotonic):
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("entity.id", 1)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1559,16 +1439,6 @@ async def test_event_listener_attribute_name_conflict(
 ) -> None:
     """Test the event listener when an attribute conflicts with another field."""
     await _setup(hass, mock_client, config_ext, get_write_api)
-
-    attrs = {"value": "value_str"}
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="fake.something",
-        object_id="something",
-        attributes=attrs,
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "fake.something",
@@ -1577,7 +1447,7 @@ async def test_event_listener_attribute_name_conflict(
             "fields": {"value": 1, "value__str": "value_str"},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set("fake.something", 1, {"value": "value_str"})
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1697,17 +1567,9 @@ async def test_invalid_inputs_error(
 
     write_api = get_write_api(mock_client)
     write_api.side_effect = test_exception
-    state = MagicMock(
-        state=1,
-        domain="fake",
-        entity_id="fake.something",
-        object_id="something",
-        attributes={},
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
 
     with patch(f"{INFLUX_PATH}.time.sleep") as sleep:
-        hass.states.async_set(state.entity_id, state.state, state.attributes)
+        hass.states.async_set("fake.something", 1)
         await hass.async_block_till_done()
         hass.data[influxdb.DOMAIN].block_till_done()
 
@@ -1797,17 +1659,6 @@ async def test_precision(
     await _setup(hass, mock_client, config, get_write_api)
 
     value = "1.9"
-    attrs = {
-        "unit_of_measurement": "foobars",
-    }
-    state = MagicMock(
-        state=value,
-        domain="fake",
-        entity_id="fake.entity_id",
-        object_id="entity",
-        attributes=attrs,
-    )
-    MagicMock(data={"new_state": state}, time_fired=12345)
     body = [
         {
             "measurement": "foobars",
@@ -1816,7 +1667,13 @@ async def test_precision(
             "fields": {"value": float(value)},
         }
     ]
-    hass.states.async_set(state.entity_id, state.state, state.attributes)
+    hass.states.async_set(
+        "fake.entity_id",
+        value,
+        {
+            "unit_of_measurement": "foobars",
+        },
+    )
     await hass.async_block_till_done()
     hass.data[influxdb.DOMAIN].block_till_done()
 
