@@ -769,9 +769,10 @@ class Entity(ABC):
         if not self.has_entity_name or not (device_entry := self.device_entry):
             return name
 
+        device_name = device_entry.name_by_user or device_entry.name
         if self.use_device_name:
-            return device_entry.name_by_user or device_entry.name
-        return f"{device_entry.name_by_user or device_entry.name} {name}"
+            return device_name
+        return f"{device_name} {name}" if device_name else name
 
     @callback
     def _async_write_ha_state(self) -> None:
