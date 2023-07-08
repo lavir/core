@@ -191,7 +191,7 @@ aio-georss-gdacs==0.8
 aioairq==0.2.4
 
 # homeassistant.components.airzone_cloud
-aioairzone-cloud==0.2.0
+aioairzone-cloud==0.2.1
 
 # homeassistant.components.airzone
 aioairzone==0.6.4
@@ -417,7 +417,7 @@ anthemav==1.4.1
 apcaccess==0.0.13
 
 # homeassistant.components.apprise
-apprise==1.4.0
+apprise==1.4.5
 
 # homeassistant.components.aprs
 aprslib==0.7.0
@@ -867,7 +867,7 @@ gitterpy==0.1.7
 glances-api==0.4.3
 
 # homeassistant.components.goalzero
-goalzero==0.2.1
+goalzero==0.2.2
 
 # homeassistant.components.goodwe
 goodwe==0.2.31
@@ -1160,7 +1160,7 @@ lupupy==0.3.0
 lw12==0.9.2
 
 # homeassistant.components.scrape
-lxml==4.9.1
+lxml==4.9.3
 
 # homeassistant.components.nmap_tracker
 mac-vendor-lookup==0.1.12
@@ -2219,7 +2219,7 @@ pyvolumio==0.1.5
 pywebpush==1.9.2
 
 # homeassistant.components.wemo
-pywemo==0.9.1
+pywemo==1.1.0
 
 # homeassistant.components.wilight
 pywilight==0.0.74
