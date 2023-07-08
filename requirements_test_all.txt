@@ -763,7 +763,7 @@ hlk-sw16==0.0.9
 hole==0.8.0
 
 # homeassistant.components.workday
-holidays==0.21.13
+holidays==0.28
 
 # homeassistant.components.frontend
 home-assistant-frontend==20230705.1
@@ -2011,7 +2011,7 @@ youless-api==1.0.1
 zamg==0.2.4
 
 # homeassistant.components.zeroconf
-zeroconf==0.70.0
+zeroconf==0.71.0
 
 # homeassistant.components.zeversolar
 zeversolar==0.3.1
