@@ -722,5 +722,6 @@ class FastUrlDispatcher(UrlDispatcher):
                     ) is not None:
                         return match_dict
 
+        _LOGGER.warning("Unable to find route %s", request.rel_url)
         # Finally, fallback to the linear search
         return await super().resolve(request)
