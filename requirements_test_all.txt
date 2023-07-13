@@ -379,9 +379,6 @@ anthemav==1.4.1
 # homeassistant.components.apcupsd
 apcaccess==0.0.13
 
-# homeassistant.components.apprise
-apprise==1.4.5
-
 # homeassistant.components.aprs
 aprslib==0.7.0
 
@@ -1606,7 +1603,7 @@ pytrafikverket==0.3.3
 pyudev==0.23.2
 
 # homeassistant.components.unifiprotect
-pyunifiprotect==4.10.4
+pyunifiprotect==4.10.5
 
 # homeassistant.components.uptimerobot
 pyuptimerobot==22.2.0
@@ -1705,7 +1702,7 @@ samsungtvws[async,encrypted]==2.6.0
 scapy==2.5.0
 
 # homeassistant.components.screenlogic
-screenlogicpy==0.9.0
+screenlogicpy==0.8.2
 
 # homeassistant.components.backup
 securetar==2023.3.0
