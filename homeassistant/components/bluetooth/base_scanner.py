@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 import datetime
 from datetime import timedelta
-from functools import partial
 import logging
 from typing import Any, Final
 
@@ -190,7 +189,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
         "_details",
         "_expire_seconds",
         "_storage",
-        "_create_bluetooth_service_info",
     )
 
     def __init__(
@@ -216,11 +214,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
         self._expire_seconds = CONNECTABLE_FALLBACK_MAXIMUM_STALE_ADVERTISEMENT_SECONDS
         assert models.MANAGER is not None
         self._storage = models.MANAGER.storage
-        self._create_bluetooth_service_info = partial(
-            BluetoothServiceInfoBleak,
-            source=self.source,
-            connectable=connectable,
-        )
 
     @hass_callback
     def async_setup(self) -> CALLBACK_TYPE:
@@ -379,15 +372,17 @@ class BaseHaRemoteScanner(BaseHaScanner):
         )
         self._discovered_device_timestamps[address] = advertisement_monotonic_time
         self._new_info_callback(
-            self._create_bluetooth_service_info(
+            BluetoothServiceInfoBleak(
                 name=local_name or address,
                 address=address,
                 rssi=rssi,
                 manufacturer_data=manufacturer_data,
                 service_data=service_data,
                 service_uuids=service_uuids,
+                source=self.source,
                 device=device,
                 advertisement=advertisement_data,
+                connectable=self.connectable,
                 time=advertisement_monotonic_time,
             )
         )
