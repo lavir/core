@@ -55,7 +55,7 @@ async def test_get_system_info_supervisor_not_available(
 
 
 async def test_get_system_info_supervisor_not_loaded(hass: HomeAssistant) -> None:
-    """Test the get system info when supervisor is not loaded is in use."""
+    """Test the get system info when supervisor is not loaded."""
     with patch("platform.system", return_value="Linux"), patch(
         "homeassistant.helpers.system_info.is_docker_env", return_value=True
     ), patch(
@@ -70,7 +70,7 @@ async def test_get_system_info_supervisor_not_loaded(hass: HomeAssistant) -> Non
         assert info["version"] == current_version
         assert info["user"] is not None
         assert json.dumps(info) is not None
-        assert info["installation_type"] == "Home Assistant Supervised"
+        assert info["installation_type"] == "Unsupported Third Party Container"
 
 
 async def test_container_installationtype(hass: HomeAssistant) -> None:
