@@ -13,8 +13,9 @@ from homeassistant.const import (
     EVENT_HOMEASSISTANT_FINAL_WRITE,
     EVENT_HOMEASSISTANT_STOP,
 )
-from homeassistant.core import CoreState, HomeAssistant
-from homeassistant.helpers import storage
+from homeassistant.core import DOMAIN as HOMEASSISTANT_DOMAIN, CoreState, HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir, storage
 from homeassistant.util import dt as dt_util
 from homeassistant.util.color import RGBColor
 
@@ -581,6 +582,12 @@ async def test_loading_corrupt_file(
     assert data is None
     assert "Unrecoverable error decoding storage" in caplog.text
 
+    issue_registry = ir.async_get(hass)
+    issue = issue_registry.async_get_issue(
+        HOMEASSISTANT_DOMAIN, f"storage_corruption_{MOCK_KEY}"
+    )
+    assert issue is not None
+
     files = await hass.async_add_executor_job(
         os.listdir, os.path.join(tmp_storage, ".storage")
     )
@@ -606,4 +613,16 @@ async def test_os_error_is_fatal(tmpdir: py.path.local) -> None:
         "homeassistant.helpers.storage.json_util.load_json", side_effect=OSError
     ):
         await store.async_load()
+
+    base_os_error = OSError()
+    base_os_error.errno = 30
+    home_assistant_error = HomeAssistantError()
+    home_assistant_error.__cause__ = base_os_error
+
+    with pytest.raises(HomeAssistantError), patch(
+        "homeassistant.helpers.storage.json_util.load_json",
+        side_effect=home_assistant_error,
+    ):
+        await store.async_load()
+
     await hass.async_stop(force=True)
