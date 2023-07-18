@@ -5,7 +5,7 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from typing import Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from pyunifiprotect.data import NVR, Event, ProtectAdoptableDeviceModel
 
@@ -17,6 +17,15 @@ from .utils import get_nested_attr
 _LOGGER = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=ProtectAdoptableDeviceModel | NVR)
+
+
+def split_tuple(value: tuple[str, ...] | str | None) -> tuple[str, ...] | None:
+    """Split string to tuple."""
+    if value is None:
+        return None
+    if TYPE_CHECKING:
+        assert isinstance(value, str)
+    return tuple(value.split("."))
 
 
 class PermRequired(int, Enum):
@@ -31,18 +40,26 @@ class PermRequired(int, Enum):
 class ProtectRequiredKeysMixin(EntityDescription, Generic[T]):
     """Mixin for required keys."""
 
-    ufp_required_field: tuple[str, ...] | None = None
-    ufp_value: tuple[str, ...] | None = None
+    ufp_required_field: tuple[str, ...] | str | None = None
+    ufp_value: tuple[str, ...] | str | None = None
     ufp_value_fn: Callable[[T], Any] | None = None
-    ufp_enabled: tuple[str, ...] | None = None
+    ufp_enabled: tuple[str, ...] | str | None = None
     ufp_perm: PermRequired | None = None
+
+    def __post_init__(self) -> None:
+        """Pre-convert strings to tuples for faster get_nested_attr."""
+        self.ufp_required_field = split_tuple(self.ufp_required_field)
+        self.ufp_value = split_tuple(self.ufp_value)
+        self.ufp_enabled = split_tuple(self.ufp_enabled)
 
     def get_ufp_value(self, obj: T) -> Any:
         """Return value from UniFi Protect device."""
-        if self.ufp_value is not None:
-            return get_nested_attr(obj, self.ufp_value)
-        if self.ufp_value_fn is not None:
-            return self.ufp_value_fn(obj)
+        if (ufp_value := self.ufp_value) is not None:
+            if TYPE_CHECKING:
+                assert isinstance(ufp_value, tuple)
+            return get_nested_attr(obj, ufp_value)
+        if (ufp_value_fn := self.ufp_value_fn) is not None:
+            return ufp_value_fn(obj)
 
         # reminder for future that one is required
         raise RuntimeError(  # pragma: no cover
@@ -51,16 +68,19 @@ class ProtectRequiredKeysMixin(EntityDescription, Generic[T]):
 
     def get_ufp_enabled(self, obj: T) -> bool:
         """Return value from UniFi Protect device."""
-        if self.ufp_enabled is not None:
-            return bool(get_nested_attr(obj, self.ufp_enabled))
+        if (ufp_enabled := self.ufp_enabled) is not None:
+            if TYPE_CHECKING:
+                assert isinstance(ufp_enabled, tuple)
+            return bool(get_nested_attr(obj, ufp_enabled))
         return True
 
     def has_required(self, obj: T) -> bool:
         """Return if has required field."""
-
-        if self.ufp_required_field is None:
+        if (ufp_required_field := self.ufp_required_field) is None:
             return True
-        return bool(get_nested_attr(obj, self.ufp_required_field))
+        if TYPE_CHECKING:
+            assert isinstance(ufp_required_field, tuple)
+        return bool(get_nested_attr(obj, ufp_required_field))
 
 
 @dataclass
@@ -71,6 +91,7 @@ class ProtectEventMixin(ProtectRequiredKeysMixin[T]):
 
     def get_event_obj(self, obj: T) -> Event | None:
         """Return value from UniFi Protect device."""
+
         if self.ufp_event_obj is not None:
             return cast(Event, getattr(obj, self.ufp_event_obj, None))
         return None
