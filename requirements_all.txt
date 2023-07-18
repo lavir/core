@@ -608,7 +608,7 @@ connect-box==0.2.8
 
 # homeassistant.components.eq3btsmart
 # homeassistant.components.xiaomi_miio
-construct==2.10.56
+construct==2.10.68
 
 # homeassistant.components.utility_meter
 croniter==1.0.6
@@ -1606,7 +1606,7 @@ pycketcasts==1.0.1
 pycmus==0.1.1
 
 # homeassistant.components.tensorflow
-pycocotools==2.0.1
+pycocotools==2.0.6
 
 # homeassistant.components.comfoconnect
 pycomfoconnect==0.5.1
@@ -2009,10 +2009,10 @@ pysma==0.7.3
 pysmappee==0.2.29
 
 # homeassistant.components.smartthings
-pysmartapp==0.3.3
+pysmartapp==0.3.5
 
 # homeassistant.components.smartthings
-pysmartthings==0.7.6
+pysmartthings==0.7.8
 
 # homeassistant.components.edl21
 pysml==0.0.12
