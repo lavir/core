@@ -88,10 +88,11 @@ def verify_connected(func: _WrapFuncType) -> _WrapFuncType:
                 f"{self._source_name}: {ble_device.name} - {ble_device.address}"
             )
             disconnected = disconnected_future.done()
-            _LOGGER.debug(
+            _LOGGER.exception(
                 "%s: Bluetooth operation cancelled (disconnected=%s)",
                 device_info,
                 disconnected,
+                exc_info=ex,
             )
             if not disconnected:
                 # If the disconnected future is not done, the task was cancelled
