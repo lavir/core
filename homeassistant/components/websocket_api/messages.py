@@ -5,6 +5,7 @@ from functools import lru_cache
 import logging
 from typing import TYPE_CHECKING, Any, Final, cast
 
+import orjson
 import voluptuous as vol
 
 from homeassistant.const import (
@@ -116,9 +117,19 @@ def _cached_state_diff_message(event: Event) -> str:
     The IDEN_TEMPLATE is used which will be replaced
     with the actual iden in cached_event_message
     """
-    return message_to_json(
-        {"id": IDEN_TEMPLATE, "type": "event", "event": _state_diff_event(event)}
-    )
+    diff = _state_diff_event(event)
+    try:
+        orjson.dumps(diff)
+    except Exception:
+        _LOGGER.error(
+            "Unable to serialize to JSON: %s. Bad data found at %s",
+            diff,
+            format_unserializable_data(
+                find_paths_unserializable_data(diff, dump=orjson.dumps)
+            ),
+        )
+
+    return message_to_json({"id": IDEN_TEMPLATE, "type": "event", "event": diff})
 
 
 def _state_diff_event(event: Event) -> dict:
