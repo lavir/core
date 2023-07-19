@@ -64,7 +64,7 @@ def mac_to_int(address: str) -> int:
 def _on_disconnected(task: asyncio.Task[Any], _: asyncio.Future[None]) -> None:
     """Call when the ESPHome or BLE device disconnects."""
     if task and not task.done():
-        task.cancel("Disconnected")
+        task.cancel("ESPHome or BLE device disconnected")
 
 
 def verify_connected(func: _WrapFuncType) -> _WrapFuncType:
@@ -77,7 +77,8 @@ def verify_connected(func: _WrapFuncType) -> _WrapFuncType:
         loop = self._loop
         disconnected_futures = self._disconnected_futures
         disconnected_future = loop.create_future()
-        disconnect_handler = partial(_on_disconnected, asyncio.current_task(loop))
+        task = asyncio.current_task(loop)
+        disconnect_handler = partial(_on_disconnected, task)
         disconnected_future.add_done_callback(disconnect_handler)
         disconnected_futures.add(disconnected_future)
         try:
@@ -99,6 +100,10 @@ def verify_connected(func: _WrapFuncType) -> _WrapFuncType:
                 # externally and we need to raise cancelled error to avoid
                 # blocking the cancellation.
                 raise
+            if uncancel := getattr(task, "uncancel", None):
+                uncancel()
+                # Only works on Python 3.11+
+                # https://github.com/python/cpython/issues/102780
             raise BleakError(f"{device_info}: Disconnected during operation") from ex
         finally:
             disconnected_futures.discard(disconnected_future)
