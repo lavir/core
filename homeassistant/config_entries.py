@@ -696,9 +696,16 @@ class ConfigEntry:
         for task in self._background_tasks:
             task.cancel(cancel_message)
 
-        _, pending = await asyncio.wait(
-            [*self._tasks, *self._background_tasks], timeout=10
-        )
+        tasks = [*self._tasks, *self._background_tasks]
+        if tasks:
+            _LOGGER.warning(
+                "Config entry %s with domain %s is being unloaded, waiting for tasks: %s, background tasks: %s",
+                self.entry_id,
+                self.domain,
+                self._tasks,
+                self._background_tasks,
+            )
+        _, pending = await asyncio.wait(tasks, timeout=10)
 
         for task in pending:
             _LOGGER.warning(
