@@ -21,6 +21,7 @@ from aioesphomeapi import (
 )
 from aioesphomeapi.connection import APIConnectionError, TimeoutAPIError
 from aioesphomeapi.core import BluetoothGATTAPIError
+from async_interrupt import interrupt
 import async_timeout
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.client import BaseBleakClient, NotifyCallback
@@ -30,7 +31,6 @@ from bleak.exc import BleakError
 
 from homeassistant.core import CALLBACK_TYPE
 
-from .async_interrupt import interrupt
 from .cache import ESPHomeBluetoothCache
 from .characteristic import BleakGATTCharacteristicESPHome
 from .descriptor import BleakGATTDescriptorESPHome
