@@ -3,8 +3,7 @@
 This module provides a context manager that can be used to interrupt
 a block of code when a future is done.
 
-The purpose is to raise as soon as possible without waiting for the next await expression
-to avoid any race conditions.
+The purpose is to raise as soon as possible to avoid any race conditions.
 
 This is based loosely on async_timeout by Andrew Svetlov and cpython asyncio.timeout
 """
@@ -30,8 +29,7 @@ class _Interrupt:
 
     exception is raised immediately when future is finished.
 
-    The purpose is to raise as soon as possible without waiting for the next await expression
-    to avoid any race conditions.
+    The purpose is to raise as soon as possible to avoid any race conditions.
     """
 
     __slots__ = (
@@ -94,8 +92,7 @@ def interrupt(
 
     Useful in cases when you want to apply interrupt logic around block
     of code that uses await expression where an exception needs to be
-    raised as soon as possible without waiting for the next await expression
-    to avoid race conditions.
+    raised as soon as possible to avoid race conditions.
 
     >>> async with interrupt(future, APIUnavailableError, 'API is became unavailable'):
     ...     await api.call()
