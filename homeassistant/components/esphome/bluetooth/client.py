@@ -83,7 +83,7 @@ def verify_connected(func: _WrapFuncType) -> _WrapFuncType:
         disconnected_futures.add(disconnected_future)
         try:
             return await func(self, *args, **kwargs)
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as ex:
             ble_device = self._ble_device
             device_info = (
                 f"{self._source_name}: {ble_device.name} - {ble_device.address}"
