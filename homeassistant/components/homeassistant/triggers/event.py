@@ -1,6 +1,7 @@
 """Offer event listening automation rules."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -13,6 +14,8 @@ from homeassistant.helpers.typing import ConfigType
 
 CONF_EVENT_TYPE = "event_type"
 CONF_EVENT_CONTEXT = "context"
+
+_LOGGER = logging.getLogger(__name__)
 
 TRIGGER_SCHEMA = cv.TRIGGER_BASE_SCHEMA.extend(
     {
@@ -85,6 +88,7 @@ async def async_attach_trigger(
     @callback
     def filter_event(event: Event) -> bool:
         """Filter events."""
+        _LOGGER.warning("Filtering event_types=%s event=%s", event_types, event)
         try:
             # Check that the event data and context match the configured
             # schema if one was provided
