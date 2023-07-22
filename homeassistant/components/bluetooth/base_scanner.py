@@ -333,22 +333,19 @@ class BaseHaRemoteScanner(BaseHaScanner):
                 local_name = prev_name
 
             if service_uuids:
-                if prev_service_uuids and service_uuids != prev_service_uuids:
+                if prev_service_uuids:
                     service_uuids = list(set(service_uuids + prev_service_uuids))
             else:
                 service_uuids = prev_service_uuids
 
             if service_data:
-                if prev_service_data and service_data != prev_service_data:
+                if prev_service_data:
                     service_data = prev_service_data | service_data
             else:
                 service_data = prev_service_data
 
             if manufacturer_data:
-                if (
-                    prev_manufacturer_data
-                    and prev_manufacturer_data != manufacturer_data
-                ):
+                if prev_manufacturer_data:
                     manufacturer_data = prev_manufacturer_data | manufacturer_data
             else:
                 manufacturer_data = prev_manufacturer_data
