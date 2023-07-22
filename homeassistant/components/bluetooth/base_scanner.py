@@ -323,11 +323,10 @@ class BaseHaRemoteScanner(BaseHaScanner):
             prev_service_uuids = prev_advertisement.service_uuids
             prev_service_data = prev_advertisement.service_data
             prev_manufacturer_data = prev_advertisement.manufacturer_data
-            prev_name = prev_device.name
 
             if (
                 local_name
-                and prev_name
+                and (prev_name := prev_device.name)
                 and local_name != prev_name
                 and len(prev_name) > len(local_name)
             ):
@@ -363,8 +362,7 @@ class BaseHaRemoteScanner(BaseHaScanner):
             #
             device = prev_device
             device.name = local_name
-            current_details: dict[str, Any] = device.details
-            current_details.update(details)
+            device.details.update(details)
             # pylint: disable-next=protected-access
             device._rssi = rssi  # deprecated, will be removed in newer bleak
 
