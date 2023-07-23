@@ -4,12 +4,12 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 import logging
 from typing import Any, Final, TypedDict, final
 
 import voluptuous as vol
 
-from homeassistant.backports.enum import StrEnum
 from homeassistant.backports.functools import cached_property
 from homeassistant.components.camera import Image
 from homeassistant.const import (
