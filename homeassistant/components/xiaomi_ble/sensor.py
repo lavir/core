@@ -1,13 +1,11 @@
 """Support for xiaomi ble sensors."""
 from __future__ import annotations
 
-from xiaomi_ble import SLEEPY_DEVICE_MODELS, DeviceClass, SensorUpdate, Units
+from xiaomi_ble import DeviceClass, SensorUpdate, Units
 
 from homeassistant import config_entries
 from homeassistant.components.bluetooth.passive_update_processor import (
-    PassiveBluetoothDataProcessor,
     PassiveBluetoothDataUpdate,
-    PassiveBluetoothProcessorCoordinator,
     PassiveBluetoothProcessorEntity,
 )
 from homeassistant.components.sensor import (
@@ -17,7 +15,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    ATTR_MODEL,
     CONCENTRATION_MILLIGRAMS_PER_CUBIC_METER,
     CONDUCTIVITY,
     LIGHT_LUX,
@@ -34,6 +31,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.sensor import sensor_device_info_to_hass_device_info
 
 from .const import DOMAIN
+from .coordinator import (
+    XiaomiActiveBluetoothProcessorCoordinator,
+    XiaomiPassiveBluetoothDataProcessor,
+)
 from .device import device_key_to_bluetooth_entity_key
 
 SENSOR_DESCRIPTIONS = {
@@ -171,10 +172,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Xiaomi BLE sensors."""
-    coordinator: PassiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
+    coordinator: XiaomiActiveBluetoothProcessorCoordinator = hass.data[DOMAIN][
         entry.entry_id
     ]
-    processor = PassiveBluetoothDataProcessor(sensor_update_to_bluetooth_data_update)
+    processor = XiaomiPassiveBluetoothDataProcessor(
+        sensor_update_to_bluetooth_data_update
+    )
     entry.async_on_unload(
         processor.async_add_entities_listener(
             XiaomiBluetoothSensorEntity, async_add_entities
@@ -184,7 +187,7 @@ async def async_setup_entry(
 
 
 class XiaomiBluetoothSensorEntity(
-    PassiveBluetoothProcessorEntity[PassiveBluetoothDataProcessor[float | int | None]],
+    PassiveBluetoothProcessorEntity[XiaomiPassiveBluetoothDataProcessor],
     SensorEntity,
 ):
     """Representation of a xiaomi ble sensor."""
@@ -197,8 +200,7 @@ class XiaomiBluetoothSensorEntity(
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        if self.device_info and self.device_info[ATTR_MODEL] in SLEEPY_DEVICE_MODELS:
-            # These devices sleep for an indeterminate amount of time
-            # so there is no way to track their availability.
-            return True
-        return super().available
+        coordinator: XiaomiActiveBluetoothProcessorCoordinator = (
+            self.processor.coordinator
+        )
+        return coordinator.device_data.sleepy_device or super().available
