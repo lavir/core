@@ -98,6 +98,7 @@ CHARACTERISTIC_PLATFORMS = {
     CharacteristicsTypes.MUTE: "switch",
     CharacteristicsTypes.FILTER_LIFE_LEVEL: "sensor",
     CharacteristicsTypes.VENDOR_AIRVERSA_SLEEP_MODE: "switch",
+    CharacteristicsTypes.INPUT_EVENT: "event",
 }
 
 STARTUP_EXCEPTIONS = (
