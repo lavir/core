@@ -102,7 +102,6 @@ async def async_setup_entry(
                         key=f"{service.accessory.aid}_{service.iid}",
                         device_class=EventDeviceClass.DOORBELL,
                         translation_key="doorbell",
-                        name="Doorbell",
                     ),
                 )
             )
@@ -116,7 +115,10 @@ async def async_setup_entry(
                 )
             )
 
-            for idx, switch in enumerate(switches):
+            for switch in switches:
+                # The Apple docs say that if we number the buttons ourselves
+                # We do it in service label index order. `switches` is already in
+                # that order.
                 entities.append(
                     HomeKitEventEntity(
                         conn,
@@ -125,7 +127,6 @@ async def async_setup_entry(
                             key=f"{service.accessory.aid}_{service.iid}",
                             device_class=EventDeviceClass.BUTTON,
                             translation_key="button",
-                            name=f"Button {idx}",
                         ),
                     )
                 )
@@ -142,7 +143,6 @@ async def async_setup_entry(
                             key=f"{service.accessory.aid}_{service.iid}",
                             device_class=EventDeviceClass.BUTTON,
                             translation_key="button",
-                            name="Button",
                         ),
                     )
                 )
