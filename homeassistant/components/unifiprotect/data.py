@@ -190,7 +190,6 @@ class ProtectData:
     def _async_update_device(
         self, device: ProtectAdoptableDeviceModel | NVR, changed_data: dict[str, Any]
     ) -> None:
-        _LOGGER.warning("Device updated: %s: %s", device.id, changed_data)
         self._async_signal_device_update(device)
         if (
             device.model == ModelType.CAMERA
@@ -215,7 +214,6 @@ class ProtectData:
 
     @callback
     def _async_process_ws_message(self, message: WSSubscriptionMessage) -> None:
-        _LOGGER.warning("WS Message: %s", message)
         if message.new_obj is None:
             if isinstance(message.old_obj, ProtectAdoptableDeviceModel):
                 self._async_remove_device(message.old_obj)
