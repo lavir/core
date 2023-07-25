@@ -190,6 +190,7 @@ class ProtectData:
     def _async_update_device(
         self, device: ProtectAdoptableDeviceModel | NVR, changed_data: dict[str, Any]
     ) -> None:
+        _LOGGER.warning("Device updated: %s: %s", device.id, changed_data)
         self._async_signal_device_update(device)
         if (
             device.model == ModelType.CAMERA
