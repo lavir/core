@@ -215,6 +215,7 @@ class ProtectData:
 
     @callback
     def _async_process_ws_message(self, message: WSSubscriptionMessage) -> None:
+        _LOGGER.warning("WS Message: %s", message)
         if message.new_obj is None:
             if isinstance(message.old_obj, ProtectAdoptableDeviceModel):
                 self._async_remove_device(message.old_obj)
