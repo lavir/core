@@ -60,6 +60,7 @@ class LookinDataUpdateCoordinator(DataUpdateCoordinator[_DataT]):
             name=name,
             update_interval=update_interval,
             update_method=update_method,
+            force_update=False,
         )
 
     @callback
