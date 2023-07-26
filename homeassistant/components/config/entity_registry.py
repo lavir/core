@@ -50,7 +50,8 @@ def websocket_list_entities(
         + ",".join(
             json_repr
             for entry in registry.entities.values()
-            if (json_repr := entry.partial_json_repr) is not None
+            if (json_repr := (entry.partial_json_repr_cache or entry.partial_json_repr))
+            is not None
         )
         + "]}"
     )
@@ -81,7 +82,10 @@ def websocket_list_entities_for_display(
             json_repr
             for entry in registry.entities.values()
             if entry.disabled_by is None
-            and (json_repr := entry.display_json_repr) is not None
+            and (
+                json_repr := (entry.display_json_repr_cache or entry.display_json_repr)
+            )
+            is not None
         )
         + "]}}"
     )
