@@ -377,6 +377,14 @@ class DataUpdateCoordinator(BaseDataUpdateCoordinatorProtocol, Generic[_DataT]):
         if not self.last_update_success and not previous_update_success:
             return
 
+        self.logger.warning(
+            "%s: Current data: %s, previous data: %s same object = %s",
+            self.name,
+            self.data,
+            previous_data,
+            self.data is previous_data,
+        )
+
         if (
             # If the data object is the same object we cannot tell if the data has
             # changed so we always notify listeners.
