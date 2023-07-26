@@ -187,14 +187,8 @@ class RegistryEntry:
     _partial_repr: str | None | UndefinedType = attr.ib(
         cmp=False, default=UNDEFINED, init=False, repr=False
     )
-    partial_json_repr_cache: str | None = attr.ib(
-        cmp=False, default=None, init=False, repr=False
-    )
     _display_repr: str | None | UndefinedType = attr.ib(
         cmp=False, default=UNDEFINED, init=False, repr=False
-    )
-    display_json_repr_cache: str | None = attr.ib(
-        cmp=False, default=None, init=False, repr=False
     )
 
     @domain.default
@@ -251,8 +245,6 @@ class RegistryEntry:
             dict_repr = self._as_display_dict
             json_repr: str | None = JSON_DUMP(dict_repr) if dict_repr else None
             object.__setattr__(self, "_display_repr", json_repr)
-            if json_repr:
-                object.__setattr__(self, "display_json_repr_cache", json_repr)
         except (ValueError, TypeError):
             object.__setattr__(self, "_display_repr", None)
             _LOGGER.error(
@@ -295,9 +287,7 @@ class RegistryEntry:
 
         try:
             dict_repr = self.as_partial_dict
-            json_repr = JSON_DUMP(dict_repr)
-            object.__setattr__(self, "_partial_repr", json_repr)
-            object.__setattr__(self, "partial_json_repr_cache", json_repr)
+            object.__setattr__(self, "_partial_repr", JSON_DUMP(dict_repr))
         except (ValueError, TypeError):
             object.__setattr__(self, "_partial_repr", None)
             _LOGGER.error(
