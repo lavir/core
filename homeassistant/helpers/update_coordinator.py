@@ -384,6 +384,7 @@ class DataUpdateCoordinator(BaseDataUpdateCoordinatorProtocol, Generic[_DataT]):
             or self.last_update_success != previous_update_success
             or previous_data != self.data
         ):
+            self.logger.error("Updating data: %s = %s", self.name, self.data)
             self.async_update_listeners()
 
     @callback
