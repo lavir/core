@@ -1562,6 +1562,9 @@ python-miio==0.5.12
 # homeassistant.components.mystrom
 python-mystrom==2.2.0
 
+# homeassistant.components.opensky
+python-opensky==0.0.10
+
 # homeassistant.components.otbr
 # homeassistant.components.thread
 python-otbr-api==2.3.0
@@ -1608,7 +1611,7 @@ pytrafikverket==0.3.3
 pyudev==0.23.2
 
 # homeassistant.components.unifiprotect
-pyunifiprotect==4.10.5
+pyunifiprotect==4.10.6
 
 # homeassistant.components.uptimerobot
 pyuptimerobot==22.2.0
@@ -2010,7 +2013,7 @@ yolink-api==0.3.0
 youless-api==1.0.1
 
 # homeassistant.components.youtube
-youtubeaio==1.1.4
+youtubeaio==1.1.5
 
 # homeassistant.components.zamg
 zamg==0.2.4
