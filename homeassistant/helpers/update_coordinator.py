@@ -371,7 +371,6 @@ class DataUpdateCoordinator(BaseDataUpdateCoordinatorProtocol, Generic[_DataT]):
             if not auth_failed and self._listeners and not self.hass.is_stopping:
                 self._schedule_refresh()
 
-        self.logger.error("Updating data: %s = %s", self.name, self.data)
         self.async_update_listeners()
 
     @callback
