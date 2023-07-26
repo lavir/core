@@ -40,7 +40,6 @@ class SensiboDataUpdateCoordinator(DataUpdateCoordinator[SensiboData]):
             request_refresh_debouncer=Debouncer(
                 hass, LOGGER, cooldown=REQUEST_REFRESH_DELAY, immediate=False
             ),
-            force_update=False,
         )
 
     async def _async_update_data(self) -> SensiboData:
