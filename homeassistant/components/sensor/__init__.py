@@ -276,7 +276,7 @@ class SensorEntity(Entity):
         return None
 
     @final
-    @property
+    @cached_property
     def _numeric_state_expected(self) -> bool:
         """Return true if the sensor must be numeric."""
         # Note: the order of the checks needs to be kept aligned
