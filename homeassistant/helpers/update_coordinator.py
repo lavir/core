@@ -277,10 +277,7 @@ class DataUpdateCoordinator(BaseDataUpdateCoordinatorProtocol, Generic[_DataT]):
 
         if log_timing := self.logger.isEnabledFor(logging.DEBUG):
             start = monotonic()
-
         auth_failed = False
-        previous_update_success = self.last_update_success
-        previous_data = self.data
 
         try:
             self.data = await self._async_update_data()
@@ -374,24 +371,7 @@ class DataUpdateCoordinator(BaseDataUpdateCoordinatorProtocol, Generic[_DataT]):
             if not auth_failed and self._listeners and not self.hass.is_stopping:
                 self._schedule_refresh()
 
-        if not self.last_update_success and not previous_update_success:
-            return
-
-        if (
-            # If the data object is the same object we cannot tell if the data has
-            # changed so we always notify listeners.
-            previous_data is self.data
-            or self.last_update_success != previous_update_success
-            or previous_data != self.data
-        ):
-            self.logger.warning(
-                "%s: Current data: %s, previous data: %s same object = %s",
-                self.name,
-                self.data,
-                previous_data,
-                self.data is previous_data,
-            )
-            self.async_update_listeners()
+        self.async_update_listeners()
 
     @callback
     def async_set_update_error(self, err: Exception) -> None:
