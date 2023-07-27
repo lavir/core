@@ -31,7 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name=entry.title,
         update_method=emonitor.async_get_status,
         update_interval=timedelta(seconds=DEFAULT_UPDATE_RATE),
-        force_update=False,
+        always_update=False,
     )
 
     await coordinator.async_config_entry_first_refresh()

@@ -91,7 +91,7 @@ class FileSizeCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=60),
-            force_update=False,
+            always_update=False,
         )
         self._path = path
 

@@ -77,7 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name="NUT resource status",
         update_method=async_update_data,
         update_interval=timedelta(seconds=scan_interval),
-        force_update=False,
+        always_update=False,
     )
 
     # Fetch initial data so we have data when entities subscribe
