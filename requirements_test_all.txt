@@ -1477,7 +1477,7 @@ pysabnzbd==1.1.1
 pyschlage==2023.5.0
 
 # homeassistant.components.sensibo
-pysensibo==1.0.31
+pysensibo==1.0.32
 
 # homeassistant.components.serial
 # homeassistant.components.zha
@@ -1677,7 +1677,7 @@ renault-api==0.1.13
 renson-endura-delta==1.5.0
 
 # homeassistant.components.reolink
-reolink-aio==0.7.3
+reolink-aio==0.7.5
 
 # homeassistant.components.rflink
 rflink==0.0.65
