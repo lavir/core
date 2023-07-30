@@ -22,6 +22,7 @@ from homeassistant.helpers.entity_platform import (
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 
+from .api import async_last_service_info
 from .const import DOMAIN
 from .models import BluetoothChange, BluetoothScanningMode, BluetoothServiceInfoBleak
 from .update_coordinator import BasePassiveBluetoothCoordinator
@@ -179,10 +180,8 @@ def async_register_coordinator_for_restore(
     """Register a coordinator to have its processors data restored."""
     data: PassiveBluetoothProcessorData = hass.data[PASSIVE_UPDATE_PROCESSOR]
     data.coordinators.add(coordinator)
-    if (restore_key := coordinator.restore_key) and (
-        coordinator_restore_data := data.restore_data.get(restore_key)
-    ):
-        coordinator.restore_data = coordinator_restore_data
+    if restore_key := coordinator.restore_key:
+        coordinator.restore_data = data.restore_data.setdefault(restore_key, {})
 
     @callback
     def _unregister_coordinator_for_restore() -> None:
@@ -277,7 +276,19 @@ class PassiveBluetoothProcessorCoordinator(
     def _async_start(self) -> None:
         """Start the callbacks."""
         super()._async_start()
-        self._on_stop.append(async_register_coordinator_for_restore(self.hass, self))
+        hass = self.hass
+        self._on_stop.append(async_register_coordinator_for_restore(hass, self))
+        # If Home Assistant is already running we need to restore the
+        # last service info as well since the startup restore has already
+        # happened.
+        if hass.is_running and (
+            last_service_info := async_last_service_info(
+                hass, self.address, self.connectable
+            )
+        ):
+            self._async_handle_bluetooth_event(
+                last_service_info, BluetoothChange.ADVERTISEMENT
+            )
 
     @callback
     def async_register_processor(
@@ -300,6 +311,7 @@ class PassiveBluetoothProcessorCoordinator(
             # so if they reload its still there
             if restore_key := processor.restore_key:
                 self.restore_data[restore_key] = processor.data.async_get_restore_data()
+
             self._processors.remove(processor)
 
         self._processors.append(processor)
@@ -406,6 +418,13 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
         """Register a coordinator."""
         self.coordinator = coordinator
         data: PassiveBluetoothDataUpdate[_T] = PassiveBluetoothDataUpdate()
+        self.data = data
+        # These attributes to access the data in
+        # self.data are for backwards compatibility.
+        self.entity_names = data.entity_names
+        self.entity_data = data.entity_data
+        self.entity_descriptions = data.entity_descriptions
+        self.devices = data.devices
         if (
             entity_description_class
             and (restore_key := self.restore_key)
@@ -416,13 +435,7 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                 cast(RestoredPassiveBluetoothDataUpdate, restored_processor_data),
                 entity_description_class,
             )
-        self.data = data
-        # These attributes to access the data in
-        # self.data are for backwards compatibility.
-        self.entity_names = data.entity_names
-        self.entity_data = data.entity_data
-        self.entity_descriptions = data.entity_descriptions
-        self.devices = data.devices
+            self.async_update_listeners(data)
 
     @property
     def available(self) -> bool:
