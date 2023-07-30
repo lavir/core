@@ -126,7 +126,9 @@ class PassiveBluetoothDataUpdate(Generic[_T]):
                 for key, device_info in self.devices.items()
             },
             "entity_descriptions": {
-                serialize_passive_bluetooth_entity_key(key): description
+                serialize_passive_bluetooth_entity_key(key): dataclasses.asdict(
+                    description
+                )
                 for key, description in self.entity_descriptions.items()
             },
             "entity_names": {
@@ -255,6 +257,7 @@ class PassiveBluetoothProcessorCoordinator(
         self.restore_key = None
         if config_entry := config_entries.current_entry.get():
             self.restore_key = config_entry.entry_id
+        self._on_stop.append(async_register_coordinator_for_restore(self.hass, self))
 
     @property
     def available(self) -> bool:
@@ -277,7 +280,6 @@ class PassiveBluetoothProcessorCoordinator(
         """Start the callbacks."""
         super()._async_start()
         hass = self.hass
-        self._on_stop.append(async_register_coordinator_for_restore(hass, self))
         # If Home Assistant is already running we need to restore the
         # last service info as well since the startup restore has already
         # happened.
@@ -301,7 +303,6 @@ class PassiveBluetoothProcessorCoordinator(
         # entity_description_class will become mandatory
         # in the future, but is optional for now to allow
         # for a transition period.
-
         processor.async_register_coordinator(self, entity_description_class)
 
         @callback
@@ -451,7 +452,7 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
     def async_add_entities_listener(
         self,
         entity_class: type[PassiveBluetoothProcessorEntity],
-        async_add_entites: AddEntitiesCallback,
+        async_add_entities: AddEntitiesCallback,
     ) -> Callable[[], None]:
         """Add a listener for new entities."""
         created: set[PassiveBluetoothEntityKey] = set()
@@ -469,7 +470,7 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                     entities.append(entity_class(self, entity_key, description))
                     created.add(entity_key)
             if entities:
-                async_add_entites(entities)
+                async_add_entities(entities)
 
         return self.async_add_listener(_async_add_or_update_entities)
 
