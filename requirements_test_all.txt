@@ -515,7 +515,7 @@ datadog==0.15.0
 datapoint==0.9.8
 
 # homeassistant.components.bluetooth
-dbus-fast==1.87.5
+dbus-fast==1.88.0
 
 # homeassistant.components.debugpy
 debugpy==1.6.7
@@ -774,7 +774,7 @@ hole==0.8.0
 holidays==0.28
 
 # homeassistant.components.frontend
-home-assistant-frontend==20230801.0
+home-assistant-frontend==20230802.0
 
 # homeassistant.components.conversation
 home-assistant-intents==2023.7.25
@@ -1223,7 +1223,7 @@ pydiscovergy==2.0.3
 pydroid-ipcam==2.0.0
 
 # homeassistant.components.duotecno
-pyduotecno==2023.8.0
+pyduotecno==2023.8.1
 
 # homeassistant.components.econet
 pyeconet==0.1.20
