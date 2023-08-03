@@ -43,6 +43,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +54,8 @@ DATA_UNSUB = "unsub"
 TIMEOUT = 10
 CONF_STUN_SERVER = "stun_server"
 LISTENER = "listener"
+
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) -> None:
