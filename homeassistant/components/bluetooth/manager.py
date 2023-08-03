@@ -435,9 +435,8 @@ class BluetoothManager:
 
         # Pre-filter noisy apple devices as they can account for 20-35% of the
         # traffic on a typical network.
-        manufacturer_data = service_info.manufacturer_data
         if (
-            manufacturer_data
+            (manufacturer_data := service_info.manufacturer_data)
             and APPLE_MFR_ID in manufacturer_data
             and manufacturer_data[APPLE_MFR_ID][0] not in APPLE_START_BYTES_WANTED
             and len(manufacturer_data) == 1
@@ -469,8 +468,8 @@ class BluetoothManager:
         #
         if (
             (old_service_info := all_history.get(address))
-            and source != (old_source := old_service_info.source)
-            and (scanner := self._sources.get(old_source))
+            and source != old_service_info.source
+            and (scanner := self._sources.get(old_service_info.source))
             and scanner.scanning
             and self._prefer_previous_adv_from_different_source(
                 old_service_info, service_info
@@ -531,7 +530,7 @@ class BluetoothManager:
             # Than check if advertisement data is the same
             and old_service_info
             and not (
-                manufacturer_data != old_service_info.manufacturer_data
+                service_info.manufacturer_data != old_service_info.manufacturer_data
                 or service_info.service_data != old_service_info.service_data
                 or service_info.service_uuids != old_service_info.service_uuids
                 or service_info.name != old_service_info.name
@@ -548,7 +547,7 @@ class BluetoothManager:
                 name=service_info.name,
                 address=service_info.address,
                 rssi=service_info.rssi,
-                manufacturer_data=manufacturer_data,
+                manufacturer_data=service_info.manufacturer_data,
                 service_data=service_info.service_data,
                 service_uuids=service_info.service_uuids,
                 source=service_info.source,

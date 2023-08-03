@@ -303,7 +303,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
     ) -> None:
         """Call the registered callback."""
         self._last_detection = advertisement_monotonic_time
-        normalized_tx_power = NO_RSSI_VALUE if tx_power is None else tx_power
         try:
             prev_discovery = self._discovered_device_advertisement_datas[address]
         except KeyError:
@@ -316,8 +315,6 @@ class BaseHaRemoteScanner(BaseHaScanner):
                 details=self._details | details,
                 rssi=rssi,  # deprecated, will be removed in newer bleak
             )
-            adv_changed = True
-
         else:
             # Merge the new data with the old data
             # to function the same as BlueZ which
@@ -328,35 +325,21 @@ class BaseHaRemoteScanner(BaseHaScanner):
             prev_service_data = prev_advertisement.service_data
             prev_manufacturer_data = prev_advertisement.manufacturer_data
             prev_name = prev_device.name
-            name_changed = prev_name != local_name
-            adv_changed = (
-                name_changed
-                or prev_advertisement.tx_power != normalized_tx_power
-                or prev_advertisement.rssi != rssi
-            )
 
-            if (
-                name_changed
-                and local_name
-                and prev_name
-                and len(prev_name) > len(local_name)
-            ):
+            if local_name and prev_name and len(prev_name) > len(local_name):
                 local_name = prev_name
 
             if service_uuids and service_uuids != prev_service_uuids:
-                adv_changed = True
                 service_uuids = list(set(service_uuids + prev_service_uuids))
             elif not service_uuids:
                 service_uuids = prev_service_uuids
 
             if service_data and service_data != prev_service_data:
-                adv_changed = True
                 service_data = prev_service_data | service_data
             elif not service_data:
                 service_data = prev_service_data
 
             if manufacturer_data and manufacturer_data != prev_manufacturer_data:
-                adv_changed = True
                 manufacturer_data = prev_manufacturer_data | manufacturer_data
             elif not manufacturer_data:
                 manufacturer_data = prev_manufacturer_data
@@ -370,28 +353,23 @@ class BaseHaRemoteScanner(BaseHaScanner):
             #
             device = prev_device
             device.name = local_name
-            if self._details != details:
-                device.details = self._details | details
+            device.details = self._details | details
             # pylint: disable-next=protected-access
             device._rssi = rssi  # deprecated, will be removed in newer bleak
 
-        if adv_changed:
-            advertisement_data = AdvertisementData(
-                local_name=None if local_name == "" else local_name,
-                manufacturer_data=manufacturer_data,
-                service_data=service_data,
-                service_uuids=service_uuids,
-                tx_power=normalized_tx_power,
-                rssi=rssi,
-                platform_data=(),
-            )
-            self._discovered_device_advertisement_datas[address] = (
-                device,
-                advertisement_data,
-            )
-        else:
-            advertisement_data = prev_advertisement
-
+        advertisement_data = AdvertisementData(
+            local_name=None if local_name == "" else local_name,
+            manufacturer_data=manufacturer_data,
+            service_data=service_data,
+            service_uuids=service_uuids,
+            tx_power=NO_RSSI_VALUE if tx_power is None else tx_power,
+            rssi=rssi,
+            platform_data=(),
+        )
+        self._discovered_device_advertisement_datas[address] = (
+            device,
+            advertisement_data,
+        )
         self._discovered_device_timestamps[address] = advertisement_monotonic_time
         self._new_info_callback(
             BluetoothServiceInfoBleak(
