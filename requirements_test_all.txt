@@ -777,7 +777,7 @@ holidays==0.28
 home-assistant-frontend==20230802.0
 
 # homeassistant.components.conversation
-home-assistant-intents==2023.7.25
+home-assistant-intents==2023.8.2
 
 # homeassistant.components.home_connect
 homeconnect==0.7.2
@@ -1178,7 +1178,7 @@ pyatag==0.3.5.3
 pyatmo==7.5.0
 
 # homeassistant.components.apple_tv
-pyatv==0.13.2
+pyatv==0.13.3
 
 # homeassistant.components.aussie_broadband
 pyaussiebb==0.0.15
