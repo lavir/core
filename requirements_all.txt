@@ -1845,7 +1845,7 @@ pymitv==1.4.3
 pymochad==0.2.0
 
 # homeassistant.components.modbus
-pymodbus==3.3.1
+pymodbus==3.4.1
 
 # homeassistant.components.monoprice
 pymonoprice==0.4
@@ -2156,7 +2156,7 @@ python-qbittorrent==0.4.3
 python-ripple-api==0.0.3
 
 # homeassistant.components.roborock
-python-roborock==0.30.2
+python-roborock==0.31.1
 
 # homeassistant.components.smarttub
 python-smarttub==0.0.33
