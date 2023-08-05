@@ -146,12 +146,12 @@ class PassiveBluetoothDataUpdate(Generic[_T]):
         original_entity_names = self.entity_names
         original_entity_data = self.entity_data
 
-        self.devices = self.devices | new_data.devices
+        self.devices = original_devices | new_data.devices
         self.entity_descriptions = (
-            self.entity_descriptions | new_data.entity_descriptions
+            original_entity_descriptions | new_data.entity_descriptions
         )
-        self.entity_data = self.entity_data | new_data.entity_data
-        self.entity_names = self.entity_names | new_data.entity_names
+        self.entity_data = original_entity_data | new_data.entity_data
+        self.entity_names = original_entity_names | new_data.entity_names
 
         return (
             self.devices != original_devices
