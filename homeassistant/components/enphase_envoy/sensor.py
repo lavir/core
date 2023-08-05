@@ -5,9 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 import datetime
 import logging
-from typing import cast
 
-from pyenphase import EnvoyInverter
+from pyenphase import EnvoyInverter, EnvoySystemConsumption, EnvoySystemProduction
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -18,7 +17,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import UNDEFINED
 from homeassistant.helpers.update_coordinator import (
@@ -50,90 +49,118 @@ class EnvoyInverterSensorEntityDescription(
     """Describes an Envoy inverter sensor entity."""
 
 
-def _inverter_last_report_time(inverter: EnvoyInverter) -> datetime.datetime:
-    """Return the last reported time for an inverter."""
-    return dt_util.utc_from_timestamp(inverter.last_report_date)
-
-
-def _inverter_current_power(inverter: EnvoyInverter) -> float:
-    """Return the current power for an inverter."""
-    return inverter.last_report_watts
-
-
 INVERTER_SENSORS = (
     EnvoyInverterSensorEntityDescription(
         key=INVERTERS_KEY,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
-        value_fn=_inverter_current_power,
+        value_fn=lambda inverter: inverter.last_report_watts,
     ),
     EnvoyInverterSensorEntityDescription(
         key=LAST_REPORTED_KEY,
         name="Last Reported",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_registry_enabled_default=False,
-        value_fn=_inverter_last_report_time,
+        value_fn=lambda inverter: dt_util.utc_from_timestamp(inverter.last_report_date),
     ),
 )
 
+
+@dataclass
+class EnvoyProductionRequiredKeysMixin:
+    """Mixin for required keys."""
+
+    value_fn: Callable[[EnvoySystemProduction], int]
+
+
+@dataclass
+class EnvoyProductionSensorEntityDescription(
+    SensorEntityDescription, EnvoyProductionRequiredKeysMixin
+):
+    """Describes an Envoy production sensor entity."""
+
+
 PRODUCTION_SENSORS = (
-    SensorEntityDescription(
+    EnvoyProductionSensorEntityDescription(
         key="production",
         name="Current Power Production",
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
+        value_fn=lambda production: production.watts_now,
     ),
-    SensorEntityDescription(
+    EnvoyProductionSensorEntityDescription(
         key="daily_production",
         name="Today's Energy Production",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda production: production.watt_hours_today,
     ),
-    SensorEntityDescription(
+    EnvoyProductionSensorEntityDescription(
         key="seven_days_production",
         name="Last Seven Days Energy Production",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda production: production.watt_hours_last_7_days,
     ),
-    SensorEntityDescription(
+    EnvoyProductionSensorEntityDescription(
         key="lifetime_production",
         name="Lifetime Energy Production",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda production: production.watt_hours_lifetime,
     ),
 )
 
+
+@dataclass
+class EnvoyConsumptionRequiredKeysMixin:
+    """Mixin for required keys."""
+
+    value_fn: Callable[[EnvoySystemConsumption], int]
+
+
+@dataclass
+class EnvoyConsumptionSensorEntityDescription(
+    SensorEntityDescription, EnvoyConsumptionRequiredKeysMixin
+):
+    """Describes an Envoy consumption sensor entity."""
+
+
 CONSUMPTION_SENSORS = (
-    SensorEntityDescription(
+    EnvoyConsumptionSensorEntityDescription(
         key="consumption",
         name="Current Power Consumption",
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
+        value_fn=lambda consumption: consumption.watts_now,
     ),
-    SensorEntityDescription(
+    EnvoyConsumptionSensorEntityDescription(
         key="daily_consumption",
         name="Today's Energy Consumption",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda consumption: consumption.watt_hours_today,
     ),
-    SensorEntityDescription(
+    EnvoyConsumptionSensorEntityDescription(
         key="seven_days_consumption",
         name="Last Seven Days Energy Consumption",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda consumption: consumption.watt_hours_last_7_days,
     ),
-    SensorEntityDescription(
+    EnvoyConsumptionSensorEntityDescription(
         key="lifetime_consumption",
         name="Lifetime Energy Consumption",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda consumption: consumption.watt_hours_lifetime,
     ),
 )
 
@@ -151,12 +178,14 @@ async def async_setup_entry(
     assert envoy_serial_num is not None
     _LOGGER.debug("Envoy data: %s", envoy_data)
 
-    entities: list[EnvoyEntity | EnvoyInverterEntity] = [
-        EnvoyEntity(coordinator, description) for description in PRODUCTION_SENSORS
+    entities: list[Entity] = [
+        EnvoyProductionEntity(coordinator, description)
+        for description in PRODUCTION_SENSORS
     ]
     if envoy_data.system_consumption:
         entities.extend(
-            EnvoyEntity(coordinator, description) for description in CONSUMPTION_SENSORS
+            EnvoyConsumptionEntity(coordinator, description)
+            for description in CONSUMPTION_SENSORS
         )
     if envoy_data.inverters:
         entities.extend(
@@ -193,12 +222,33 @@ class EnvoyEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEntity):
         )
         super().__init__(coordinator)
 
+
+class EnvoyProductionEntity(EnvoyEntity):
+    """Envoy production entity."""
+
+    entity_description: EnvoyProductionSensorEntityDescription
+
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> int | None:
         """Return the state of the sensor."""
-        if (value := self.coordinator.data.get(self.entity_description.key)) is None:
-            return None
-        return cast(float, value)
+        envoy = self.coordinator.envoy
+        assert envoy.data is not None
+        assert envoy.data.system_production is not None
+        return self.entity_description.value_fn(envoy.data.system_production)
+
+
+class EnvoyConsumptionEntity(EnvoyEntity):
+    """Envoy consumption entity."""
+
+    entity_description: EnvoyConsumptionSensorEntityDescription
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the state of the sensor."""
+        envoy = self.coordinator.envoy
+        assert envoy.data is not None
+        assert envoy.data.system_consumption is not None
+        return self.entity_description.value_fn(envoy.data.system_consumption)
 
 
 class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEntity):
