@@ -23,8 +23,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     password = config[CONF_PASSWORD]
 
     envoy = Envoy(host, get_async_client(hass, verify_ssl=False))
-    await envoy.setup()
-    await envoy.authenticate(username=username, password=password)
+
     coordinator = EnphaseUpdateCoordinator(hass, envoy, name, username, password)
 
     await coordinator.async_config_entry_first_refresh()
