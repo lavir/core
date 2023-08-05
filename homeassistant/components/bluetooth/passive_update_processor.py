@@ -566,19 +566,14 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                 f" {new_data} instead of a PassiveBluetoothDataUpdate"
             )
 
-        success_changed = False
-        if not self.last_update_success:
-            success_changed = True
+        success_changed = not self.last_update_success
+        if success_changed:
             self.last_update_success = True
             self.coordinator.logger.info(
                 "Processing %s data recovered", self.coordinator.name
             )
 
         data_changed = self.data.update(new_data)
-
-        self.coordinator.logger.warning(
-            "Data changed: %s, success_changed: %s", data_changed, success_changed
-        )
 
         if data_changed or success_changed:
             self.async_update_listeners(new_data)
