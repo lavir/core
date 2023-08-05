@@ -1,7 +1,7 @@
 """Test the Enphase Envoy config flow."""
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import httpx
+from pyenphase import EnvoyAuthenticationError, EnvoyError
 import pytest
 
 from homeassistant import config_entries
@@ -65,16 +65,7 @@ async def test_user_no_serial_number(
     }
 
 
-@pytest.mark.parametrize(
-    "mock_get_full_serial_number",
-    [
-        AsyncMock(
-            side_effect=httpx.HTTPStatusError(
-                "any", request=MagicMock(), response=MagicMock()
-            )
-        )
-    ],
-)
+@pytest.mark.parametrize("serial_number", [None])
 async def test_user_fetching_serial_fails(
     hass: HomeAssistant, setup_enphase_envoy
 ) -> None:
@@ -104,13 +95,9 @@ async def test_user_fetching_serial_fails(
 
 
 @pytest.mark.parametrize(
-    "mock_get_data",
+    "mock_authenticate",
     [
-        AsyncMock(
-            side_effect=httpx.HTTPStatusError(
-                "any", request=MagicMock(), response=MagicMock()
-            )
-        )
+        AsyncMock(side_effect=EnvoyAuthenticationError("test")),
     ],
 )
 async def test_form_invalid_auth(hass: HomeAssistant, setup_enphase_envoy) -> None:
@@ -131,7 +118,8 @@ async def test_form_invalid_auth(hass: HomeAssistant, setup_enphase_envoy) -> No
 
 
 @pytest.mark.parametrize(
-    "mock_get_data", [AsyncMock(side_effect=httpx.HTTPError("any"))]
+    "mock_setup",
+    [AsyncMock(side_effect=EnvoyError)],
 )
 async def test_form_cannot_connect(hass: HomeAssistant, setup_enphase_envoy) -> None:
     """Test we handle cannot connect error."""
@@ -150,7 +138,10 @@ async def test_form_cannot_connect(hass: HomeAssistant, setup_enphase_envoy) -> 
     assert result2["errors"] == {"base": "cannot_connect"}
 
 
-@pytest.mark.parametrize("mock_get_data", [AsyncMock(side_effect=ValueError)])
+@pytest.mark.parametrize(
+    "mock_setup",
+    [AsyncMock(side_effect=ValueError)],
+)
 async def test_form_unknown_error(hass: HomeAssistant, setup_enphase_envoy) -> None:
     """Test we handle unknown error."""
     result = await hass.config_entries.flow.async_init(
@@ -311,7 +302,6 @@ async def test_reauth(hass: HomeAssistant, config_entry, setup_enphase_envoy) ->
     result2 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
-            "host": "1.1.1.1",
             "username": "test-username",
             "password": "test-password",
         },
