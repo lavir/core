@@ -145,8 +145,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if self._reauth_entry:
             host = self._reauth_entry.data[CONF_HOST]
-        elif user_input is not None:
-            host = user_input.get(CONF_HOST) or self.ip_address or ""
+        else:
+            host = (user_input or {}).get(CONF_HOST) or self.ip_address or ""
 
         if user_input is not None:
             if not self._reauth_entry:
