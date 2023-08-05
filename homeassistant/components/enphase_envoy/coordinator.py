@@ -32,7 +32,7 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Initialize DataUpdateCoordinator to gather data for specific SmartPlug."""
         self.envoy = envoy
         self.envoy_serial_number = envoy.serial_number
-        self.name = name
+        self.name = name or f"Envoy {self.envoy_serial_number}"
         super().__init__(
             hass,
             _LOGGER,
