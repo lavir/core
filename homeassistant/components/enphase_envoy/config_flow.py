@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-import contextlib
 import logging
 from typing import Any
 
-from envoy_reader.envoy_reader import EnvoyReader
-import httpx
+from pyenphase import (
+    Envoy,
+    EnvoyAuthenticationError,
+    EnvoyAuthenticationRequired,
+    EnvoyError,
+)
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -15,7 +18,6 @@ from homeassistant.components import zeroconf
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.util.network import is_ipv4_address
 
@@ -27,25 +29,14 @@ ENVOY = "Envoy"
 
 CONF_SERIAL = "serial"
 
+INVALID_AUTH_ERRORS = (EnvoyAuthenticationError, EnvoyAuthenticationRequired)
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> EnvoyReader:
+
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> Envoy:
     """Validate the user input allows us to connect."""
-    envoy_reader = EnvoyReader(
-        data[CONF_HOST],
-        data[CONF_USERNAME],
-        data[CONF_PASSWORD],
-        inverters=False,
-        async_client=get_async_client(hass),
-    )
-
-    try:
-        await envoy_reader.getData()
-    except httpx.HTTPStatusError as err:
-        raise InvalidAuth from err
-    except (RuntimeError, httpx.HTTPError) as err:
-        raise CannotConnect from err
-
-    return envoy_reader
+    envoy = Envoy(data[CONF_HOST], get_async_client(hass))
+    await envoy.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD])
+    return envoy
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -124,16 +115,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return f"{ENVOY} {self.unique_id}"
         return ENVOY
 
-    async def _async_set_unique_id_from_envoy(self, envoy_reader: EnvoyReader) -> bool:
-        """Set the unique id by fetching it from the envoy."""
-        serial = None
-        with contextlib.suppress(httpx.HTTPError):
-            serial = await envoy_reader.get_full_serial_number()
-        if serial:
-            await self.async_set_unique_id(serial)
-            return True
-        return False
-
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -147,11 +128,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ):
                 return self.async_abort(reason="already_configured")
             try:
-                envoy_reader = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
+                envoy = await validate_input(self.hass, user_input)
+            except INVALID_AUTH_ERRORS:
                 errors["base"] = "invalid_auth"
+            except EnvoyError:
+                errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -166,9 +147,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                     return self.async_abort(reason="reauth_successful")
 
-                if not self.unique_id and await self._async_set_unique_id_from_envoy(
-                    envoy_reader
-                ):
+                if not self.unique_id:
+                    await self.async_set_unique_id(envoy.serial_number)
                     data[CONF_NAME] = self._async_envoy_name()
 
                 if self.unique_id:
@@ -186,11 +166,3 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=self._async_generate_schema(),
             errors=errors,
         )
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
