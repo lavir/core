@@ -65,7 +65,7 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await self._async_setup_and_authenticate()
                 return (await envoy.update()).raw
             except (EnvoyAuthenticationError, EnvoyAuthenticationRequired) as err:
-                if self._setup_complete and tries == 1:
+                if self._setup_complete and tries == 0:
                     # token likely expired or firmware changed, try to re-authenticate
                     self._setup_complete = False
                     continue
