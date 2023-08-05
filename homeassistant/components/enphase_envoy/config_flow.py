@@ -127,6 +127,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._reauth_entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
         )
+        assert self._reauth_entry is not None
+        if unique_id := self._reauth_entry.unique_id:
+            await self.async_set_unique_id(unique_id, raise_on_progress=False)
         return await self.async_step_user()
 
     def _async_envoy_name(self) -> str:
