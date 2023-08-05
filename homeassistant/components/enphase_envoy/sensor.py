@@ -7,6 +7,8 @@ import datetime
 import logging
 from typing import cast
 
+from pyenphase import EnvoyInverter
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -21,11 +23,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import UNDEFINED
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
-    DataUpdateCoordinator,
 )
 from homeassistant.util import dt as dt_util
 
-from .const import COORDINATOR, DOMAIN, NAME
+from .const import DOMAIN
+from .coordinator import EnphaseUpdateCoordinator
 
 ICON = "mdi:flash"
 _LOGGER = logging.getLogger(__name__)
@@ -35,22 +37,22 @@ LAST_REPORTED_KEY = "last_reported"
 
 
 @dataclass
-class EnvoyRequiredKeysMixin:
+class EnvoyInverterRequiredKeysMixin:
     """Mixin for required keys."""
 
-    value_fn: Callable[[tuple[float, str]], datetime.datetime | float | None]
+    value_fn: Callable[[EnvoyInverter], datetime.datetime | float | None]
 
 
 @dataclass
-class EnvoySensorEntityDescription(SensorEntityDescription, EnvoyRequiredKeysMixin):
+class EnvoyInverterSensorEntityDescription(
+    SensorEntityDescription, EnvoyInverterRequiredKeysMixin
+):
     """Describes an Envoy inverter sensor entity."""
 
 
-def _inverter_last_report_time(
-    watt_report_time: tuple[float, str]
-) -> datetime.datetime | None:
-    if (report_time := watt_report_time[1]) is None:
-        return None
+def _inverter_last_report_time(inverter: EnvoyInverter) -> datetime.datetime | None:
+    """Return the last reported time for an inverter."""
+    report_time = inverter.last_report_date
     if (last_reported_dt := dt_util.parse_datetime(report_time)) is None:
         return None
     if last_reported_dt.tzinfo is None:
@@ -58,15 +60,20 @@ def _inverter_last_report_time(
     return last_reported_dt
 
 
+def _inverter_current_power(inverter: EnvoyInverter) -> float:
+    """Return the current power for an inverter."""
+    return inverter.last_report_watts
+
+
 INVERTER_SENSORS = (
-    EnvoySensorEntityDescription(
+    EnvoyInverterSensorEntityDescription(
         key=INVERTERS_KEY,
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
-        value_fn=lambda watt_report_time: watt_report_time[0],
+        value_fn=_inverter_current_power,
     ),
-    EnvoySensorEntityDescription(
+    EnvoyInverterSensorEntityDescription(
         key=LAST_REPORTED_KEY,
         name="Last Reported",
         device_class=SensorDeviceClass.TIMESTAMP,
@@ -75,7 +82,7 @@ INVERTER_SENSORS = (
     ),
 )
 
-SENSORS = (
+PRODUCTION_SENSORS = (
     SensorEntityDescription(
         key="production",
         name="Current Power Production",
@@ -103,6 +110,9 @@ SENSORS = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
     ),
+)
+
+CONSUMPTION_SENSORS = (
     SensorEntityDescription(
         key="consumption",
         name="Current Power Consumption",
@@ -139,58 +149,45 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up envoy sensor platform."""
-    data: dict = hass.data[DOMAIN][config_entry.entry_id]
-    coordinator: DataUpdateCoordinator = data[COORDINATOR]
-    envoy_data: dict = coordinator.data
-    envoy_name: str = data[NAME]
+    coordinator: EnphaseUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    envoy_data = coordinator.envoy.data
+    assert envoy_data is not None
     envoy_serial_num = config_entry.unique_id
     assert envoy_serial_num is not None
     _LOGGER.debug("Envoy data: %s", envoy_data)
 
-    entities: list[Envoy | EnvoyInverter] = []
-    for description in SENSORS:
-        sensor_data = envoy_data.get(description.key)
-        if isinstance(sensor_data, str) and "not available" in sensor_data:
-            continue
-        entities.append(
-            Envoy(
-                coordinator,
-                description,
-                envoy_name,
-                envoy_serial_num,
-            )
-        )
-
-    if production := envoy_data.get("inverters_production"):
+    entities: list[EnvoyEntity | EnvoyInverterEntity] = [
+        EnvoyEntity(coordinator, description) for description in PRODUCTION_SENSORS
+    ]
+    if envoy_data.system_consumption:
         entities.extend(
-            EnvoyInverter(
-                coordinator,
-                description,
-                envoy_name,
-                envoy_serial_num,
-                str(inverter),
-            )
+            EnvoyEntity(coordinator, description) for description in CONSUMPTION_SENSORS
+        )
+    if envoy_data.inverters:
+        entities.extend(
+            EnvoyInverterEntity(coordinator, description, inverter)
             for description in INVERTER_SENSORS
-            for inverter in production
+            for inverter in envoy_data.inverters
         )
 
     async_add_entities(entities)
 
 
-class Envoy(CoordinatorEntity, SensorEntity):
+class EnvoyEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEntity):
     """Envoy inverter entity."""
 
     _attr_icon = ICON
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
+        coordinator: EnphaseUpdateCoordinator,
         description: SensorEntityDescription,
-        envoy_name: str,
-        envoy_serial_num: str,
     ) -> None:
         """Initialize Envoy entity."""
         self.entity_description = description
+        envoy_name = coordinator.name
+        envoy_serial_num = coordinator.envoy.serial_number
+        assert envoy_serial_num is not None
         self._attr_name = f"{envoy_name} {description.name}"
         self._attr_unique_id = f"{envoy_serial_num}_{description.key}"
         self._attr_device_info = DeviceInfo(
@@ -209,22 +206,23 @@ class Envoy(CoordinatorEntity, SensorEntity):
         return cast(float, value)
 
 
-class EnvoyInverter(CoordinatorEntity, SensorEntity):
+class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEntity):
     """Envoy inverter entity."""
 
     _attr_icon = ICON
-    entity_description: EnvoySensorEntityDescription
+    entity_description: EnvoyInverterSensorEntityDescription
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
-        description: EnvoySensorEntityDescription,
-        envoy_name: str,
-        envoy_serial_num: str,
+        coordinator: EnphaseUpdateCoordinator,
+        description: EnvoyInverterSensorEntityDescription,
         serial_number: str,
     ) -> None:
         """Initialize Envoy inverter entity."""
         self.entity_description = description
+        envoy_name = coordinator.name
+        envoy_serial_num = coordinator.envoy.serial_number
+        assert envoy_serial_num is not None
         self._serial_number = serial_number
         if description.name is not UNDEFINED:
             self._attr_name = (
@@ -248,7 +246,8 @@ class EnvoyInverter(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> datetime.datetime | float | None:
         """Return the state of the sensor."""
-        watt_report_time: tuple[float, str] = self.coordinator.data[
-            "inverters_production"
-        ][self._serial_number]
-        return self.entity_description.value_fn(watt_report_time)
+        envoy = self.coordinator.envoy
+        assert envoy.data is not None
+        assert envoy.data.inverters is not None
+        inverter = envoy.data.inverters[self._serial_number]
+        return self.entity_description.value_fn(inverter)
