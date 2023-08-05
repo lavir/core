@@ -49,12 +49,9 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         envoy = self.envoy
         await envoy.setup()
         assert envoy.serial_number is not None
-        assert envoy.auth is not None
         self.envoy_serial_number = envoy.serial_number
 
-        if isinstance(envoy.auth, EnvoyTokenAuth) and (
-            token := self.entry.data[CONF_TOKEN]
-        ):
+        if token := self.entry.data.get(CONF_TOKEN):
             try:
                 await envoy.authenticate(token=token)
             except INVALID_AUTH_ERRORS:
@@ -65,6 +62,7 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return
 
         await envoy.authenticate(username=self.username, password=self.password)
+        assert envoy.auth is not None
 
         if isinstance(envoy.auth, EnvoyTokenAuth):
             # update token in config entry so we can
