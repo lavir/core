@@ -88,6 +88,7 @@ PRODUCTION_SENSORS = (
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
+        suggested_unit_of_measurement=UnitOfPower.KILO_WATT,
         value_fn=lambda production: production.watts_now,
     ),
     EnvoyProductionSensorEntityDescription(
@@ -96,6 +97,7 @@ PRODUCTION_SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda production: production.watt_hours_today,
     ),
     EnvoyProductionSensorEntityDescription(
@@ -103,6 +105,7 @@ PRODUCTION_SENSORS = (
         name="Last Seven Days Energy Production",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda production: production.watt_hours_last_7_days,
     ),
     EnvoyProductionSensorEntityDescription(
@@ -111,6 +114,7 @@ PRODUCTION_SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.MEGA_WATT_HOUR,
         value_fn=lambda production: production.watt_hours_lifetime,
     ),
 )
@@ -137,6 +141,7 @@ CONSUMPTION_SENSORS = (
         native_unit_of_measurement=UnitOfPower.WATT,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.POWER,
+        suggested_unit_of_measurement=UnitOfPower.KILO_WATT,
         value_fn=lambda consumption: consumption.watts_now,
     ),
     EnvoyConsumptionSensorEntityDescription(
@@ -145,6 +150,7 @@ CONSUMPTION_SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda consumption: consumption.watt_hours_today,
     ),
     EnvoyConsumptionSensorEntityDescription(
@@ -152,6 +158,7 @@ CONSUMPTION_SENSORS = (
         name="Last Seven Days Energy Consumption",
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         value_fn=lambda consumption: consumption.watt_hours_last_7_days,
     ),
     EnvoyConsumptionSensorEntityDescription(
@@ -160,6 +167,7 @@ CONSUMPTION_SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         state_class=SensorStateClass.TOTAL_INCREASING,
         device_class=SensorDeviceClass.ENERGY,
+        suggested_unit_of_measurement=UnitOfEnergy.MEGA_WATT_HOUR,
         value_fn=lambda consumption: consumption.watt_hours_lifetime,
     ),
 )
