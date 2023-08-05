@@ -249,7 +249,7 @@ aioguardian==2022.07.0
 aioharmony==0.2.10
 
 # homeassistant.components.homekit_controller
-aiohomekit==2.6.12
+aiohomekit==2.6.13
 
 # homeassistant.components.emulated_hue
 # homeassistant.components.http
@@ -1371,7 +1371,7 @@ openwrt-luci-rpc==1.1.16
 openwrt-ubus-rpc==0.0.2
 
 # homeassistant.components.opower
-opower==0.0.19
+opower==0.0.20
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
@@ -1653,7 +1653,7 @@ pydrawise==2023.7.1
 pydroid-ipcam==2.0.0
 
 # homeassistant.components.duotecno
-pyduotecno==2023.8.1
+pyduotecno==2023.8.3
 
 # homeassistant.components.ebox
 pyebox==1.1.4

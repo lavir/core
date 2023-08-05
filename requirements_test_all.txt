@@ -227,7 +227,7 @@ aioguardian==2022.07.0
 aioharmony==0.2.10
 
 # homeassistant.components.homekit_controller
-aiohomekit==2.6.12
+aiohomekit==2.6.13
 
 # homeassistant.components.emulated_hue
 # homeassistant.components.http
@@ -1037,7 +1037,7 @@ openerz-api==0.2.0
 openhomedevice==2.2.0
 
 # homeassistant.components.opower
-opower==0.0.19
+opower==0.0.20
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
@@ -1223,7 +1223,7 @@ pydiscovergy==2.0.3
 pydroid-ipcam==2.0.0
 
 # homeassistant.components.duotecno
-pyduotecno==2023.8.1
+pyduotecno==2023.8.3
 
 # homeassistant.components.econet
 pyeconet==0.1.20
