@@ -124,7 +124,7 @@ def serialize_entity_description(description: EntityDescription) -> dict[str, An
     }
 
 
-@dataclasses.dataclass(slots=True, frozen=True)
+@dataclasses.dataclass(slots=True)
 class PassiveBluetoothDataUpdate(Generic[_T]):
     """Generic bluetooth data."""
 
@@ -139,12 +139,26 @@ class PassiveBluetoothDataUpdate(Generic[_T]):
         default_factory=dict
     )
 
-    def update(self, new_data: PassiveBluetoothDataUpdate[_T]) -> None:
+    def update(self, new_data: PassiveBluetoothDataUpdate[_T]) -> bool:
         """Update the data."""
-        self.devices.update(new_data.devices)
-        self.entity_descriptions.update(new_data.entity_descriptions)
-        self.entity_data.update(new_data.entity_data)
-        self.entity_names.update(new_data.entity_names)
+        original_devices = self.devices
+        original_entity_descriptions = self.entity_descriptions
+        original_entity_names = self.entity_names
+        original_entity_data = self.entity_data
+
+        self.devices = self.devices | new_data.devices
+        self.entity_descriptions = (
+            self.entity_descriptions | new_data.entity_descriptions
+        )
+        self.entity_data = self.entity_data | new_data.entity_data
+        self.entity_names = self.entity_names | new_data.entity_names
+
+        return (
+            self.devices != original_devices
+            or self.entity_descriptions != original_entity_descriptions
+            or self.entity_names != original_entity_names
+            or self.entity_data != original_entity_data
+        )
 
     def async_get_restore_data(self) -> RestoredPassiveBluetoothDataUpdate:
         """Serialize restore data to storage."""
@@ -287,7 +301,6 @@ class PassiveBluetoothProcessorCoordinator(
         if config_entry := config_entries.current_entry.get():
             self.restore_key = config_entry.entry_id
         self._on_stop.append(async_register_coordinator_for_restore(self.hass, self))
-        self.last_service_info: BluetoothServiceInfoBleak | None = None
 
     @property
     def available(self) -> bool:
@@ -348,18 +361,6 @@ class PassiveBluetoothProcessorCoordinator(
     ) -> None:
         """Handle a Bluetooth event."""
         super()._async_handle_bluetooth_event(service_info, change)
-
-        if service_info != self.last_service_info:
-            self.logger.warning(
-                "Service info changed, updating: %s -> %s",
-                self.last_service_info,
-                service_info,
-            )
-
-            self.last_service_info = service_info
-        else:
-            self.logger.error("Service info unchanged: %s", service_info)
-
         if self.hass.is_stopping:
             return
 
@@ -565,14 +566,22 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                 f" {new_data} instead of a PassiveBluetoothDataUpdate"
             )
 
+        success_changed = False
         if not self.last_update_success:
+            success_changed = True
             self.last_update_success = True
             self.coordinator.logger.info(
                 "Processing %s data recovered", self.coordinator.name
             )
 
-        self.data.update(new_data)
-        self.async_update_listeners(new_data)
+        data_changed = self.data.update(new_data)
+
+        self.coordinator.logger.warning(
+            "Data changed: %s, success_changed: %s", data_changed, success_changed
+        )
+
+        if data_changed or success_changed:
+            self.async_update_listeners(new_data)
 
 
 class PassiveBluetoothProcessorEntity(Entity, Generic[_PassiveBluetoothDataProcessorT]):
