@@ -1207,7 +1207,7 @@ micloud==0.5
 mill-local==0.2.0
 
 # homeassistant.components.mill
-millheater==0.10.0
+millheater==0.11.0
 
 # homeassistant.components.minio
 minio==7.1.12
@@ -1665,7 +1665,7 @@ pyedimax==0.2.1
 pyefergy==22.1.1
 
 # homeassistant.components.enphase_envoy
-pyenphase==0.8.0
+pyenphase==0.9.0
 
 # homeassistant.components.envisalink
 pyenvisalink==4.6
@@ -2701,7 +2701,7 @@ wyoming==1.1.0
 xbox-webapi==2.0.11
 
 # homeassistant.components.xiaomi_ble
-xiaomi-ble==0.20.0
+xiaomi-ble==0.21.1
 
 # homeassistant.components.knx
 xknx==2.11.2
