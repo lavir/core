@@ -17,7 +17,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.httpx_client import get_async_client
@@ -135,12 +135,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the initial step."""
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            host = user_input[CONF_HOST]
-            if not self._reauth_entry and host in self._async_current_hosts():
-                return self.async_abort(reason="already_configured")
+            if self._reauth_entry:
+                host = self._reauth_entry.data[CONF_HOST]
+            else:
+                host = user_input.get(CONF_HOST) or self.ip_address
+                if host in self._async_current_hosts():
+                    return self.async_abort(reason="already_configured")
+
             try:
                 envoy = await validate_input(self.hass, user_input)
             except INVALID_AUTH_ERRORS:
@@ -151,7 +155,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                data = user_input.copy()
                 name = self._async_envoy_name()
 
                 if self._reauth_entry:
@@ -168,7 +171,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if self.unique_id:
                     self._abort_if_unique_id_configured({CONF_HOST: host})
 
-                return self.async_create_entry(title=name, data=data)
+                # CONF_NAME is still set for legacy backwards compatibility
+                return self.async_create_entry(
+                    title=name, data={CONF_HOST: host, CONF_NAME: name} | user_input
+                )
 
         if self.unique_id:
             self.context["title_placeholders"] = {
