@@ -235,6 +235,7 @@ class EnvoyEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEntity):
             manufacturer="Enphase",
             model="Envoy",
             name=envoy_name,
+            sw_version=str(coordinator.envoy.firmware),
         )
         super().__init__(coordinator)
 
