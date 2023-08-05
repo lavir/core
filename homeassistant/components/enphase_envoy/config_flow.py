@@ -175,6 +175,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         self._reauth_entry,
                         data=self._reauth_entry.data | user_input,
                     )
+                    self.hass.async_create_task(
+                        self.hass.config_entries.async_reload(
+                            self._reauth_entry.entry_id
+                        )
+                    )
                     return self.async_abort(reason="reauth_successful")
 
                 if not self.unique_id:
