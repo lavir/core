@@ -287,9 +287,13 @@ class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEnt
         key = description.key
 
         if key == INVERTERS_KEY:
+            # Originally there was only one inverter sensor, so we don't want to
+            # break existing installations by changing the name or unique_id.
             self._attr_name = f"{envoy_name} Inverter {serial_number}"
             self._attr_unique_id = serial_number
         else:
+            # Additional sensors have a name and unique_id that includes the
+            # sensor key.
             self._attr_name = f"{envoy_name} Inverter {serial_number} {name}"
             self._attr_unique_id = f"{serial_number}_{key}"
 
