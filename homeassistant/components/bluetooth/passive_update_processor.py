@@ -357,6 +357,8 @@ class PassiveBluetoothProcessorCoordinator(
             )
 
             self.last_service_info = service_info
+        else:
+            self.logger.error("Service info unchanged: %s", service_info)
 
         if self.hass.is_stopping:
             return
