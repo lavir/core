@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     envoy = Envoy(host, get_async_client(hass, verify_ssl=False))
     await envoy.setup()
     await envoy.authenticate(username=username, password=password)
-    coordinator = EnphaseUpdateCoordinator(hass, envoy, name)
+    coordinator = EnphaseUpdateCoordinator(hass, envoy, name, username, password)
 
     await coordinator.async_config_entry_first_refresh()
     if not entry.unique_id:
