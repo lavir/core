@@ -17,7 +17,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.httpx_client import get_async_client
@@ -65,7 +65,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema[vol.Required(CONF_HOST, default=self.ip_address)] = vol.In(
                 [self.ip_address]
             )
-        else:
+        elif not self._reauth_entry:
             schema[vol.Required(CONF_HOST)] = str
 
         default_username = ""
@@ -138,10 +138,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            if (
-                not self._reauth_entry
-                and user_input[CONF_HOST] in self._async_current_hosts()
-            ):
+            host = user_input[CONF_HOST]
+            if not self._reauth_entry and host in self._async_current_hosts():
                 return self.async_abort(reason="already_configured")
             try:
                 envoy = await validate_input(self.hass, user_input)
@@ -154,23 +152,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 data = user_input.copy()
-                data[CONF_NAME] = self._async_envoy_name()
+                name = self._async_envoy_name()
 
                 if self._reauth_entry:
                     self.hass.config_entries.async_update_entry(
                         self._reauth_entry,
-                        data=data,
+                        data=self._reauth_entry.data | user_input,
                     )
                     return self.async_abort(reason="reauth_successful")
 
                 if not self.unique_id:
                     await self.async_set_unique_id(envoy.serial_number)
-                    data[CONF_NAME] = self._async_envoy_name()
+                    name = self._async_envoy_name()
 
                 if self.unique_id:
-                    self._abort_if_unique_id_configured({CONF_HOST: data[CONF_HOST]})
+                    self._abort_if_unique_id_configured({CONF_HOST: host})
 
-                return self.async_create_entry(title=data[CONF_NAME], data=data)
+                return self.async_create_entry(title=name, data=data)
 
         if self.unique_id:
             self.context["title_placeholders"] = {
