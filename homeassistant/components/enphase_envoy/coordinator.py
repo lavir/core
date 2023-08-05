@@ -24,7 +24,6 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """DataUpdateCoordinator to gather data from any envoy."""
 
     envoy_serial_number: str
-    name: str
 
     def __init__(
         self,
@@ -38,12 +37,12 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.envoy = envoy
         self.username = username
         self.password = password
-        self._default_name = name
+        self.name = name
         self._setup_complete = False
         super().__init__(
             hass,
             _LOGGER,
-            name=self.name,
+            name=name,
             update_interval=SCAN_INTERVAL,
             always_update=False,
         )
@@ -52,20 +51,26 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Set up and authenticate with the envoy."""
         envoy = self.envoy
         await envoy.setup()
-        await envoy.authenticate(username=self.username, password=self.password)
         assert envoy.serial_number is not None
         self.envoy_serial_number = envoy.serial_number
-        self.name = self._default_name or f"Envoy {self.envoy_serial_number}"
+        await envoy.authenticate(username=self.username, password=self.password)
         self._setup_complete = True
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch all device and sensor data from api."""
         envoy = self.envoy
-        try:
-            if not self._setup_complete:
-                await self._async_setup_and_authenticate()
-            return (await envoy.update()).raw
-        except (EnvoyAuthenticationError, EnvoyAuthenticationRequired) as err:
-            raise ConfigEntryAuthFailed from err
-        except EnvoyError as err:
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+        for tries in range(2):
+            try:
+                if not self._setup_complete:
+                    await self._async_setup_and_authenticate()
+                return (await envoy.update()).raw
+            except (EnvoyAuthenticationError, EnvoyAuthenticationRequired) as err:
+                if self._setup_complete and tries == 0:
+                    # token likely expired or firmware changed, try to re-authenticate
+                    self._setup_complete = False
+                    continue
+                raise ConfigEntryAuthFailed from err
+            except EnvoyError as err:
+                raise UpdateFailed(f"Error communicating with API: {err}") from err
+
+        raise RuntimeError("Unreachable code in _async_update_data")  # pragma: no cover
