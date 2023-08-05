@@ -52,8 +52,7 @@ async def async_remove_config_entry_device(
     """Remove an enphase_envoy config entry from a device."""
     dev_ids = {dev_id[1] for dev_id in device_entry.identifiers if dev_id[0] == DOMAIN}
     coordinator: EnphaseUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    envoy = coordinator.envoy
-    envoy_data = envoy.data
+    envoy_data = coordinator.envoy.data
     envoy_serial_num = config_entry.unique_id
     if envoy_serial_num in dev_ids:
         return False
