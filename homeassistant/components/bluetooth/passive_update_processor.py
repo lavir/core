@@ -287,6 +287,7 @@ class PassiveBluetoothProcessorCoordinator(
         if config_entry := config_entries.current_entry.get():
             self.restore_key = config_entry.entry_id
         self._on_stop.append(async_register_coordinator_for_restore(self.hass, self))
+        self.last_service_info: BluetoothServiceInfoBleak | None = None
 
     @property
     def available(self) -> bool:
@@ -347,6 +348,16 @@ class PassiveBluetoothProcessorCoordinator(
     ) -> None:
         """Handle a Bluetooth event."""
         super()._async_handle_bluetooth_event(service_info, change)
+
+        if service_info != self.last_service_info:
+            self.logger.warning(
+                "Service info changed, updating: %s -> %s",
+                self.last_service_info,
+                service_info,
+            )
+
+            self.last_service_info = service_info
+
         if self.hass.is_stopping:
             return
 
@@ -544,10 +555,6 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                 "Unexpected error updating %s data: %s", self.coordinator.name, err
             )
             return
-
-        self.coordinator.logger.warning(
-            "new_data: %s, current_data: %s", new_data, self.data
-        )
 
         if not isinstance(new_data, PassiveBluetoothDataUpdate):
             self.last_update_success = False  # type: ignore[unreachable]
