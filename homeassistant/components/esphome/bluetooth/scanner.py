@@ -11,6 +11,8 @@ from homeassistant.core import callback
 class ESPHomeScanner(BaseHaRemoteScanner):
     """Scanner for esphome."""
 
+    __slots__ = ()
+
     @callback
     def async_on_advertisement(self, adv: BluetoothLEAdvertisement) -> None:
         """Call the registered callback."""
