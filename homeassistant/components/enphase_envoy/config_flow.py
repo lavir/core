@@ -38,7 +38,7 @@ INSTALLER_AUTH_USERNAME = "installer"
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> Envoy:
     """Validate the user input allows us to connect."""
-    envoy = Envoy(data[CONF_HOST], get_async_client(hass))
+    envoy = Envoy(data[CONF_HOST], get_async_client(hass, verify_ssl=False))
     await envoy.setup()
     await envoy.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD])
     return envoy
