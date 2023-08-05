@@ -19,7 +19,6 @@ from homeassistant.const import UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import UNDEFINED
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
 )
@@ -283,19 +282,23 @@ class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEnt
         """Initialize Envoy inverter entity."""
         self.entity_description = description
         envoy_name = coordinator.name
-        envoy_serial_num = coordinator.envoy.serial_number
-        assert envoy_serial_num is not None
         self._serial_number = serial_number
-        if description.name is not UNDEFINED:
-            self._attr_name = (
-                f"{envoy_name} Inverter {serial_number} {description.name}"
-            )
-        else:
+        name = description.name
+        key = description.key
+
+        if key == INVERTERS_KEY:
+            # Originally there was only one inverter sensor, so we don't want to
+            # break existing installations by changing the name or unique_id.
             self._attr_name = f"{envoy_name} Inverter {serial_number}"
-        if description.key == INVERTERS_KEY:
             self._attr_unique_id = serial_number
         else:
-            self._attr_unique_id = f"{serial_number}_{description.key}"
+            # Additional sensors have a name and unique_id that includes the
+            # sensor key.
+            self._attr_name = f"{envoy_name} Inverter {serial_number} {name}"
+            self._attr_unique_id = f"{serial_number}_{key}"
+
+        envoy_serial_num = coordinator.envoy.serial_number
+        assert envoy_serial_num is not None
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, serial_number)},
             name=f"Inverter {serial_number}",
