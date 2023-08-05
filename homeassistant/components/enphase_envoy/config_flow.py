@@ -36,11 +36,13 @@ INVALID_AUTH_ERRORS = (EnvoyAuthenticationError, EnvoyAuthenticationRequired)
 INSTALLER_AUTH_USERNAME = "installer"
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> Envoy:
+async def validate_input(
+    hass: HomeAssistant, host: str, username: str, password: str
+) -> Envoy:
     """Validate the user input allows us to connect."""
-    envoy = Envoy(data[CONF_HOST], get_async_client(hass, verify_ssl=False))
+    envoy = Envoy(host, get_async_client(hass, verify_ssl=False))
     await envoy.setup()
-    await envoy.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD])
+    await envoy.authenticate(username=username, password=password)
     return envoy
 
 
@@ -146,7 +148,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return self.async_abort(reason="already_configured")
 
             try:
-                envoy = await validate_input(self.hass, user_input)
+                envoy = await validate_input(
+                    self.hass,
+                    host,
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
+                )
             except INVALID_AUTH_ERRORS:
                 errors["base"] = "invalid_auth"
             except EnvoyError:
