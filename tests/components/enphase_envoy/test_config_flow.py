@@ -159,7 +159,17 @@ async def test_form_unknown_error(hass: HomeAssistant, setup_enphase_envoy) -> N
     assert result2["errors"] == {"base": "unknown"}
 
 
-async def test_zeroconf(hass: HomeAssistant, setup_enphase_envoy) -> None:
+def _get_schema_default(schema, key_name):
+    """Iterate schema to find a key."""
+    for schema_key in schema:
+        if schema_key == key_name:
+            return schema_key.default()
+    raise KeyError(f"{key_name} not found in schema")
+
+
+async def test_zeroconf_pre_token_firmware(
+    hass: HomeAssistant, setup_enphase_envoy
+) -> None:
     """Test we can setup from zeroconf."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
@@ -170,12 +180,54 @@ async def test_zeroconf(hass: HomeAssistant, setup_enphase_envoy) -> None:
             hostname="mock_hostname",
             name="mock_name",
             port=None,
-            properties={"serialnum": "1234"},
+            properties={"serialnum": "1234", "protovers": "3.0.0"},
             type="mock_type",
         ),
     )
     assert result["type"] == "form"
     assert result["step_id"] == "user"
+
+    assert _get_schema_default(result["data_schema"].schema, "username") == "installer"
+
+    result2 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "host": "1.1.1.1",
+            "username": "test-username",
+            "password": "test-password",
+        },
+    )
+    assert result2["type"] == "create_entry"
+    assert result2["title"] == "Envoy 1234"
+    assert result2["result"].unique_id == "1234"
+    assert result2["data"] == {
+        "host": "1.1.1.1",
+        "name": "Envoy 1234",
+        "username": "test-username",
+        "password": "test-password",
+    }
+
+
+async def test_zeroconf_token_firmware(
+    hass: HomeAssistant, setup_enphase_envoy
+) -> None:
+    """Test we can setup from zeroconf."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_ZEROCONF},
+        data=zeroconf.ZeroconfServiceInfo(
+            host="1.1.1.1",
+            addresses=["1.1.1.1"],
+            hostname="mock_hostname",
+            name="mock_name",
+            port=None,
+            properties={"serialnum": "1234", "protovers": "7.0.0"},
+            type="mock_type",
+        ),
+    )
+    assert result["type"] == "form"
+    assert result["step_id"] == "user"
+    assert _get_schema_default(result["data_schema"].schema, "username") == ""
 
     result2 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
