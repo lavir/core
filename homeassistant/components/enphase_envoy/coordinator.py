@@ -36,7 +36,7 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
-            name=f"envoy {name}",
+            name=self.name,
             update_interval=SCAN_INTERVAL,
             always_update=False,
         )
