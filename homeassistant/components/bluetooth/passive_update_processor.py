@@ -545,6 +545,10 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
             )
             return
 
+        self.coordinator.logger.warning(
+            "new_data: %s, current_data: %s", new_data, self.data
+        )
+
         if not isinstance(new_data, PassiveBluetoothDataUpdate):
             self.last_update_success = False  # type: ignore[unreachable]
             raise TypeError(
