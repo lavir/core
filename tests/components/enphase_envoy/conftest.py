@@ -43,11 +43,10 @@ def config_fixture():
 
 
 @pytest.fixture(name="mock_envoy")
-def mock_envoy_fixture(serial_number, mock_update, mock_authenticate, mock_setup):
+def mock_envoy_fixture(serial_number, mock_authenticate, mock_setup):
     """Define a mocked Envoy fixture."""
     mock_envoy = Mock(spec=Envoy)
     mock_envoy.serial_number = serial_number
-    mock_envoy.update = mock_update
     mock_envoy.authenticate = mock_authenticate
     mock_envoy.setup = mock_setup
     mock_envoy.data = EnvoyData(
@@ -71,7 +70,9 @@ def mock_envoy_fixture(serial_number, mock_update, mock_authenticate, mock_setup
                 max_report_watts=1,
             )
         },
+        raw={"varies_by": "firmware_version"},
     )
+    mock_envoy.update = AsyncMock(return_value=mock_envoy.data)
     return mock_envoy
 
 
@@ -90,12 +91,6 @@ async def setup_enphase_envoy_fixture(hass, config, mock_envoy):
         assert await async_setup_component(hass, DOMAIN, config)
         await hass.async_block_till_done()
         yield
-
-
-@pytest.fixture(name="mock_update")
-def mock_update():
-    """Define a mocked Envoy.update fixture."""
-    return AsyncMock()
 
 
 @pytest.fixture(name="mock_authenticate")
