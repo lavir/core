@@ -1,8 +1,6 @@
 """The Enphase Envoy integration."""
 from __future__ import annotations
 
-import logging
-
 from pyenphase import Envoy
 
 from homeassistant.config_entries import ConfigEntry
@@ -13,8 +11,6 @@ from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import DOMAIN, PLATFORMS
 from .coordinator import EnphaseUpdateCoordinator
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

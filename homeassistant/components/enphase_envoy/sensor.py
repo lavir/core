@@ -40,7 +40,7 @@ LAST_REPORTED_KEY = "last_reported"
 class EnvoyInverterRequiredKeysMixin:
     """Mixin for required keys."""
 
-    value_fn: Callable[[EnvoyInverter], datetime.datetime | float | None]
+    value_fn: Callable[[EnvoyInverter], datetime.datetime | float]
 
 
 @dataclass
@@ -50,14 +50,9 @@ class EnvoyInverterSensorEntityDescription(
     """Describes an Envoy inverter sensor entity."""
 
 
-def _inverter_last_report_time(inverter: EnvoyInverter) -> datetime.datetime | None:
+def _inverter_last_report_time(inverter: EnvoyInverter) -> datetime.datetime:
     """Return the last reported time for an inverter."""
-    report_time = inverter.last_report_date
-    if (last_reported_dt := dt_util.parse_datetime(report_time)) is None:
-        return None
-    if last_reported_dt.tzinfo is None:
-        return last_reported_dt.replace(tzinfo=dt_util.UTC)
-    return last_reported_dt
+    return dt_util.utc_from_timestamp(inverter.last_report_date)
 
 
 def _inverter_current_power(inverter: EnvoyInverter) -> float:
@@ -244,7 +239,7 @@ class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEnt
         super().__init__(coordinator)
 
     @property
-    def native_value(self) -> datetime.datetime | float | None:
+    def native_value(self) -> datetime.datetime | float:
         """Return the state of the sensor."""
         envoy = self.coordinator.envoy
         assert envoy.data is not None
