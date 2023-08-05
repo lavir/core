@@ -124,7 +124,7 @@ def serialize_entity_description(description: EntityDescription) -> dict[str, An
     }
 
 
-@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass(slots=True, frozen=True)
 class PassiveBluetoothDataUpdate(Generic[_T]):
     """Generic bluetooth data."""
 
@@ -139,26 +139,12 @@ class PassiveBluetoothDataUpdate(Generic[_T]):
         default_factory=dict
     )
 
-    def update(self, new_data: PassiveBluetoothDataUpdate[_T]) -> bool:
+    def update(self, new_data: PassiveBluetoothDataUpdate[_T]) -> None:
         """Update the data."""
-        original_devices = self.devices
-        original_entity_descriptions = self.entity_descriptions
-        original_entity_names = self.entity_names
-        original_entity_data = self.entity_data
-
-        self.devices = original_devices | new_data.devices
-        self.entity_descriptions = (
-            original_entity_descriptions | new_data.entity_descriptions
-        )
-        self.entity_data = original_entity_data | new_data.entity_data
-        self.entity_names = original_entity_names | new_data.entity_names
-
-        return (
-            self.devices != original_devices
-            or self.entity_descriptions != original_entity_descriptions
-            or self.entity_names != original_entity_names
-            or self.entity_data != original_entity_data
-        )
+        self.devices.update(new_data.devices)
+        self.entity_descriptions.update(new_data.entity_descriptions)
+        self.entity_data.update(new_data.entity_data)
+        self.entity_names.update(new_data.entity_names)
 
     def async_get_restore_data(self) -> RestoredPassiveBluetoothDataUpdate:
         """Serialize restore data to storage."""
@@ -566,17 +552,14 @@ class PassiveBluetoothDataProcessor(Generic[_T]):
                 f" {new_data} instead of a PassiveBluetoothDataUpdate"
             )
 
-        success_changed = not self.last_update_success
-        if success_changed:
+        if not self.last_update_success:
             self.last_update_success = True
             self.coordinator.logger.info(
                 "Processing %s data recovered", self.coordinator.name
             )
 
-        data_changed = self.data.update(new_data)
-
-        if data_changed or success_changed:
-            self.async_update_listeners(new_data)
+        self.data.update(new_data)
+        self.async_update_listeners(new_data)
 
 
 class PassiveBluetoothProcessorEntity(Entity, Generic[_PassiveBluetoothDataProcessorT]):
