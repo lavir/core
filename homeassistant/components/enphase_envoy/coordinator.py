@@ -23,6 +23,9 @@ _LOGGER = logging.getLogger(__name__)
 class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """DataUpdateCoordinator to gather data from any envoy."""
 
+    envoy_serial_number: str
+    name: str
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -33,10 +36,9 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         """Initialize DataUpdateCoordinator to gather data for specific SmartPlug."""
         self.envoy = envoy
-        self.envoy_serial_number = envoy.serial_number
-        self.name = name or f"Envoy {self.envoy_serial_number}"
         self.username = username
         self.password = password
+        self._default_name = name
         self._setup_complete = False
         super().__init__(
             hass,
@@ -46,14 +48,22 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             always_update=False,
         )
 
+    async def _async_setup_and_authenticate(self) -> None:
+        """Set up and authenticate with the envoy."""
+        envoy = self.envoy
+        await envoy.setup()
+        await envoy.authenticate(username=self.username, password=self.password)
+        assert envoy.serial_number is not None
+        self.envoy_serial_number = envoy.serial_number
+        self.name = self._default_name or f"Envoy {self.envoy_serial_number}"
+        self._setup_complete = True
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch all device and sensor data from api."""
         envoy = self.envoy
         try:
             if not self._setup_complete:
-                await envoy.setup()
-                await envoy.authenticate(username=self.username, password=self.password)
-                self._setup_complete = True
+                await self._async_setup_and_authenticate()
             return (await envoy.update()).raw
         except (EnvoyAuthenticationError, EnvoyAuthenticationRequired) as err:
             raise ConfigEntryAuthFailed from err
