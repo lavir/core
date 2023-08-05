@@ -141,6 +141,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
+        description_placeholders: dict[str, str] = {}
 
         if user_input is not None:
             if self._reauth_entry:
@@ -157,10 +158,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     user_input[CONF_USERNAME],
                     user_input[CONF_PASSWORD],
                 )
-            except INVALID_AUTH_ERRORS:
+            except INVALID_AUTH_ERRORS as e:
                 errors["base"] = "invalid_auth"
-            except EnvoyError:
+                description_placeholders = {"reason": str(e)}
+            except EnvoyError as e:
                 errors["base"] = "cannot_connect"
+                description_placeholders = {"reason": str(e)}
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -195,5 +198,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=self._async_generate_schema(),
+            description_placeholders=description_placeholders,
             errors=errors,
         )
