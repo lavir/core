@@ -24,7 +24,6 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """DataUpdateCoordinator to gather data from any envoy."""
 
     envoy_serial_number: str
-    name: str
 
     def __init__(
         self,
@@ -38,12 +37,12 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.envoy = envoy
         self.username = username
         self.password = password
-        self._default_name = name
+        self.name = name
         self._setup_complete = False
         super().__init__(
             hass,
             _LOGGER,
-            name=self.name,
+            name=name,
             update_interval=SCAN_INTERVAL,
             always_update=False,
         )
@@ -55,7 +54,6 @@ class EnphaseUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await envoy.authenticate(username=self.username, password=self.password)
         assert envoy.serial_number is not None
         self.envoy_serial_number = envoy.serial_number
-        self.name = self._default_name or f"Envoy {self.envoy_serial_number}"
         self._setup_complete = True
 
     async def _async_update_data(self) -> dict[str, Any]:
