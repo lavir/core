@@ -7,6 +7,7 @@ from typing import Any
 
 from awesomeversion import AwesomeVersion
 from pyenphase import (
+    AUTH_TOKEN_MIN_VERSION,
     Envoy,
     EnvoyAuthenticationError,
     EnvoyAuthenticationRequired,
@@ -32,13 +33,13 @@ CONF_SERIAL = "serial"
 
 INVALID_AUTH_ERRORS = (EnvoyAuthenticationError, EnvoyAuthenticationRequired)
 
-INSTALLER_AUTH_LAST_WORKING_VERSION = AwesomeVersion("7.0.0")
 INSTALLER_AUTH_USERNAME = "installer"
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> Envoy:
     """Validate the user input allows us to connect."""
     envoy = Envoy(data[CONF_HOST], get_async_client(hass))
+    await envoy.setup()
     await envoy.authenticate(data[CONF_USERNAME], data[CONF_PASSWORD])
     return envoy
 
@@ -71,7 +72,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if (
             not self.username
             and self.protovers
-            and AwesomeVersion(self.protovers) < INSTALLER_AUTH_LAST_WORKING_VERSION
+            and AwesomeVersion(self.protovers) < AUTH_TOKEN_MIN_VERSION
         ):
             default_username = INSTALLER_AUTH_USERNAME
 
