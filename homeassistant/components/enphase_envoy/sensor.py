@@ -283,7 +283,6 @@ class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEnt
     ) -> None:
         """Initialize Envoy inverter entity."""
         self.entity_description = description
-        envoy_name = coordinator.name
         self._serial_number = serial_number
         key = description.key
 
@@ -300,7 +299,7 @@ class EnvoyInverterEntity(CoordinatorEntity[EnphaseUpdateCoordinator], SensorEnt
         assert envoy_serial_num is not None
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, serial_number)},
-            name=f"{envoy_name} Inverter {serial_number}",
+            name=f"Inverter {serial_number}",
             manufacturer="Enphase",
             model="Inverter",
             via_device=(DOMAIN, envoy_serial_num),
