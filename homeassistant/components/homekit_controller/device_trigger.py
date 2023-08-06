@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
+import logging
 from typing import TYPE_CHECKING, Any
 
 from aiohomekit.model.characteristics import CharacteristicsTypes
@@ -52,6 +53,8 @@ HK_TO_HA_INPUT_EVENT_VALUES = {
     InputEventValues.DOUBLE_PRESS: "double_press",
     InputEventValues.LONG_PRESS: "long_press",
 }
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class TriggerSource:
@@ -264,6 +267,7 @@ def async_fire_triggers(conn: HKDevice, events: dict[tuple[int, int], dict[str, 
     for (aid, iid), ev in events.items():
         # If the value is None, we received the event via polling
         # and we don't want to trigger on that
+        _LOGGER.debug("Event (%s,%s) %s", aid, iid, ev)
         if ev["value"] is None:
             continue
         if aid in conn.devices:
