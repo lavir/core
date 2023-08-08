@@ -9,6 +9,7 @@ from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, cast
 
 import async_timeout
+from bleak.backends.scanner import AdvertisementData
 from home_assistant_bluetooth import BluetoothServiceInfoBleak
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback as hass_callback
@@ -194,6 +195,6 @@ def async_register_scanner(
 @hass_callback
 def async_get_advertisement_callback(
     hass: HomeAssistant,
-) -> Callable[[BluetoothServiceInfoBleak], None]:
+) -> Callable[[BLEDevice, AdvertisementData, bool, str, float], None]:
     """Get the advertisement callback."""
     return _get_manager(hass).scanner_adv_received
