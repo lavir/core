@@ -473,14 +473,15 @@ class BluetoothManager:
         #                       scanners with the best advertisement from each
         #                       connectable scanner
         #
-        prefer_previous = False
         if (
             (old_service_info := all_history.get(address))
             and source != old_service_info.source
             and (scanner := self._sources.get(old_service_info.source))
             and scanner.scanning
-            and self._prefer_previous_adv_from_different_source(
-                old_service_info, source, monotonic_time, rssi
+            and (
+                prefer_previous := self._prefer_previous_adv_from_different_source(
+                    old_service_info, source, monotonic_time, rssi
+                )
             )
         ):
             # If we are rejecting the new advertisement and the device is connectable
@@ -509,8 +510,6 @@ class BluetoothManager:
                     )
                 ):
                     return
-
-            prefer_previous = True
 
         # Constructing BluetoothServiceInfoBleak is expensive, so we only do it
         # after we have determined that we are going to prefer the new advertisement
