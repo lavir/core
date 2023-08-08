@@ -14,6 +14,7 @@ from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 from bleak_retry_connector import NO_RSSI_VALUE
 from bluetooth_adapters import DiscoveredDeviceAdvertisementData, adapter_human_name
+from home_assistant_bluetooth import BluetoothServiceInfoBleak
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import (
@@ -195,9 +196,7 @@ class BaseHaRemoteScanner(BaseHaScanner):
         hass: HomeAssistant,
         scanner_id: str,
         name: str,
-        new_info_callback: Callable[
-            [BLEDevice, AdvertisementData, bool, str, float], None
-        ],
+        new_info_callback: Callable[[BluetoothServiceInfoBleak], None],
         connector: HaBluetoothConnector | None,
         connectable: bool,
     ) -> None:
@@ -373,11 +372,19 @@ class BaseHaRemoteScanner(BaseHaScanner):
         )
         self._discovered_device_timestamps[address] = advertisement_monotonic_time
         self._new_info_callback(
-            device,
-            advertisement_data,
-            self.connectable,
-            self.source,
-            advertisement_monotonic_time,
+            BluetoothServiceInfoBleak(
+                name=local_name or address,
+                address=address,
+                rssi=rssi,
+                manufacturer_data=manufacturer_data,
+                service_data=service_data,
+                service_uuids=service_uuids,
+                source=self.source,
+                device=device,
+                advertisement=advertisement_data,
+                connectable=self.connectable,
+                time=advertisement_monotonic_time,
+            )
         )
 
     async def async_diagnostics(self) -> dict[str, Any]:

@@ -31,7 +31,7 @@ from .const import (
     SOURCE_LOCAL,
     START_TIMEOUT,
 )
-from .models import BluetoothScanningMode
+from .models import BluetoothScanningMode, BluetoothServiceInfoBleak
 from .util import async_reset_adapter
 
 OriginalBleakScanner = bleak.BleakScanner
@@ -129,9 +129,7 @@ class HaScanner(BaseHaScanner):
         mode: BluetoothScanningMode,
         adapter: str,
         address: str,
-        new_info_callback: Callable[
-            [BLEDevice, AdvertisementData, bool, str, float], None
-        ],
+        new_info_callback: Callable[[BluetoothServiceInfoBleak], None],
     ) -> None:
         """Init bluetooth discovery."""
         self.mac_address = address
@@ -191,7 +189,19 @@ class HaScanner(BaseHaScanner):
             # state if all the data is empty.
             self._last_detection = callback_time
         self._new_info_callback(
-            device, advertisement_data, self.connectable, self.source, callback_time
+            BluetoothServiceInfoBleak(
+                name=advertisement_data.local_name or device.name or device.address,
+                address=device.address,
+                rssi=advertisement_data.rssi,
+                manufacturer_data=advertisement_data.manufacturer_data,
+                service_data=advertisement_data.service_data,
+                service_uuids=advertisement_data.service_uuids,
+                source=self.source,
+                device=device,
+                advertisement=advertisement_data,
+                connectable=True,
+                time=callback_time,
+            )
         )
 
     async def async_start(self) -> None:

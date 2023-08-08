@@ -381,16 +381,14 @@ class BluetoothManager:
     def _prefer_previous_adv_from_different_source(
         self,
         old: BluetoothServiceInfoBleak,
-        source: str,
-        monotonic_time: float,
-        rssi: int,
+        new: BluetoothServiceInfoBleak,
     ) -> bool:
         """Prefer previous advertisement from a different source if it is better."""
-        if stale_seconds := self._advertisement_tracker.intervals.get(old.address):
-            stale_seconds += TRACKER_BUFFERING_WOBBLE_SECONDS
-        else:
-            stale_seconds = FALLBACK_MAXIMUM_STALE_ADVERTISEMENT_SECONDS
-        if monotonic_time - old.time > stale_seconds:
+        if new.time - old.time > (
+            stale_seconds := self._advertisement_tracker.intervals.get(
+                new.address, FALLBACK_MAXIMUM_STALE_ADVERTISEMENT_SECONDS
+            )
+        ):
             # If the old advertisement is stale, any new advertisement is preferred
             if self._debug:
                 _LOGGER.debug(
@@ -398,15 +396,15 @@ class BluetoothManager:
                         "%s (%s): Switching from %s to %s (time elapsed:%s > stale"
                         " seconds:%s)"
                     ),
-                    old.name,
-                    old.address,
-                    self._async_describe_source(old.source),
-                    self._async_describe_source(source),
-                    monotonic_time - old.time,
+                    new.name,
+                    new.address,
+                    self._async_describe_source(old),
+                    self._async_describe_source(new),
+                    new.time - old.time,
                     stale_seconds,
                 )
             return False
-        if (rssi or NO_RSSI_VALUE) - RSSI_SWITCH_THRESHOLD > (
+        if (new.rssi or NO_RSSI_VALUE) - RSSI_SWITCH_THRESHOLD > (
             old.rssi or NO_RSSI_VALUE
         ):
             # If new advertisement is RSSI_SWITCH_THRESHOLD more,
@@ -417,11 +415,11 @@ class BluetoothManager:
                         "%s (%s): Switching from %s to %s (new rssi:%s - threshold:%s >"
                         " old rssi:%s)"
                     ),
-                    old.name,
-                    old.address,
-                    self._async_describe_source(old.source),
-                    self._async_describe_source(source),
-                    rssi,
+                    new.name,
+                    new.address,
+                    self._async_describe_source(old),
+                    self._async_describe_source(new),
+                    new.rssi,
                     RSSI_SWITCH_THRESHOLD,
                     old.rssi,
                 )
@@ -429,34 +427,29 @@ class BluetoothManager:
         return True
 
     @hass_callback
-    def scanner_adv_received(
-        self,
-        device: BLEDevice,
-        advertisement: AdvertisementData,
-        connectable: bool,
-        source: str,
-        monotonic_time: float,
-    ) -> None:
+    def scanner_adv_received(self, service_info: BluetoothServiceInfoBleak) -> None:
         """Handle a new advertisement from any scanner.
 
         Callbacks from all the scanners arrive here.
         """
+
         # Pre-filter noisy apple devices as they can account for 20-35% of the
         # traffic on a typical network.
         if (
-            (manufacturer_data := advertisement.manufacturer_data)
+            (manufacturer_data := service_info.manufacturer_data)
             and APPLE_MFR_ID in manufacturer_data
             and manufacturer_data[APPLE_MFR_ID][0] not in APPLE_START_BYTES_WANTED
             and len(manufacturer_data) == 1
-            and not advertisement.service_data
+            and not service_info.service_data
         ):
             return
 
-        address = device.address
+        address = service_info.device.address
         all_history = self._all_history
+        connectable = service_info.connectable
         connectable_history = self._connectable_history
         old_connectable_service_info = connectable and connectable_history.get(address)
-        rssi = advertisement.rssi
+        source = service_info.source
         # This logic is complex due to the many combinations of scanners
         # that are supported.
         #
@@ -478,10 +471,8 @@ class BluetoothManager:
             and source != old_service_info.source
             and (scanner := self._sources.get(old_service_info.source))
             and scanner.scanning
-            and (
-                prefer_previous := self._prefer_previous_adv_from_different_source(
-                    old_service_info, source, monotonic_time, rssi
-                )
+            and self._prefer_previous_adv_from_different_source(
+                old_service_info, service_info
             )
         ):
             # If we are rejecting the new advertisement and the device is connectable
@@ -505,37 +496,18 @@ class BluetoothManager:
                         )
                         and connectable_scanner.scanning
                         and self._prefer_previous_adv_from_different_source(
-                            old_connectable_service_info, source, monotonic_time, rssi
+                            old_connectable_service_info, service_info
                         )
                     )
                 ):
                     return
 
-        # Constructing BluetoothServiceInfoBleak is expensive, so we only do it
-        # after we have determined that we are going to prefer the new advertisement
-        # over the old one.
-        name = device.name or address
-        service_data = advertisement.service_data
-        service_uuids = advertisement.service_uuids
-        service_info = BluetoothServiceInfoBleak(
-            name,
-            address,
-            rssi,
-            manufacturer_data,
-            service_data,
-            service_uuids,
-            source,
-            device,
-            advertisement,
-            connectable,
-            monotonic_time,
-        )
+                connectable_history[address] = service_info
+
+            return
 
         if connectable:
             connectable_history[address] = service_info
-
-        if prefer_previous:
-            return
 
         all_history[address] = service_info
 
@@ -558,10 +530,10 @@ class BluetoothManager:
             # Than check if advertisement data is the same
             and old_service_info
             and not (
-                manufacturer_data != old_service_info.manufacturer_data
-                or service_data != old_service_info.service_data
-                or service_uuids != old_service_info.service_uuids
-                or name != old_service_info.name
+                service_info.manufacturer_data != old_service_info.manufacturer_data
+                or service_info.service_data != old_service_info.service_data
+                or service_info.service_uuids != old_service_info.service_uuids
+                or service_info.name != old_service_info.name
             )
         ):
             return
@@ -571,26 +543,25 @@ class BluetoothManager:
             # route any connection attempts to the connectable path, we
             # mark the service_info as connectable so that the callbacks
             # will be called and the device can be discovered.
-            # TODO: service_info -> as_connectable
             service_info = BluetoothServiceInfoBleak(
-                name,
-                address,
-                rssi,
-                manufacturer_data,
-                service_data,
-                service_uuids,
-                source,
-                device,
-                advertisement,
-                True,
-                monotonic_time,
+                name=service_info.name,
+                address=service_info.address,
+                rssi=service_info.rssi,
+                manufacturer_data=service_info.manufacturer_data,
+                service_data=service_info.service_data,
+                service_uuids=service_info.service_uuids,
+                source=service_info.source,
+                device=service_info.device,
+                advertisement=service_info.advertisement,
+                connectable=True,
+                time=service_info.time,
             )
 
         matched_domains = self._integration_matcher.match_domains(service_info)
         if self._debug:
             _LOGGER.debug(
                 "%s: %s %s match: %s",
-                self._async_describe_source(service_info.source),
+                self._async_describe_source(service_info),
                 address,
                 service_info.advertisement,
                 matched_domains,
@@ -621,14 +592,14 @@ class BluetoothManager:
             )
 
     @hass_callback
-    def _async_describe_source(self, source: str) -> str:
+    def _async_describe_source(self, service_info: BluetoothServiceInfoBleak) -> str:
         """Describe a source."""
-        if scanner := self._sources.get(source):
+        if scanner := self._sources.get(service_info.source):
             description = scanner.name
-            if scanner.connectable:
-                description += " [connectable]"
         else:
-            description = source
+            description = service_info.source
+        if service_info.connectable:
+            description += " [connectable]"
         return description
 
     @hass_callback
