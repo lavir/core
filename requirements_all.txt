@@ -635,7 +635,7 @@ datadog==0.15.0
 datapoint==0.9.8
 
 # homeassistant.components.bluetooth
-dbus-fast==1.90.1
+dbus-fast==1.91.1
 
 # homeassistant.components.debugpy
 debugpy==1.6.7
@@ -1368,7 +1368,7 @@ openwrt-luci-rpc==1.1.16
 openwrt-ubus-rpc==0.0.2
 
 # homeassistant.components.opower
-opower==0.0.20
+opower==0.0.24
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
@@ -1827,7 +1827,7 @@ pymailgunner==1.4
 pymata-express==1.19
 
 # homeassistant.components.mazda
-pymazda==0.3.10
+pymazda==0.3.11
 
 # homeassistant.components.mediaroom
 pymediaroom==0.6.5.4
