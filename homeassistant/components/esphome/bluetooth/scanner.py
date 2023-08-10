@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from aioesphomeapi import BluetoothLEAdvertisement, BluetoothLERawAdvertisement
-from bluetooth_data_tools import int_to_bluetooth_address, parse_advertisement_data
+from bluetooth_data_tools import (
+    int_to_bluetooth_address,
+    parse_advertisement_data_tuple,
+)
 
 from homeassistant.components.bluetooth import MONOTONIC_TIME, BaseHaRemoteScanner
 from homeassistant.core import callback
@@ -36,15 +39,11 @@ class ESPHomeScanner(BaseHaRemoteScanner):
         """Call the registered callback."""
         now = MONOTONIC_TIME()
         for adv in advertisements:
-            parsed = parse_advertisement_data((adv.data,))
+            parsed = parse_advertisement_data_tuple((adv.data,))
             self._async_on_advertisement(
                 int_to_bluetooth_address(adv.address),
                 adv.rssi,
-                parsed.local_name,
-                parsed.service_uuids,
-                parsed.service_data,
-                parsed.manufacturer_data,
-                None,
+                *parsed,
                 {"address_type": adv.address_type},
                 now,
             )
