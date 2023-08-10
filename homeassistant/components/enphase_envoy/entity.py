@@ -10,7 +10,7 @@ from .coordinator import EnphaseUpdateCoordinator
 
 
 class EnvoyBaseEntity(CoordinatorEntity[EnphaseUpdateCoordinator]):
-    """Defines a base envoy entities."""
+    """Defines a base envoy entity."""
 
     _attr_has_entity_name = True
 
@@ -19,7 +19,7 @@ class EnvoyBaseEntity(CoordinatorEntity[EnphaseUpdateCoordinator]):
         coordinator: EnphaseUpdateCoordinator,
         description: EntityDescription,
     ) -> None:
-        """Init the Enphase base binary_sensor entity."""
+        """Init the Enphase base entity."""
         self.entity_description = description
         serial_number = coordinator.envoy.serial_number
         assert serial_number is not None

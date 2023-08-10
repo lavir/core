@@ -515,7 +515,7 @@ datadog==0.15.0
 datapoint==0.9.8
 
 # homeassistant.components.bluetooth
-dbus-fast==1.91.1
+dbus-fast==1.91.2
 
 # homeassistant.components.debugpy
 debugpy==1.6.7
@@ -2049,7 +2049,7 @@ zigpy-znp==0.11.4
 zigpy==0.56.4
 
 # homeassistant.components.zwave_js
-zwave-js-server-python==0.49.0
+zwave-js-server-python==0.50.1
 
 # homeassistant.components.zwave_me
 zwave-me-ws==0.4.3
