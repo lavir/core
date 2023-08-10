@@ -454,7 +454,7 @@ bluetooth-auto-recovery==1.2.1
 # homeassistant.components.esphome
 # homeassistant.components.ld2410_ble
 # homeassistant.components.led_ble
-bluetooth-data-tools==1.7.0
+bluetooth-data-tools==1.8.0
 
 # homeassistant.components.bond
 bond-async==0.2.1
@@ -1034,7 +1034,7 @@ openerz-api==0.2.0
 openhomedevice==2.2.0
 
 # homeassistant.components.opower
-opower==0.0.24
+opower==0.0.26
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
