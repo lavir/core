@@ -31,7 +31,6 @@ from aiortc import (
 )
 from aiortc.contrib.media import MediaPlayer
 from aiortc.rtcrtpsender import RTCRtpSender
-import async_timeout
 from rtsp_to_webrtc.client import get_adaptive_client
 from rtsp_to_webrtc.exceptions import ClientError, ResponseError
 from rtsp_to_webrtc.interface import WebRTCClientInterface
@@ -63,7 +62,7 @@ async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) 
     client: WebRTCClientInterface
     server_url: str = entry.options[DATA_SERVER_URL]
     try:
-        async with async_timeout.timeout(TIMEOUT):
+        async with asyncio.timeout(TIMEOUT):
             client = await get_adaptive_client(
                 async_get_clientsession(hass), server_url
             )
@@ -84,7 +83,7 @@ async def _async_setup_external_server(hass: HomeAssistant, entry: ConfigEntry) 
         the stream itself happens directly between the client and proxy.
         """
         try:
-            async with async_timeout.timeout(TIMEOUT):
+            async with asyncio.timeout(TIMEOUT):
                 return await client.offer_stream_id(stream_id, offer_sdp, stream_source)
         except TimeoutError as err:
             raise HomeAssistantError("Timeout talking to RTSPtoWebRTC server") from err

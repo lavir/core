@@ -3,8 +3,6 @@ import asyncio
 from functools import partial
 import logging
 
-import async_timeout
-
 from homeassistant import exceptions
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -86,7 +84,7 @@ async def async_connect_or_timeout(hass, roomba):
     """Connect to vacuum."""
     try:
         name = None
-        async with async_timeout.timeout(10):
+        async with asyncio.timeout(10):
             _LOGGER.debug("Initialize connection to vacuum")
             await hass.async_add_executor_job(roomba.connect)
             while not roomba.roomba_connected or name is None:
@@ -110,7 +108,7 @@ async def async_connect_or_timeout(hass, roomba):
 async def async_disconnect_or_timeout(hass, roomba):
     """Disconnect to vacuum."""
     _LOGGER.debug("Disconnect vacuum")
-    async with async_timeout.timeout(3):
+    async with asyncio.timeout(3):
         await hass.async_add_executor_job(roomba.disconnect)
     return True
 
