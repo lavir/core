@@ -228,7 +228,7 @@ aioecowitt==2023.5.0
 aioemonitor==1.0.5
 
 # homeassistant.components.esphome
-aioesphomeapi==15.1.15
+aioesphomeapi==16.0.1
 
 # homeassistant.components.flo
 aioflo==2021.11.0
@@ -280,7 +280,7 @@ aiolivisi==0.0.19
 aiolookin==1.0.0
 
 # homeassistant.components.lyric
-aiolyric==1.0.9
+aiolyric==1.1.0
 
 # homeassistant.components.modern_forms
 aiomodernforms==0.1.8
@@ -1243,7 +1243,7 @@ nad-receiver==0.3.0
 ndms2-client==0.1.2
 
 # homeassistant.components.ness_alarm
-nessclient==0.10.0
+nessclient==1.0.0
 
 # homeassistant.components.netdata
 netdata==1.1.0
@@ -1368,7 +1368,7 @@ openwrt-luci-rpc==1.1.16
 openwrt-ubus-rpc==0.0.2
 
 # homeassistant.components.opower
-opower==0.0.26
+opower==0.0.29
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
