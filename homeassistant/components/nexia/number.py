@@ -1,6 +1,7 @@
 """Support for Nexia / Trane XL Thermostats."""
 from __future__ import annotations
 
+from nexia.home import NexiaHome
 from nexia.thermostat import NexiaThermostat
 
 from homeassistant.components.number import NumberEntity
@@ -22,9 +23,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors for a Nexia device."""
     coordinator: NexiaDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    nexia_home = coordinator.nexia_home
+    nexia_home: NexiaHome = coordinator.nexia_home
 
-    entities = []
+    entities: list[NexiaThermostatEntity] = []
     for thermostat_id in nexia_home.get_thermostat_ids():
         thermostat = nexia_home.get_thermostat_by_id(thermostat_id)
         if thermostat.has_variable_fan_speed():
@@ -52,7 +53,7 @@ class NexiaFanSpeedEntity(NexiaThermostatEntity, NumberEntity):
         super().__init__(
             coordinator,
             thermostat,
-            name=f"{thermostat.get_name()} Fan Speed",
+            name=f"{thermostat.get_name()} Fan speed",
             unique_id=f"{thermostat.thermostat_id}_fan_speed_setpoint",
         )
         min_value, max_value = valid_range
