@@ -1034,7 +1034,7 @@ openerz-api==0.2.0
 openhomedevice==2.2.0
 
 # homeassistant.components.opower
-opower==0.0.30
+opower==0.0.31
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
@@ -2010,7 +2010,7 @@ yalesmartalarmclient==0.3.9
 yalexs-ble==2.2.3
 
 # homeassistant.components.august
-yalexs==1.5.2
+yalexs==1.6.0
 
 # homeassistant.components.yeelight
 yeelight==0.7.13
