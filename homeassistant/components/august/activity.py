@@ -64,10 +64,10 @@ class ActivityStream(AugustSubscriberMixin):
     async def _async_update_house_id_later(
         self, debouncer: Debouncer, _: datetime
     ) -> None:
-        """Call a debouncer later."""
+        """Call a debouncer from async_call_later."""
         await debouncer.async_call()
 
-    async def async_setup(self):
+    async def async_setup(self) -> None:
         """Token refresh check and catch up the activity stream."""
         update_debounce = self._update_debounce
         update_debounce_jobs = self._update_debounce_jobs
@@ -90,7 +90,7 @@ class ActivityStream(AugustSubscriberMixin):
         self._did_first_update = True
 
     @callback
-    def async_stop(self):
+    def async_stop(self) -> None:
         """Cleanup any debounces."""
         for debouncer in self._update_debounce.values():
             debouncer.async_cancel()
