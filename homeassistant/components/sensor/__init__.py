@@ -5,12 +5,10 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation as DecimalInvalidOperation
 import logging
 from math import ceil, floor, log10
-import re
-import sys
 from typing import Any, Final, Self, cast, final
 
 from homeassistant.backports.functools import cached_property
@@ -89,10 +87,6 @@ from .websocket_api import async_setup as async_setup_ws_api
 _LOGGER: Final = logging.getLogger(__name__)
 
 ENTITY_ID_FORMAT: Final = DOMAIN + ".{}"
-
-NEGATIVE_ZERO_PATTERN = re.compile(r"^-(0\.?0*)$")
-
-PY_311 = sys.version_info >= (3, 11, 0)
 
 SCAN_INTERVAL: Final = timedelta(seconds=30)
 
@@ -535,8 +529,8 @@ class SensorEntity(Entity):
                         "which is missing timezone information"
                     )
 
-                if value.tzinfo != timezone.utc:
-                    value = value.astimezone(timezone.utc)
+                if value.tzinfo != UTC:
+                    value = value.astimezone(UTC)
 
                 return value.isoformat(timespec="seconds")
             except (AttributeError, OverflowError, TypeError) as err:
@@ -637,12 +631,7 @@ class SensorEntity(Entity):
                 )
                 precision = precision + floor(ratio_log)
 
-                if PY_311:
-                    value = f"{converted_numerical_value:z.{precision}f}"
-                else:
-                    value = f"{converted_numerical_value:.{precision}f}"
-                    if value.startswith("-0") and NEGATIVE_ZERO_PATTERN.match(value):
-                        value = value[1:]
+                value = f"{converted_numerical_value:z.{precision}f}"
             else:
                 value = converted_numerical_value
 
@@ -904,11 +893,6 @@ def async_rounded_state(hass: HomeAssistant, entity_id: str, state: State) -> st
 
     with suppress(TypeError, ValueError):
         numerical_value = float(value)
-        if PY_311:
-            value = f"{numerical_value:z.{precision}f}"
-        else:
-            value = f"{numerical_value:.{precision}f}"
-            if value.startswith("-0") and NEGATIVE_ZERO_PATTERN.match(value):
-                value = value[1:]
+        value = f"{numerical_value:z.{precision}f}"
 
     return value
