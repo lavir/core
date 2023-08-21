@@ -23,6 +23,10 @@ from homeassistant.components.climate import (
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
     FAN_AUTO,
+    FAN_HIGH,
+    FAN_LOW,
+    FAN_MEDIUM,
+    FAN_OFF,
     FAN_ON,
     SWING_OFF,
     SWING_VERTICAL,
@@ -35,6 +39,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, Platform, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util.percentage import (
+    percentage_to_ranged_value,
+    ranged_value_to_percentage,
+)
 
 from . import KNOWN_DEVICES
 from .connection import HKDevice
@@ -85,6 +93,10 @@ TARGET_HEATER_COOLER_STATE_HASS_TO_HOMEKIT = {
 SWING_MODE_HASS_TO_HOMEKIT = {v: k for k, v in SWING_MODE_HOMEKIT_TO_HASS.items()}
 
 DEFAULT_MIN_STEP: Final = 1.0
+
+ROTATION_SPEED_LOW = 33
+ROTATION_SPEED_MEDIUM = 66
+ROTATION_SPEED_HIGH = 100
 
 
 async def async_setup_entry(
@@ -170,7 +182,54 @@ class HomeKitHeaterCoolerEntity(HomeKitBaseClimateEntity):
             CharacteristicsTypes.TEMPERATURE_COOLING_THRESHOLD,
             CharacteristicsTypes.TEMPERATURE_HEATING_THRESHOLD,
             CharacteristicsTypes.SWING_MODE,
+            CharacteristicsTypes.ROTATION_SPEED,
         ]
+
+    def _get_rotation_speed_range(self) -> tuple[float, float]:
+        return (
+            round(self.service[CharacteristicsTypes.ROTATION_SPEED].minValue or 0) + 1,
+            round(self.service[CharacteristicsTypes.ROTATION_SPEED].maxValue or 100),
+        )
+
+    @property
+    def fan_modes(self) -> list[str]:
+        """Return the available fan modes."""
+        return [FAN_OFF, FAN_LOW, FAN_MEDIUM, FAN_HIGH]
+
+    @property
+    def fan_mode(self) -> str | None:
+        """Return the current fan mode."""
+        speed_range = self._get_rotation_speed_range()
+        speed_percentage = ranged_value_to_percentage(
+            speed_range, self.service.value(CharacteristicsTypes.ROTATION_SPEED)
+        )
+        fan_mode = FAN_OFF
+
+        # homekit value 0 33 66 100
+        if speed_percentage > ROTATION_SPEED_MEDIUM:
+            fan_mode = FAN_HIGH
+        elif speed_percentage > ROTATION_SPEED_LOW:
+            fan_mode = FAN_MEDIUM
+        elif speed_percentage > 0:
+            fan_mode = FAN_LOW
+
+        return fan_mode
+
+    async def async_set_fan_mode(self, fan_mode: str) -> None:
+        """Set new target fan mode."""
+        rotation = 0
+        if fan_mode == FAN_LOW:
+            rotation = ROTATION_SPEED_LOW
+        elif fan_mode == FAN_MEDIUM:
+            rotation = ROTATION_SPEED_MEDIUM
+        elif fan_mode == FAN_HIGH:
+            rotation = ROTATION_SPEED_HIGH
+
+        speed_range = self._get_rotation_speed_range()
+        speed = round(percentage_to_ranged_value(speed_range, rotation))
+        await self.async_put_characteristics(
+            {CharacteristicsTypes.ROTATION_SPEED: speed}
+        )
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -386,6 +445,9 @@ class HomeKitHeaterCoolerEntity(HomeKitBaseClimateEntity):
 
         if self.service.has(CharacteristicsTypes.SWING_MODE):
             features |= ClimateEntityFeature.SWING_MODE
+
+        if self.service.has(CharacteristicsTypes.ROTATION_SPEED):
+            features |= ClimateEntityFeature.FAN_MODE
 
         return features
 
