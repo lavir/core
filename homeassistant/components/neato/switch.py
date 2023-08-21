@@ -12,10 +12,10 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_OFF, STATE_ON, EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import NEATO_DOMAIN, NEATO_LOGIN, NEATO_ROBOTS, SCAN_INTERVAL_MINUTES
+from .const import NEATO_LOGIN, NEATO_ROBOTS, SCAN_INTERVAL_MINUTES
+from .entity import NeatoEntity
 from .hub import NeatoHub
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,17 +45,15 @@ async def async_setup_entry(
     async_add_entities(dev, True)
 
 
-class NeatoConnectedSwitch(SwitchEntity):
+class NeatoConnectedSwitch(NeatoEntity, SwitchEntity):
     """Neato Connected Switches."""
 
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
     _attr_translation_key = "schedule"
 
     def __init__(self, neato: NeatoHub, robot: Robot, switch_type: str) -> None:
         """Initialize the Neato Connected switches."""
+        super().__init__(robot)
         self.type = switch_type
-        self.robot = robot
         self._available = False
         self._state: dict[str, Any] | None = None
         self._schedule_state: str | None = None
@@ -106,12 +104,9 @@ class NeatoConnectedSwitch(SwitchEntity):
         )
 
     @property
-    def device_info(self) -> DeviceInfo:
-        """Device info for neato robot."""
-        return DeviceInfo(
-            identifiers={(NEATO_DOMAIN, self._robot_serial)},
-            name=self.robot.name,
-        )
+    def entity_category(self) -> EntityCategory:
+        """Device entity category."""
+        return EntityCategory.CONFIG
 
     def turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
