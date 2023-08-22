@@ -475,7 +475,7 @@ brottsplatskartan==0.0.1
 brunt==1.2.0
 
 # homeassistant.components.bthome
-bthome-ble==3.0.0
+bthome-ble==3.1.0
 
 # homeassistant.components.buienradar
 buienradar==1.0.5
@@ -2028,7 +2028,7 @@ youtubeaio==1.1.5
 zamg==0.2.4
 
 # homeassistant.components.zeroconf
-zeroconf==0.80.0
+zeroconf==0.81.0
 
 # homeassistant.components.zeversolar
 zeversolar==0.3.1
