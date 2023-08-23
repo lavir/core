@@ -1668,7 +1668,7 @@ pyedimax==0.2.1
 pyefergy==22.1.1
 
 # homeassistant.components.enphase_envoy
-pyenphase==1.6.0
+pyenphase==1.8.1
 
 # homeassistant.components.envisalink
 pyenvisalink==4.6
@@ -1815,7 +1815,7 @@ pylibrespot-java==0.1.1
 pylitejet==0.5.0
 
 # homeassistant.components.litterrobot
-pylitterbot==2023.4.4
+pylitterbot==2023.4.5
 
 # homeassistant.components.lutron_caseta
 pylutron-caseta==0.18.1
