@@ -8,7 +8,6 @@ PLATFORMS = [
     Platform.SCENE,
     Platform.SENSOR,
     Platform.SWITCH,
-    Platform.NUMBER,
 ]
 
 ATTRIBUTION = "Data provided by Trane Technologies"
