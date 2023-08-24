@@ -3,8 +3,6 @@ from http import HTTPStatus
 from typing import Any
 
 from aiohttp.test_utils import TestClient
-
-# pylint: disable=unused-import
 import pytest
 
 from homeassistant.components.mobile_app.const import DOMAIN
