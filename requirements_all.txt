@@ -8,7 +8,7 @@ AEMET-OpenData==0.3.0
 AIOAladdinConnect==0.1.57
 
 # homeassistant.components.honeywell
-AIOSomecomfort==0.0.16
+AIOSomecomfort==0.0.17
 
 # homeassistant.components.adax
 Adax-local==0.1.5
@@ -2250,6 +2250,9 @@ pyws66i==1.1
 
 # homeassistant.components.xeoma
 pyxeoma==1.4.1
+
+# homeassistant.components.yardian
+pyyardian==1.1.0
 
 # homeassistant.components.qrcode
 pyzbar==0.1.7
