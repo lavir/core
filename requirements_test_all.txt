@@ -1034,7 +1034,7 @@ openerz-api==0.2.0
 openhomedevice==2.2.0
 
 # homeassistant.components.opower
-opower==0.0.31
+opower==0.0.32
 
 # homeassistant.components.oralb
 oralb-ble==0.17.6
@@ -2029,7 +2029,7 @@ youtubeaio==1.1.5
 zamg==0.2.4
 
 # homeassistant.components.zeroconf
-zeroconf==0.82.1
+zeroconf==0.83.0
 
 # homeassistant.components.zeversolar
 zeversolar==0.3.1
