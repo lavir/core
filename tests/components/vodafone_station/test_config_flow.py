@@ -65,7 +65,7 @@ async def test_exception_connection(hass: HomeAssistant, side_effect, error) -> 
     assert result["step_id"] == "user"
 
     with patch(
-        "aiovodafone.api.VodafoneStationApi.login",
+        "homeassistant.components.vodafone_station.config_flow.VodafoneStationApi.login",
         side_effect=side_effect,
     ):
         result = await hass.config_entries.flow.async_configure(
@@ -134,8 +134,6 @@ async def test_reauth_not_successful(hass: HomeAssistant, side_effect, error) ->
         side_effect=side_effect,
     ), patch(
         "homeassistant.components.vodafone_station.config_flow.VodafoneStationApi.logout",
-    ), patch(
-        "homeassistant.components.vodafone_station.async_setup_entry"
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -159,11 +157,17 @@ async def test_reauth_not_successful(hass: HomeAssistant, side_effect, error) ->
 
         # Should be recoverable after hits error
         with patch(
-            "aiovodafone.api.VodafoneStationApi.get_all_devices",
+            "homeassistant.components.vodafone_station.config_flow.VodafoneStationApi.get_all_devices",
             return_value={
                 "wifi_user": "on|laptop|device-1|xx:xx:xx:xx:xx:xx|192.168.100.1||2.4G",
                 "ethernet": "laptop|device-2|yy:yy:yy:yy:yy:yy|192.168.100.2|;",
             },
+        ), patch(
+            "homeassistant.components.vodafone_station.config_flow.VodafoneStationApi.login",
+        ), patch(
+            "homeassistant.components.vodafone_station.config_flow.VodafoneStationApi.logout",
+        ), patch(
+            "homeassistant.components.vodafone_station.async_setup_entry"
         ):
             result2 = await hass.config_entries.flow.async_configure(
                 result["flow_id"],
@@ -173,10 +177,5 @@ async def test_reauth_not_successful(hass: HomeAssistant, side_effect, error) ->
             )
             await hass.async_block_till_done()
 
-        assert result2["type"] == FlowResultType.CREATE_ENTRY
-        assert result2["title"] == "fake_host"
-        assert result2["data"] == {
-            CONF_HOST: "fake_host",
-            CONF_USERNAME: "fake_username",
-            CONF_PASSWORD: "fake_pwd",
-        }
+        assert result2["type"] == FlowResultType.ABORT
+        assert result2["reason"] == "reauth_successful"
