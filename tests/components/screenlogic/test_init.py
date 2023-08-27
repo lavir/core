@@ -1,8 +1,9 @@
 """Tests for ScreenLogic integration init."""
 from dataclasses import dataclass
-from unittest.mock import patch
+from unittest.mock import DEFAULT, patch
 
 import pytest
+from screenlogicpy import ScreenLogicGateway
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.components.screenlogic import DOMAIN
@@ -11,9 +12,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import slugify
 
-from .conftest import (
+from . import (
+    DATA_MIN_MIGRATION,
+    GATEWAY_DISCOVERY_IMPORT_PATH,
     MOCK_ADAPTER_MAC,
     MOCK_ADAPTER_NAME,
+    stub_async_connect,
 )
 
 from tests.common import MockConfigEntry
@@ -39,9 +43,9 @@ TEST_MIGRATING_ENTITIES = [
         BINARY_SENSOR_DOMAIN,
     ),
     EntityMigrationData(
-        "Pool Pump Current Watts",
+        "Pool Low Pump Current Watts",
         "currentWatts_0",
-        "Pool Pump Watts Now",
+        "Pool Low Pump Watts Now",
         "pump_0_watts_now",
         SENSOR_DOMAIN,
     ),
@@ -60,11 +64,11 @@ TEST_MIGRATING_ENTITIES = [
         SENSOR_DOMAIN,
     ),
     EntityMigrationData(
-        "Missing Migration Device",
-        "missing_device",
-        "Missing Migration Device",
-        "missing_device",
-        BINARY_SENSOR_DOMAIN,
+        "Cyanuric Acid",
+        "chem_cya",
+        "Cyanuric Acid",
+        "chem_cya",
+        SENSOR_DOMAIN,
     ),
     EntityMigrationData(
         "Old Sensor",
@@ -75,15 +79,9 @@ TEST_MIGRATING_ENTITIES = [
     ),
 ]
 
-TEST_EXISTING_ENTRY = {
-    "domain": SENSOR_DOMAIN,
-    "platform": DOMAIN,
-    "unique_id": f"{MOCK_ADAPTER_MAC}_existing",
-    "suggested_object_id": f"{MOCK_ADAPTER_NAME} Existing Sensor",
-    "disabled_by": None,
-    "has_entity_name": True,
-    "original_name": "Existing Sensor",
-}
+MIGRATION_CONNECT = lambda *args, **kwargs: stub_async_connect(
+    DATA_MIN_MIGRATION, *args, **kwargs
+)
 
 
 @pytest.mark.parametrize(
@@ -103,11 +101,11 @@ TEST_EXISTING_ENTRY = {
         )
         for ent_data in TEST_MIGRATING_ENTITIES
     ],
+    ids=[ent_data.old_name for ent_data in TEST_MIGRATING_ENTITIES],
 )
 async def test_async_migrate_entries(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
-    mock_gateway,
     entity_def: dict,
     ent_data: EntityMigrationData,
 ) -> None:
@@ -120,8 +118,18 @@ async def test_async_migrate_entries(
 
     device: dr.DeviceEntry = device_registry.async_get_or_create(
         config_entry_id=mock_config_entry.entry_id,
-        identifiers={(DOMAIN, MOCK_ADAPTER_MAC)},
+        connections={(dr.CONNECTION_NETWORK_MAC, MOCK_ADAPTER_MAC)},
     )
+
+    TEST_EXISTING_ENTRY = {
+        "domain": SENSOR_DOMAIN,
+        "platform": DOMAIN,
+        "unique_id": f"{MOCK_ADAPTER_MAC}_cya",
+        "suggested_object_id": f"{MOCK_ADAPTER_NAME} CYA",
+        "disabled_by": None,
+        "has_entity_name": True,
+        "original_name": "CYA",
+    }
 
     entity_registry.async_get_or_create(
         **TEST_EXISTING_ENTRY, device_id=device.id, config_entry=mock_config_entry
@@ -138,26 +146,15 @@ async def test_async_migrate_entries(
 
     assert entity.unique_id == old_uid
     assert entity.entity_id == old_eid
-    with patch.dict(
-        "homeassistant.components.screenlogic.data.ENTITY_MIGRATIONS",
-        {
-            "missing_device": {
-                "new_key": "state",
-                "old_name": "Missing Migration Device",
-                "new_name": "Bad ENTITY_MIGRATIONS Entry",
-            },
-            "old_sensor": {
-                "new_key": "existing",
-                "old_name": "Old",
-                "new_name": "Existing",
-            },
-        },
-    ), patch(
-        "homeassistant.components.screenlogic.async_discover_gateways_by_unique_id",
+
+    with patch(
+        GATEWAY_DISCOVERY_IMPORT_PATH,
         return_value={},
-    ), patch(
-        "homeassistant.components.screenlogic.ScreenLogicGateway",
-        return_value=mock_gateway,
+    ), patch.multiple(
+        ScreenLogicGateway,
+        async_connect=MIGRATION_CONNECT,
+        is_connected=True,
+        _async_connected_request=DEFAULT,
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
@@ -167,3 +164,73 @@ async def test_async_migrate_entries(
     assert entity_migrated.entity_id == new_eid
     assert entity_migrated.unique_id == new_uid
     assert entity_migrated.original_name == ent_data.new_name
+
+
+async def test_entity_migration_data(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Test ENTITY_MIGRATION data guards."""
+
+    mock_config_entry.add_to_hass(hass)
+
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+
+    device: dr.DeviceEntry = device_registry.async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id,
+        connections={(dr.CONNECTION_NETWORK_MAC, MOCK_ADAPTER_MAC)},
+    )
+
+    TEST_EXISTING_ENTRY = {
+        "domain": SENSOR_DOMAIN,
+        "platform": DOMAIN,
+        "unique_id": f"{MOCK_ADAPTER_MAC}_missing_device",
+        "suggested_object_id": f"{MOCK_ADAPTER_NAME} Missing Migration Device",
+        "disabled_by": None,
+        "has_entity_name": True,
+        "original_name": "EMissing Migration Device",
+    }
+
+    original_entity: er.RegistryEntry = entity_registry.async_get_or_create(
+        **TEST_EXISTING_ENTRY, device_id=device.id, config_entry=mock_config_entry
+    )
+
+    old_eid = original_entity.entity_id
+    old_uid = original_entity.unique_id
+
+    assert old_uid == f"{MOCK_ADAPTER_MAC}_missing_device"
+    assert (
+        old_eid
+        == f"{SENSOR_DOMAIN}.{slugify(f'{MOCK_ADAPTER_NAME} Missing Migration Device')}"
+    )
+
+    # This patch simulates bad data being added to ENTITY_MIGRATIONS
+    with patch.dict(
+        "homeassistant.components.screenlogic.data.ENTITY_MIGRATIONS",
+        {
+            "missing_device": {
+                "new_key": "state",
+                "old_name": "Missing Migration Device",
+                "new_name": "Bad ENTITY_MIGRATIONS Entry",
+            },
+        },
+    ), patch(
+        GATEWAY_DISCOVERY_IMPORT_PATH,
+        return_value={},
+    ), patch.multiple(
+        ScreenLogicGateway,
+        async_connect=MIGRATION_CONNECT,
+        is_connected=True,
+        _async_connected_request=DEFAULT,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    entity_migrated = entity_registry.async_get(
+        slugify(f"{MOCK_ADAPTER_NAME} Bad ENTITY_MIGRATIONS Entry")
+    )
+    assert entity_migrated is None
+
+    entity_not_migrated = entity_registry.async_get(old_eid)
+    assert entity_not_migrated == original_entity
